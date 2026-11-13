@@ -1,6 +1,7 @@
 import path from 'node:path';
 
-export const ROOT = path.resolve(import.meta.dirname, '../..');
+/** JOB_ROOT is injected by the Nuxt/Nitro bundle (import.meta.dirname is wrong after bundling). */
+export const ROOT = process.env.JOB_ROOT || path.resolve(import.meta.dirname, '../..');
 export const DATA_DIR = path.join(ROOT, 'data');
 export const VACANCIES_DIR = path.join(DATA_DIR, 'vacancies');
 export const RUNS_DIR = path.join(DATA_DIR, 'runs');

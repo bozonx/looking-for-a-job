@@ -1,0 +1,15 @@
+import path from 'node:path';
+
+const root = path.resolve(import.meta.dirname, '..');
+
+export default defineNuxtConfig({
+  compatibilityDate: '2026-11-01',
+  srcDir: '.',
+  ssr: false,
+  devtools: { enabled: false },
+  app: { head: { title: 'Вакансии', htmlAttrs: { lang: 'ru' } } },
+  nitro: {
+    replace: { 'process.env.JOB_ROOT': JSON.stringify(root) },
+  },
+  vite: { server: { fs: { allow: [root] } } },
+});
