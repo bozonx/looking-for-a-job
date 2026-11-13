@@ -5,7 +5,7 @@ const { data, refresh } = useFetch<{ items: Row[]; errors: { file: string; error
 const items = computed(() => data.value?.items ?? []);
 
 // ---- filters (remembered per browser) ----
-const defaults = { tab: 'inbox', status: '', minOverall: 0, track: '', source: '', region: '', lang: '', since: '', q: '', sort: 'overall' };
+const defaults = { tab: 'inbox', status: '', minOverall: 0, track: '', source: '', region: '', lang: '', since: '', q: '', sort: 'overall', dir: 'desc' as 'asc' | 'desc' };
 const f = reactive({ ...defaults });
 onMounted(() => {
   try {
@@ -42,13 +42,40 @@ const rows = computed(() => {
     if (q && !`${v.title} ${v.company} ${v.location ?? ''}`.toLowerCase().includes(q)) return false;
     return true;
   });
-  const by: Record<string, (a: Row, b: Row) => number> = {
-    overall: (a, b) => (b.scores?.overall ?? -1) - (a.scores?.overall ?? -1),
-    date: (a, b) => String(b.posted_at ?? b.collected_at).localeCompare(String(a.posted_at ?? a.collected_at)),
-    company: (a, b) => String(a.company).localeCompare(String(b.company)),
+  // Ascending comparators; direction is applied on top. Empty values always go last.
+  const key: Record<string, (v: Row) => string | number | null> = {
+    overall: (v) => v.scores?.overall ?? null,
+    date: (v) => v.posted_at ?? v.collected_at ?? null,
+    company: (v) => v.company ?? null,
+    profile: (v) => v.best_resume ?? null,
+    region: (v) => v.region ?? null,
   };
-  return [...list].sort((a, b) => Number(!!b.starred) - Number(!!a.starred) || by[f.sort]!(a, b));
+  const get = key[f.sort] ?? key.overall!;
+  const sign = f.dir === 'asc' ? 1 : -1;
+  const cmp = (a: Row, b: Row) => {
+    const x = get(a), y = get(b);
+    if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
+    return sign * (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y)));
+  };
+  return [...list].sort((a, b) => Number(!!b.starred) - Number(!!a.starred) || cmp(a, b));
 });
+
+// ---- column sort ----
+const DEFAULT_DIR: Record<string, 'asc' | 'desc'> = { overall: 'desc', date: 'desc' };
+function sortBy(k: string) {
+  if (f.sort === k) f.dir = f.dir === 'asc' ? 'desc' : 'asc';
+  else Object.assign(f, { sort: k, dir: DEFAULT_DIR[k] ?? 'asc' });
+}
+const arrow = (k: string) => (f.sort === k ? (f.dir === 'asc' ? ' ▲' : ' ▼') : '');
+
+// ---- bulk mark for auto-apply (visible rows, except already applied) ----
+const markable = computed(() => rows.value.filter((v) => v.status !== 'applied'));
+const allMarked = computed(() => markable.value.length > 0 && markable.value.every((v) => v.status === 'selected'));
+const someMarked = computed(() => markable.value.some((v) => v.status === 'selected'));
+async function markAll(on: boolean) {
+  const ids = markable.value.filter((v) => (v.status === 'selected') !== on).map((v) => v.id);
+  for (const id of ids) await patch(id, { status: on ? 'selected' : 'new' });
+}
 
 // ---- selection ----
 const current = ref<string | null>(null);
@@ -178,11 +205,14 @@ const tabs = [
           <option v-for="l in uniq('vacancy_language')" :key="l" :value="l">{{ l }}</option>
         </select>
         <label>с <input v-model="f.since" type="date" /></label>
-        <select v-model="f.sort">
-          <option value="overall">↓ overall</option>
-          <option value="date">↓ дата</option>
+        <select :value="f.sort" @change="sortBy(($event.target as HTMLSelectElement).value)">
+          <option value="overall">overall</option>
+          <option value="profile">профиль</option>
+          <option value="date">дата</option>
+          <option value="region">регион</option>
           <option value="company">компания</option>
         </select>
+        <button class="ghost" :title="f.dir === 'asc' ? 'по возрастанию' : 'по убыванию'" @click="f.dir = f.dir === 'asc' ? 'desc' : 'asc'">{{ f.dir === 'asc' ? '▲' : '▼' }}</button>
         <button class="ghost" @click="Object.assign(f, { ...defaults, tab: f.tab })">сброс</button>
       </div>
 
@@ -194,18 +224,42 @@ const tabs = [
         <table>
           <thead>
             <tr>
-              <th>overall</th><th>Вакансия</th><th>регион</th><th>дата</th><th>бейджи</th><th>яз.</th><th>профиль</th><th>статус</th><th>дубли</th>
+              <th class="check">
+                <input
+                  type="checkbox"
+                  title="Отметить / снять все видимые"
+                  :checked="allMarked"
+                  :indeterminate="someMarked && !allMarked"
+                  :disabled="!markable.length"
+                  @change="markAll(($event.target as HTMLInputElement).checked)"
+                />
+              </th>
+              <th class="sortable" @click="sortBy('overall')">overall{{ arrow('overall') }}</th>
+              <th class="sortable" @click="sortBy('profile')">профиль{{ arrow('profile') }}</th>
+              <th class="sortable" @click="sortBy('date')">дата{{ arrow('date') }}</th>
+              <th>Вакансия</th>
+              <th class="sortable" @click="sortBy('region')">регион{{ arrow('region') }}</th><th>бейджи</th><th>яз.</th><th>статус</th><th>дубли</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="v in rows" :key="v.id" :class="{ cur: v.id === current }" @click="current = v.id">
+              <td class="check" @click.stop>
+                <input
+                  type="checkbox"
+                  :checked="v.status === 'selected' || v.status === 'applied'"
+                  :disabled="v.status === 'applied'"
+                  title="Отметить для автоотклика"
+                  @change="patch(v.id, { status: ($event.target as HTMLInputElement).checked ? 'selected' : 'new' })"
+                />
+              </td>
               <td><span class="badge big" :class="tone(v.scores?.overall)">{{ v.scores?.overall ?? '…' }}</span></td>
+              <td>{{ v.best_resume ?? '—' }}</td>
+              <td class="nowrap">{{ (v.posted_at ?? v.collected_at)?.slice(5) }}</td>
               <td class="title">
                 <div><span v-if="v.starred" class="star">★</span>{{ v.title }}</div>
                 <div class="muted small">{{ v.company }}<template v-if="v.stop_flags?.length"> · <span class="flag">⛔ {{ v.stop_flags.join(', ') }}</span></template></div>
               </td>
               <td>{{ v.region ?? '—' }}</td>
-              <td class="nowrap">{{ (v.posted_at ?? v.collected_at)?.slice(5) }}</td>
               <td class="badges">
                 <template v-if="v.scores">
                   <span class="badge" :class="tone(v.scores.remote)" title="remote">R{{ v.scores.remote }}</span>
@@ -216,11 +270,10 @@ const tabs = [
                 </template>
               </td>
               <td>{{ v.vacancy_language ?? '' }}<template v-if="v.work_languages?.length">/{{ v.work_languages.join(',') }}</template></td>
-              <td>{{ v.best_resume ?? '—' }}</td>
               <td><span class="status" :data-s="v.status">{{ STATUS_LABEL[v.status] ?? v.status }}</span></td>
               <td>{{ v.duplicates?.length || '' }}</td>
             </tr>
-            <tr v-if="!rows.length"><td colspan="9" class="muted empty">Пусто</td></tr>
+            <tr v-if="!rows.length"><td colspan="10" class="muted empty">Пусто</td></tr>
           </tbody>
         </table>
       </div>
@@ -272,6 +325,10 @@ tbody tr:hover { background: color-mix(in srgb, var(--cur) 50%, transparent); }
 tr.cur { background: var(--cur) !important; }
 .title { min-width: 220px; }
 .nowrap { white-space: nowrap; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--fg); }
+.check { width: 28px; text-align: center; }
+.check input { cursor: pointer; padding: 0; }
 .badges { white-space: nowrap; }
 .badge { display: inline-block; min-width: 26px; text-align: center; padding: 0 5px; border-radius: 4px; font-size: 12px; font-variant-numeric: tabular-nums; margin-right: 2px; }
 .badge.big { font-size: 14px; font-weight: 600; min-width: 36px; padding: 2px 6px; }
