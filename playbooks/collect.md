@@ -3,7 +3,7 @@
 Сбор двухфазный: **скрипт** забирает список, применяет лимиты, предфильтр и дедупликацию → **агент** скорит
 только новые вакансии. Так агент не тратит токены на рутину.
 
-1. Прочитай `config/preferences.md`, `config/regions.yaml`, `playbooks/scoring.md`, `sources/sources.md`.
+1. Прочитай `config/preferences.md`, `config/regions.yaml`, `playbooks/scoring.md`, `config/sources.md`.
 2. Для каждого источника со статусом ✅ запусти его команду (сейчас: `npm run collect:remoteok`).
    Скрипт сам: применяет лимиты из `.env` (design.md §5.1), предфильтр (`config/prefilter.yaml`),
    дедупликацию (дубли дописываются в `duplicates` существующей записи, `apply_target` пересчитывается),

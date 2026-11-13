@@ -151,5 +151,9 @@ vite.config.ts.timestamp-*
 # looking-for-a-job: personal data & local artifacts
 data/
 profile/*
+!profile/*/
+!profile/**/*.example.md
+profile/*/**/*
+!profile/*/**/
 !profile/**/*.example.md
 *.pdf
