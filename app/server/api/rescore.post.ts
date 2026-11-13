@@ -1,19 +1,21 @@
-/** Recompute scores.overall for all scored vacancies from config/weights.yaml (no LLM). */
-import { computeOverall, loadWeights } from '../../../scripts/lib/scoring.ts';
+/** Recompute derived fields + scores.overall for all scored vacancies (same logic as `npm run rescore`, no LLM). */
+import { loadRescoreCtx, rescoreVacancy } from '../../../scripts/lib/rescore.ts';
 import { parseVacancy, writeVacancy } from '../../../scripts/lib/vacancy.ts';
 
 export default defineEventHandler(() => {
-  const W = loadWeights();
+  const ctx = loadRescoreCtx();
   let n = 0;
+  const failed: { file: string; error: string }[] = [];
   for (const cached of allVacancies()) {
     if (!cached.data.scores) continue;
-    const v = parseVacancy(cached.file);
-    if (!v.data.scores) continue;
-    const { overall, flags } = computeOverall(W, v.data.scores, v.data.stop_flags ?? []);
-    v.data.scores = { ...v.data.scores, overall };
-    v.data.stop_flags = flags;
-    writeVacancy(v.file, v.data, v.body);
-    n++;
+    try {
+      const v = parseVacancy(cached.file);
+      if (!rescoreVacancy(v, ctx)) continue;
+      writeVacancy(v.file, v.data, v.body);
+      n++;
+    } catch (e) {
+      failed.push({ file: relFile(cached.file), error: (e as Error).message });
+    }
   }
-  return { rescored: n, weightsVersion: W.version };
+  return { rescored: n, failed, weightsVersion: ctx.W.version };
 });

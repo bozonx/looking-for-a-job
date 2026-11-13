@@ -1,9 +1,11 @@
 import { z } from 'zod';
-import { STATUSES } from '../../../../scripts/lib/schema.ts';
+
+/** UI may only move a vacancy between these statuses; applied/needs_attention/apply_failed are set by the agent. */
+const UI_STATUSES = ['new', 'selected', 'rejected'] as const;
 
 const Patch = z
   .object({
-    status: z.enum(STATUSES),
+    status: z.enum(UI_STATUSES),
     starred: z.boolean(),
     notes: z.string(),
   })
@@ -12,7 +14,7 @@ const Patch = z
 
 export default defineEventHandler(async (event) => {
   const parsed = Patch.safeParse(await readBody(event));
-  if (!parsed.success) throw createError({ statusCode: 400, message: parsed.error.message });
+  if (!parsed.success) throw createError({ statusCode: 400, statusMessage: 'Invalid patch', message: parsed.error.message });
   const v = patchVacancy(getRouterParam(event, 'id')!, parsed.data);
   if (!v) throw createError({ statusCode: 404, statusMessage: 'Vacancy not found' });
   return { data: v.data };

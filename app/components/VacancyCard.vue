@@ -10,7 +10,14 @@ defineExpose({ refresh });
 const v = computed(() => (full.value as any)?.data);
 const showBody = ref(false);
 const notes = ref('');
-watch(v, (x) => (notes.value = x?.notes ?? ''), { immediate: true });
+// Take server notes unless the user has unsaved edits (the file may be refreshed while typing).
+watch(
+  v,
+  (x, old) => {
+    if (!old || notes.value === (old.notes ?? '')) notes.value = x?.notes ?? '';
+  },
+  { immediate: true },
+);
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 // Vacancy text comes from third-party sites: raw HTML is escaped, links open in a new tab.
@@ -18,6 +25,9 @@ const renderer = new marked.Renderer();
 renderer.html = ({ text }) => escapeHtml(text);
 renderer.link = ({ href, text }) =>
   /^https?:|^mailto:/i.test(href) ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>` : escapeHtml(text);
+// Do not load third-party images (tracking pixels): show them as links instead.
+renderer.image = ({ href, text }) =>
+  /^https?:/i.test(href) ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">[изображение${text ? `: ${escapeHtml(text)}` : ''}]</a>` : '';
 const bodyHtml = computed(() => (full.value ? (marked.parse((full.value as any).body, { renderer, async: false }) as string) : ''));
 
 const scoreRows = computed(() => {
@@ -59,8 +69,8 @@ function saveNotes() {
       </div>
     </header>
 
-    <section v-if="v.status === 'needs_attention' || v.attention_reason" class="attention">
-      <b>Требует внимания: {{ ATTENTION_LABEL[v.attention_reason] ?? v.attention_reason ?? '—' }}</b>
+    <section v-if="v.status === 'needs_attention' || v.status === 'apply_failed'" class="attention">
+      <b>{{ v.status === 'apply_failed' ? 'Ошибка отклика' : 'Требует внимания' }}: {{ ATTENTION_LABEL[v.attention_reason] ?? v.attention_reason ?? '—' }}</b>
       <p v-if="v.attention_details" class="pre">{{ v.attention_details }}</p>
     </section>
 

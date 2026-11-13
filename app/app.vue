@@ -75,23 +75,35 @@ async function patch(id: string, body: Record<string, unknown>) {
     const res = await $fetch<{ data: Row }>(`/api/vacancies/${encodeURIComponent(id)}`, { method: 'PATCH', body });
     const it = items.value.find((v) => v.id === id);
     if (it) Object.assign(it, res.data);
-    card.value?.refresh();
     if (current.value === id && !rows.value.some((v) => v.id === id)) {
       const next = r[i + 1] ?? r[i - 1];
       current.value = next && next.id !== id ? next.id : (rows.value[0]?.id ?? null);
     }
   } catch (e: any) {
-    toast.value = `Ошибка сохранения: ${e?.data?.statusMessage ?? e.message}`;
+    toast.value = `Ошибка сохранения: ${errText(e)}`;
   }
 }
 
+const errText = (e: any) => e?.data?.message ?? e?.data?.statusMessage ?? e?.message ?? String(e);
+
 async function rescore() {
-  const r = await $fetch<{ rescored: number; weightsVersion: number }>('/api/rescore', { method: 'POST' });
-  toast.value = `Пересчитано: ${r.rescored} (weights v${r.weightsVersion})`;
-  await refresh();
-  card.value?.refresh();
+  try {
+    const r = await $fetch<{ rescored: number; failed: { file: string; error: string }[]; weightsVersion: number }>('/api/rescore', { method: 'POST' });
+    toast.value = `Пересчитано: ${r.rescored} (weights v${r.weightsVersion})` + (r.failed.length ? ` · ошибок: ${r.failed.length} — ${r.failed.map((f) => f.error).join('; ')}` : '');
+    await refresh();
+  } catch (e) {
+    toast.value = `Ошибка пересчёта: ${errText(e)}`;
+  }
 }
-watch(toast, (t) => t && setTimeout(() => (toast.value = ''), 3500));
+
+// Refresh the open card whenever its row changes on disk (agent edits, rescore, own patches).
+watch(
+  () => [current.value, JSON.stringify(items.value.find((v) => v.id === current.value) ?? null)] as const,
+  ([id, n], [oldId, o]) => {
+    if (id === oldId && o !== 'null' && n !== o) card.value?.refresh();
+  },
+);
+watch(toast, (t) => t && setTimeout(() => (toast.value = ''), t.length > 80 ? 8000 : 3500));
 
 // Live updates: the server watches files; poll the cheap list endpoint.
 let timer: ReturnType<typeof setInterval>;

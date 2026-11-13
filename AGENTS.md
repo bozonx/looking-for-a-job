@@ -19,4 +19,4 @@
 - После любых правок вакансий — `npm run validate`.
 - Код скриптов — только TypeScript; после изменений — `npm run typecheck`.
 - `data/` и `profile/` — личное, в git не коммитить.
-- UI (`app/`, Nuxt) пишет в front matter только `status`, `starred`, `notes`; остальное — агент/скрипты. UI подхватывает изменения файлов на лету.
+- UI (`app/`, Nuxt) пишет в front matter только `status` (`new`/`selected`/`rejected`), `starred`, `notes`; плюс кнопка rescore — то же, что `npm run rescore`. Остальное — агент/скрипты. UI подхватывает изменения файлов на лету.

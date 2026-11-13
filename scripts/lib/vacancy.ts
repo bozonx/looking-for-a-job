@@ -15,7 +15,7 @@ export function parseVacancy(file: string): VacancyFile {
   const raw = fs.readFileSync(file, 'utf8');
   const m = FM.exec(raw);
   if (!m) throw new Error(`${file}: no front matter`);
-  return { file, data: YAML.parse(m[1]) ?? {}, body: m[2] };
+  return { file, data: YAML.parse(m[1]!) ?? {}, body: m[2] ?? '' };
 }
 
 export function serialize(data: Record<string, any>, body: string): string {
@@ -58,7 +58,7 @@ export function slug(s: string, max = 40): string {
 }
 
 export function vacancyPath(collectedAt: string, source: string, company: string, title: string): string {
-  const [y, m] = collectedAt.split('-');
+  const [y = '', m = ''] = collectedAt.split('-');
   return path.join(VACANCIES_DIR, y, m, `${collectedAt}-${source}-${slug(company, 30)}-${slug(title, 50)}.md`);
 }
 
