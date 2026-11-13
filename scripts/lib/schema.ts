@@ -16,7 +16,7 @@ export const ScoresSchema = z.object({
   outsource: score,
   end_client_corporate: nscore,
   legitimacy: score,
-  region: score,
+  region: nscore.optional(), // считает score.ts из regions.yaml
   language: score,
   fit: z.object(Object.fromEntries(TRACKS.map((t) => [t, score])) as Record<(typeof TRACKS)[number], typeof score>),
   overall: nscore.optional(),

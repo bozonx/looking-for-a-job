@@ -19,7 +19,7 @@
 | `scores.outsource` | наниматель — аутсорс/аутстаф/body-shop/рекрутинговое агентство «our client» |
 | `scores.end_client_corporate` | только при outsource ≥ 50: крупный ли конечный клиент; иначе null |
 | `scores.legitimacy` | реальность компании и вакансии; < 30 = скам |
-| `scores.region` | по `config/regions.yaml` |
+| `scores.region` | не заполняй — `npm run score` проставит из `config/regions.yaml` по полю `region` |
 | `scores.language` | ru/en/es → 100; требуется другой язык → 0–40 |
 | `scores.fit.*` | соответствие каждому треку (design.md §8.3), все пять ключей обязательны |
 | `stop_flags` | office_outside_ar / ru_corporate / inadequate / scam — только при явных признаках |

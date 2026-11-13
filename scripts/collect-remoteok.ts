@@ -10,9 +10,11 @@ import path from 'node:path';
 import YAML from 'yaml';
 import { CONFIG_DIR, env, today } from './lib/env.ts';
 import { loadAll, vacancyPath, writeVacancy } from './lib/vacancy.ts';
-import { buildIndex, findDuplicate, key } from './lib/dedupe.ts';
+import { buildIndex, findDuplicate, key, normUrl } from './lib/dedupe.ts';
 import { htmlToMarkdown } from './lib/html.ts';
 import { appendRunLog } from './lib/runlog.ts';
+import { applyMethodFromUrl, pickApplyTarget } from './lib/target.ts';
+import { SeenStore } from './lib/seen.ts';
 
 const SOURCE = 'remoteok';
 const API = 'https://remoteok.com/api';
@@ -97,21 +99,6 @@ function decode(s = ''): string {
     .trim();
 }
 
-function applyMethod(url: string | null): string {
-  if (!url) return 'unknown';
-  if (url.startsWith('mailto:')) return 'email';
-  const h = (() => {
-    try {
-      return new URL(url).host;
-    } catch {
-      return '';
-    }
-  })();
-  for (const ats of ['greenhouse', 'lever', 'ashby', 'workable', 'smartrecruiters', 'recruitee', 'teamtailor', 'breezy', 'bamboohr', 'personio', 'workday', 'jobvite'])
-    if (h.includes(ats)) return `ats-${ats}`;
-  return 'external';
-}
-
 function employment(tags: string[]): string {
   const t = tags.map((x) => x.toLowerCase());
   if (t.some((x) => x.includes('contract') || x.includes('freelance'))) return 'contract';
@@ -122,7 +109,7 @@ function employment(tags: string[]): string {
 function toVacancy(j: RemoteOkJob) {
   const sourceUrl = j.url || `https://remoteok.com/remote-jobs/${j.slug}`;
   const apply = j.apply_url && !/remoteok\.(com|io)/i.test(j.apply_url) ? j.apply_url : null;
-  const method = applyMethod(apply);
+  const method = applyMethodFromUrl(apply);
   const tags = j.tags ?? [];
   const hasSalary = (j.salary_min ?? 0) > 0 || (j.salary_max ?? 0) > 0;
   const data = {
@@ -135,7 +122,7 @@ function toVacancy(j: RemoteOkJob) {
     real_url: apply && /^https?:/.test(apply) ? apply : null,
     apply_method: method,
     duplicates: [],
-    apply_target: method.startsWith('ats-') ? method : method === 'external' ? 'company-site' : SOURCE,
+    apply_target: null as string | null,
     collected_at: today(),
     posted_at: j.date?.slice(0, 10) ?? null,
     location: decode(j.location) || null,
@@ -164,6 +151,7 @@ function toVacancy(j: RemoteOkJob) {
     apply_log: null,
     scoring_version: null,
   };
+  data.apply_target = pickApplyTarget(data);
   const body =
     `# ${data.title} — ${data.company}\n\n` +
     `Source: [Remote OK](${sourceUrl})${apply ? ` · Apply: ${apply}` : ''}\n\n` +
@@ -177,6 +165,7 @@ async function main() {
   const jobs = (await fetchJobs()).sort((a, b) => b.epoch - a.epoch);
   const all = loadAll();
   const idx = buildIndex(all);
+  const seen = new SeenStore(SOURCE);
   const minEpoch = Date.now() / 1000 - env.COLLECT_MAX_AGE_DAYS * 86400;
 
   const stats = { listed: jobs.length, viewed: 0, prefiltered: 0, duplicates: 0, known: 0, saved: 0 };
@@ -198,7 +187,7 @@ async function main() {
     stats.viewed++;
     const id = `${SOURCE}-${j.id}`;
 
-    if (idx.byId.has(id)) {
+    if (idx.byId.has(id) || seen.has(id)) {
       stats.known++;
       if (++seenStreak >= env.COLLECT_STOP_ON_SEEN) {
         stopReason = `${seenStreak} known in a row`;
@@ -211,6 +200,7 @@ async function main() {
     const f = prefilter(j);
     if (!f.ok) {
       stats.prefiltered++;
+      seen.add(id);
       rejected.push(`- ${decode(j.position)} — ${decode(j.company)} (${f.reason})`);
       continue;
     }
@@ -221,8 +211,11 @@ async function main() {
       stats.duplicates++;
       const d = dup.vacancy.data;
       d.duplicates ??= [];
-      if (!d.duplicates.some((x: any) => x.url === data.source_url) && d.source_url !== data.source_url) {
+      const u = normUrl(data.source_url);
+      if (!d.duplicates.some((x: any) => normUrl(x.url) === u) && normUrl(d.source_url) !== u) {
         d.duplicates.push({ source: SOURCE, url: data.source_url, seen_at: today() });
+        if (data.real_url && !d.real_url) d.real_url = data.real_url;
+        d.apply_target = pickApplyTarget(d);
         if (!dryRun) writeVacancy(dup.vacancy.file, d, dup.vacancy.body);
       }
       dupLines.push(`- ${data.title} — ${data.company} → дубль ${d.id} (по ${dup.by})`);
@@ -244,7 +237,7 @@ async function main() {
     `## ${SOURCE} — ${new Date().toISOString().slice(11, 16)} UTC${dryRun ? ' (dry-run)' : ''}\n\n` +
     `- в ленте: ${stats.listed}, просмотрено: ${stats.viewed}\n` +
     `- отсеяно предфильтром: ${stats.prefiltered}\n` +
-    `- уже известных: ${stats.known}, дублей с других площадок: ${stats.duplicates}\n` +
+    `- уже известных (вкл. отсеянные ранее): ${stats.known}, дублей с других площадок: ${stats.duplicates}\n` +
     `- сохранено новых: ${stats.saved}\n` +
     `- причина остановки: ${stopReason}\n\n` +
     (saved.length ? `### Сохранено (ждут скоринга)\n${saved.map((f) => `- ${rel(f)}`).join('\n')}\n\n` : '') +
@@ -252,11 +245,12 @@ async function main() {
     (rejected.length ? `<details><summary>Отсеяно предфильтром (${rejected.length})</summary>\n\n${rejected.join('\n')}\n\n</details>\n` : '');
 
   if (!dryRun) {
+    seen.save();
     const logFile = appendRunLog('collect', log);
     console.log(`Run log: ${rel(logFile)}`);
   }
   console.log(log.replace(/<details>[\s\S]*<\/details>\n?/, `(отсеяно предфильтром: ${rejected.length}, список — в логе)\n`));
-  if (saved.length && !dryRun) console.log(`NEXT: отскорить ${saved.length} вакансий (npm run pending), затем npm run score && npm run validate`);
+  if (saved.length && !dryRun) console.log(`NEXT: отскорить ${saved.length} вакансий (npm run pending), поискать real_url, затем npm run score && npm run validate; дописать data/insights.md`);
 }
 
 main().catch((e) => {

@@ -16,6 +16,10 @@ export function loadWeights(): Weights {
   return YAML.parse(fs.readFileSync(path.join(CONFIG_DIR, 'weights.yaml'), 'utf8')) as Weights;
 }
 
+export function loadRegions(): Record<string, number> {
+  return YAML.parse(fs.readFileSync(path.join(CONFIG_DIR, 'regions.yaml'), 'utf8')) as Record<string, number>;
+}
+
 export function computeOverall(W: Weights, scores: Record<string, any>, stopFlags: string[]): { overall: number; flags: string[] } {
   const flags = [...new Set(stopFlags ?? [])];
   if (typeof scores.legitimacy === 'number' && scores.legitimacy < W.scam_legitimacy_below && !flags.includes('scam')) flags.push('scam');
