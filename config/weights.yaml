@@ -1,0 +1,24 @@
+# Машиночитаемые веса скоринга (см. config/preferences.md).
+# overall = Σ(w·score) / Σ(w) по всем ненулевым весам, округление до целого.
+# Для "inverse" используется (100 - score): чем выше оценка, тем хуже.
+# fit — берётся максимум по трекам из fit_tracks (вес трека 0 — трек игнорируется).
+version: 1
+positive:
+  remote: 3
+  legitimacy: 2
+  fit: 4
+  region: 1
+  language: 2
+  startup: 1
+inverse:
+  corporate: 2
+  outsource: 0.5
+  end_client_corporate: 0.5     # учитывается только если не null (т.е. для аутсорса)
+fit_tracks:
+  vue: 1
+  react: 1
+  angular: 0.8
+  fullstack: 1
+  ai_engineer: 1
+stop_flags: [office_outside_ar, ru_corporate, inadequate, scam]   # любой → overall = 0
+scam_legitimacy_below: 30                                        # автоматически ставит флаг scam

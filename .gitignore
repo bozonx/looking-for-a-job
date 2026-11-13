@@ -147,3 +147,9 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# looking-for-a-job: personal data & local artifacts
+data/
+profile/*
+!profile/**/*.example.md
+*.pdf

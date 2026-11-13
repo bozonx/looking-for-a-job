@@ -1,0 +1,27 @@
+{
+  "name": "looking-for-a-job",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=23.6"
+  },
+  "scripts": {
+    "collect:remoteok": "node --env-file-if-exists=.env scripts/collect-remoteok.ts",
+    "pending": "node --env-file-if-exists=.env scripts/pending.ts",
+    "dedupe": "node --env-file-if-exists=.env scripts/dedupe.ts",
+    "score": "node --env-file-if-exists=.env scripts/score.ts",
+    "rescore": "node --env-file-if-exists=.env scripts/score.ts --all",
+    "validate": "node --env-file-if-exists=.env scripts/validate.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "turndown": "^7.2.5",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/turndown": "^5.0.6",
+    "typescript": "^7.0.2"
+  }
+}

@@ -1,0 +1,15 @@
+# Куда откликаться при дублях: выше в списке — приоритетнее.
+priority:
+  - company-site
+  - ats-greenhouse
+  - ats-lever
+  - ats-ashby
+  - ats-workable
+  - ats-other
+  - wellfound
+  - getonbrd
+  - hh
+  - remoteok
+  - himalayas
+  - weworkremotely
+  - linkedin

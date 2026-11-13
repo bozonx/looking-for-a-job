@@ -363,7 +363,7 @@ CLEANUP_DEFAULT_DAYS=30
 | Хранилище | markdown + YAML front matter | вакансии вне git |
 | Агент | Claude Code / Codex | вход через `AGENTS.md`; playbook описывает «что сделать», а не конкретные команды конкретного агента |
 | Браузер | встроенный браузер Orca (`orca tab`, `orca snapshot`, `click`, `fill`…) | мои сессии и куки. **Проверено 2026-11-13:** Orca запущен, runtime доступен, вкладка открывается, снапшот страницы читается |
-| Скрипты | Node + TS (`tsx`) | fetch/markdown (`turndown`), дедуп, скоринг, валидация, PDF |
+| Скрипты | Node ≥ 23.6 + TypeScript (нативный запуск `.ts`, `npm run typecheck`) | fetch/markdown (`turndown`), дедуп, скоринг, валидация, PDF |
 | UI | Nuxt + Nitro, `gray-matter`, `chokidar` | всё в памяти |
 | Валидация | `zod`-схема, общая для UI и скриптов | агент запускает `npm run validate` после записи |
 | PDF | Playwright/Chromium `page.pdf()` | ATS-дружественный шаблон |

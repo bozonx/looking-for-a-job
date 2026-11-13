@@ -1,0 +1,76 @@
+# Предфильтр по заголовку/тегам ДО скоринга (дёшево, без LLM).
+# Правило: если заголовок содержит exclude_title → отсеять.
+# Иначе оставить, если заголовок содержит include_title ИЛИ среди тегов есть include_tags.
+# Сравнение регистронезависимое, по подстроке (для коротких слов — по границе слова).
+include_title:
+  - vue
+  - nuxt
+  - react
+  - next.js
+  - angular
+  - frontend
+  - front-end
+  - front end
+  - fullstack
+  - full-stack
+  - full stack
+  - javascript
+  - typescript
+  - node
+  - software engineer
+  - software developer
+  - web developer
+  - web engineer
+  - product engineer
+  - ai engineer
+  - llm
+  - genai
+  - rust
+  - golang
+  - go developer
+  - go engineer
+  - python developer
+  - python engineer
+  - backend engineer
+  - backend developer
+include_tags: [vue, vuejs, nuxt, react, reactjs, angular, javascript, typescript, node, nodejs, frontend, front end, full stack, fullstack, llm, ai, rust, golang]
+exclude_title:
+  - sales
+  - marketing
+  - recruit
+  - account executive
+  - account manager
+  - customer success
+  - customer support
+  - support engineer
+  - designer
+  - copywriter
+  - writer
+  - accountant
+  - finance
+  - legal
+  - hr
+  - android
+  - ios
+  - mobile
+  - qa
+  - test engineer
+  - devops
+  - sre
+  - data analyst
+  - data scientist
+  - "@intern"
+  - java developer
+  - java engineer
+  - .net
+  - c#
+  - php
+  - ruby
+  - salesforce
+  - sap
+  - wordpress
+  - shopify
+  - manager
+  - director
+  - vp
+  - head of
