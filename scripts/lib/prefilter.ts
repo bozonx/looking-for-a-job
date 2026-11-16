@@ -10,11 +10,18 @@ interface PrefilterConfig {
   exclude_title: string[];
 }
 
-/** Короткие «словные» ключи (буквы/цифры/пробелы, любой алфавит) — по началу слова, иначе — подстрокой. */
+/**
+ * Короткие «словные» ключи (буквы/цифры/пробелы, любой алфавит) — по началу слова, иначе — подстрокой.
+ * Суффикс `$` у ключа — ещё и по концу слова: `intern$` ловит «Intern», но не «Internal».
+ */
 function toRe(w: string): RegExp {
-  const word = w.replace(/^@/, '');
+  const whole = w.endsWith('$');
+  const word = w.replace(/^@/, '').replace(/\$$/, '');
   const esc = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return /^[\p{L}\p{N} ]+$/u.test(word) ? new RegExp(`(^|[^\\p{L}\\p{N}])${esc}`, 'iu') : new RegExp(esc, 'iu');
+  const end = whole ? '(?![\\p{L}\\p{N}])' : '';
+  return /^[\p{L}\p{N} ]+$/u.test(word)
+    ? new RegExp(`(^|[^\\p{L}\\p{N}])${esc}${end}`, 'iu')
+    : new RegExp(`${esc}${end}`, 'iu');
 }
 
 export type Prefilter = (title: string, tags: string[]) => { ok: boolean; reason: string };

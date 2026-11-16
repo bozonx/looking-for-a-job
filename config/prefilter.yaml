@@ -1,7 +1,8 @@
 # Предфильтр по заголовку/тегам ДО скоринга (дёшево, без LLM).
 # Правило: если заголовок содержит exclude_title → отсеять.
 # Иначе оставить, если заголовок содержит include_title ИЛИ среди тегов есть include_tags.
-# Сравнение регистронезависимое, по подстроке (для коротких слов — по границе слова).
+# Сравнение регистронезависимое: «словные» ключи — с начала слова (node → nodejs), прочие — подстрокой.
+# Суффикс `$` — ещё и по концу слова (intern$ не ловит Internal).
 include_title:
   - vue
   - nuxt
@@ -33,6 +34,27 @@ include_title:
   - python engineer
   - backend engineer
   - backend developer
+  - ui engineer
+  - ui developer
+  - nestjs
+  - svelte
+  - tauri
+  - electron
+  - founding engineer
+  - member of technical staff
+  - staff engineer
+  - principal engineer
+  - tech lead
+  - application engineer
+  - applications engineer
+  - ai developer
+  - ai-engineer
+  - ai-native
+  - ai native
+  - applied ai
+  - agentic
+  - ai agent
+  - automation engineer
   # русскоязычные площадки (hh.ru и т.п.)
   - разработчик
   - программист
@@ -43,13 +65,12 @@ include_title:
   - фулстек
   - фуллстек
   - инженер-программист
-include_tags: [vue, vuejs, nuxt, react, reactjs, angular, javascript, typescript, node, nodejs, frontend, front end, full stack, fullstack, llm, ai, rust, golang]
+include_tags: [vue, vuejs, nuxt, nuxtjs, react, reactjs, next.js, nextjs, angular, svelte, javascript, typescript, node, nodejs, nestjs, tauri, electron, frontend, front end, full stack, fullstack, llm, ai, ai-native, agents, rust, golang, go, python]
 exclude_title:
   - sales
   - marketing
   - recruit
   - account executive
-  - account manager
   - customer success
   - customer support
   - support engineer
@@ -61,7 +82,6 @@ exclude_title:
   - дизайнер
   - java-разработчик
   - 1с
-  - аккаунт-менеджер
   - техподдерж
   - тестировщик
   - designer
@@ -73,14 +93,25 @@ exclude_title:
   - hr
   - android
   - ios
-  - mobile
   - qa
   - test engineer
-  - devops
   - sre
+  - intern$
+  - internship
+  - стажёр
+  - стажер
+  - стажировка
+  - junior
+  - джуниор
+  - c++
+  - embedded
+  - unity
+  - game developer
+  - solidity
+  - blockchain
+  - 1c
   - data analyst
   - data scientist
-  - "@intern"
   - java developer
   - java engineer
   - .net
