@@ -1,16 +1,17 @@
 import type { VacancyFile } from './vacancy.ts';
+import { translit } from './translit.ts';
 
-const STOP = /\b(remote|senior|sr|junior|jr|middle|mid|lead|staff|principal|the|a|an|and|of|for|with|\(.*?\))\b/g;
+// (после транслитерации: starshiy/veduschiy/mladshiy/udalenno/udalenka — «старший», «ведущий», «младший», «удалённо»)
+const STOP = /\b(remote|senior|sr|junior|jr|middle|mid|lead|staff|principal|the|a|an|and|of|for|with|starshiy|veduschiy|mladshiy|udalenno|udalenka|\(.*?\))\b/g;
 
 export function normCompany(s: string): string {
-  return s
-    .toLowerCase()
+  return translit(s)
     .replace(/\b(inc|llc|ltd|gmbh|corp|corporation|co|s\.?a|s\.?l|limited)\b\.?/g, '')
     .replace(/[^a-z0-9]+/g, '');
 }
 
 export function normTitle(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(STOP, ' ').replace(/\s+/g, ' ').trim();
+  return translit(s).replace(/[^a-z0-9 ]+/g, ' ').replace(STOP, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export function normUrl(u: string): string {

@@ -64,14 +64,14 @@ cp resumes/vue.example.md resumes/vue.md
 Пробный прогон без записи:
 
 ```bash
-npm run collect:remoteok -- --dry-run
+npm run collect -- --dry-run
 ```
 
 Покажет, сколько вакансий в ленте, сколько отсеет предфильтр и сколько было бы сохранено. Если отсеивается слишком много/мало — правьте `config/prefilter.yaml`.
 
 Дальше — скажите агенту **«собери»**. Он выполнит `playbooks/collect.md`: запустит скрипт сбора, отскорит новые вакансии, посчитает итог, проверит схему, допишет журнал наблюдений и выдаст топ.
 
-Для первого раза удобно ограничить объём: `npm run collect:remoteok -- --limit 5`, затем попросить агента «отскорь pending».
+Для первого раза удобно ограничить объём: `npm run collect -- --limit 5`, затем попросить агента «отскорь pending».
 
 ## 5. Просмотр
 
@@ -93,6 +93,6 @@ npm run dev     # http://localhost:3000
 - [ ] резюме в `profile/resumes/` по нужным трекам
 - [ ] `config/preferences.md` и `config/weights.yaml` согласованы и отражают ваши приоритеты
 - [ ] `config/regions.yaml`, `config/prefilter.yaml` проверены
-- [ ] `npm run collect:remoteok -- --dry-run` даёт разумную картину
+- [ ] `npm run collect -- --dry-run` даёт разумную картину
 - [ ] агенту сказано «собери», `npm run validate` без ошибок
 - [ ] `npm run dev` открывается

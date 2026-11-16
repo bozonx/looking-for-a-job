@@ -33,6 +33,16 @@ include_title:
   - python engineer
   - backend engineer
   - backend developer
+  # русскоязычные площадки (hh.ru и т.п.)
+  - разработчик
+  - программист
+  - фронтенд
+  - фронт-энд
+  - бэкенд
+  - бекенд
+  - фулстек
+  - фуллстек
+  - инженер-программист
 include_tags: [vue, vuejs, nuxt, react, reactjs, angular, javascript, typescript, node, nodejs, frontend, front end, full stack, fullstack, llm, ai, rust, golang]
 exclude_title:
   - sales
@@ -43,6 +53,17 @@ exclude_title:
   - customer success
   - customer support
   - support engineer
+  - продаж
+  - маркетолог
+  - рекрутер
+  - менеджер
+  - аналитик
+  - дизайнер
+  - java-разработчик
+  - 1с
+  - аккаунт-менеджер
+  - техподдерж
+  - тестировщик
   - designer
   - copywriter
   - writer

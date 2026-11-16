@@ -6,7 +6,8 @@
     "node": ">=23.6"
   },
   "scripts": {
-    "collect:remoteok": "node --env-file-if-exists=.env scripts/collect-remoteok.ts",
+    "collect": "node --env-file-if-exists=.env scripts/collect.ts",
+    "collect:remoteok": "node --env-file-if-exists=.env scripts/collect.ts remoteok",
     "pending": "node --env-file-if-exists=.env scripts/pending.ts",
     "dedupe": "node --env-file-if-exists=.env scripts/dedupe.ts",
     "score": "node --env-file-if-exists=.env scripts/score.ts",
@@ -14,7 +15,9 @@
     "validate": "node --env-file-if-exists=.env scripts/validate.ts",
     "typecheck": "tsc -p . && nuxi prepare app >/dev/null && tsc -p app/.nuxt/tsconfig.server.json --noEmit && tsc -p app/.nuxt/tsconfig.app.json --noEmit",
     "dev": "nuxt dev app",
-    "ui:build": "nuxt build app"
+    "ui:build": "nuxt build app",
+    "fetch-page": "node --env-file-if-exists=.env scripts/fetch-page.ts",
+    "cleanup": "node --env-file-if-exists=.env scripts/cleanup.ts"
   },
   "dependencies": {
     "chokidar": "^6.0.0",

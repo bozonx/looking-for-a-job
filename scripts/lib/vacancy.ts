@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
 import { VACANCIES_DIR } from './env.ts';
+import { translit } from './translit.ts';
 
 export interface VacancyFile {
   file: string;
@@ -46,10 +47,7 @@ export function loadAll(): VacancyFile[] {
 
 export function slug(s: string, max = 40): string {
   return (
-    s
-      .normalize('NFKD')
-      .replace(/[̀-ͯ]/g, '')
-      .toLowerCase()
+    translit(s)
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, max)
@@ -57,9 +55,11 @@ export function slug(s: string, max = 40): string {
   );
 }
 
-export function vacancyPath(collectedAt: string, source: string, company: string, title: string): string {
+/** Имя файла: <date>-<source>-<company>-<title>[-<extId>].md; extId защищает от совпадения имён. */
+export function vacancyPath(collectedAt: string, source: string, company: string, title: string, extId?: string): string {
   const [y = '', m = ''] = collectedAt.split('-');
-  return path.join(VACANCIES_DIR, y, m, `${collectedAt}-${source}-${slug(company, 30)}-${slug(title, 50)}.md`);
+  const suffix = extId ? `-${slug(extId, 16)}` : '';
+  return path.join(VACANCIES_DIR, y, m, `${collectedAt}-${source}-${slug(company, 30)}-${slug(title, 50)}${suffix}.md`);
 }
 
 /** Resolve CLI args (ids or paths) into files. */

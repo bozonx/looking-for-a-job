@@ -23,27 +23,31 @@
 
 | Команда | Что делает |
 |---|---|
-| `npm run collect:remoteok` | Фаза A сбора с Remote OK: лента → лимиты → предфильтр → дедупликация → новые файлы со `scores: null` → лог в `data/runs/` |
+| `npm run collect` | Фаза A сбора со всех источников (`-- <id>` — с выбранных; `collect:remoteok` — псевдоним): лента → лимиты → предфильтр → дедупликация → новые файлы со `scores: null` → лог в `data/runs/` |
 | `npm run pending` | вакансии, ждущие скоринга агентом (`scores: null` и `status: new`) |
 | `npm run score` | `overall` и производные поля для отскоренных, у которых `overall` ещё не посчитан |
 | `npm run rescore` | то же для **всех** вакансий (`score --all`) — после правки весов/регионов/приоритетов |
 | `npm run validate` | zod-проверка front matter; код выхода 1 при ошибках |
 | `npm run dedupe` | диагностика индекса дублей |
+| `npm run fetch-page -- <url\|file.html> [--out f.md]` | страница → markdown (для HTML-площадок и поиска `real_url`) |
+| `npm run cleanup` | удаление старых вакансий: `--older-than 30d` (по умолчанию `CLEANUP_DEFAULT_DAYS`), `--status rejected,applied`, `--dry-run`; со звездой не трогает |
 | `npm run dev` | UI на http://localhost:3000 |
 | `npm run ui:build` | production-сборка UI в `app/.output/` |
 | `npm run typecheck` | проверка типов скриптов и `.ts`-кода UI (`.vue` не проверяются) |
 
 ### Флаги
 
-**`collect:remoteok`**
+**`collect`**
 
 | Флаг | Смысл |
 |---|---|
 | `--dry-run` | ничего не записывать (ни вакансии, ни лог, ни `seen`) — только показать |
-| `--limit N` | сохранить не более N новых вакансий |
-| `--file path.json` | взять ленту из файла вместо сети (отладка) |
+| `--limit N` | сохранить не более N новых вакансий (на каждый источник) |
+| `--file path.json` | взять ленту из файла вместо сети (отладка; только с одним источником) |
 
-Аргументы npm передаются после `--`: `npm run collect:remoteok -- --dry-run --limit 3`.
+Код выхода: 0 — ок, 1 — у какого-то источника не загрузился список, 2 — неверные аргументы.
+
+Аргументы npm передаются после `--`: `npm run collect -- remoteok --dry-run --limit 3`.
 
 **`pending`** — `--paths`: только пути к файлам.
 
@@ -62,7 +66,7 @@
 Можно пройти конвейер руками — полезно для отладки:
 
 ```bash
-npm run collect:remoteok          # фаза A
+npm run collect                   # фаза A
 npm run pending                   # что нужно отскорить
 # … заполнить поля по playbooks/scoring.md в каждом файле …
 npm run score && npm run validate

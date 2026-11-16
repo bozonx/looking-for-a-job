@@ -18,6 +18,7 @@ export const env = {
   COLLECT_MAX_PAGES: num('COLLECT_MAX_PAGES', 5),
   COLLECT_MAX_AGE_DAYS: num('COLLECT_MAX_AGE_DAYS', 7),
   COLLECT_STOP_ON_SEEN: num('COLLECT_STOP_ON_SEEN', 5),
+  CLEANUP_DEFAULT_DAYS: num('CLEANUP_DEFAULT_DAYS', 30),
 };
 
 export function today(): string {
