@@ -117,6 +117,15 @@ export interface CollectResult {
   source: string;
   saved: number;
   failed: boolean;
+  /** источник пропущен (minIntervalHours) */
+  skipped?: string;
+  stats?: { listed: number; prefiltered: number; duplicates: number; known: number; old: number; saved: number; errors: number };
+  /** строки разделов «Ошибки» и «⚠ Предупреждения» лога (с ведущим «- ») */
+  errors?: string[];
+  warnings?: string[];
+  /** дубли, совпавшие только по компании+названию, — агент сверяет тексты */
+  titleOnlyDups?: string[];
+  stopReason?: string;
 }
 
 async function* pages(p: Provider, opts: CollectOptions, onStop: (r: string) => void): AsyncGenerator<RawJob[]> {
@@ -158,7 +167,7 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
   if (prevAttempt && p.minIntervalHours && startedAt - prevAttempt < p.minIntervalHours * 3600e3) {
     const next = new Date(prevAttempt + p.minIntervalHours * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
     console.log(`## ${SOURCE} — пропущен: площадка просит не чаще раза в ${p.minIntervalHours} ч (следующий сбор после ${next} UTC)\n`);
-    return { source: SOURCE, saved: 0, failed: false };
+    return { source: SOURCE, saved: 0, failed: false, skipped: `не чаще раза в ${p.minIntervalHours} ч, следующий после ${next} UTC` };
   }
 
   // окно сбора: с прошлого полного сбора (+ запас), но не дальше COLLECT_MAX_AGE_DAYS; первый сбор — COLLECT_MAX_AGE_DAYS
@@ -345,5 +354,14 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
     console.log(`Run log: ${rel(appendRunLog('collect', log))}`);
   }
   console.log(log.replace(/<details>[\s\S]*<\/details>\n?/, `(отсеяно предфильтром: ${rejected.length}, список — в логе)\n`));
-  return { source: SOURCE, saved: stats.saved, failed };
+  return {
+    source: SOURCE,
+    saved: stats.saved,
+    failed,
+    stats,
+    errors,
+    warnings,
+    titleOnlyDups: dupLines.filter((l) => l.includes('совпадение только по названию')),
+    stopReason,
+  };
 }
