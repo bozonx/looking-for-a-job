@@ -18,6 +18,10 @@
 | workingnomads | Working Nomads — https://www.workingnomads.com | api (JSON) | удалёнка, последние ~30–50 | ✅ |
 | landingjobs | Landing.jobs — https://landing.jobs | api (JSON, snapshot) | Европа; берутся только удалённые | ✅ |
 | yc | Y Combinator Jobs — https://www.ycombinator.com/jobs | html (JSON в `data-page`, snapshot) | стартапы YC, удалёнка | ✅ |
+| bumeran | Bumeran — https://www.bumeran.com.ar | api (JSON, POST, `x-site-id: BMAR`) | Аргентина: офис/гибрид/удалёнка, IT-рубрика | ✅ |
+| zonajobs | ZonaJobs — https://www.zonajobs.com.ar | api (JSON, та же платформа, `x-site-id: ZJAR`) | Аргентина, свой пул вакансий (не копия Bumeran) | ✅ |
+| computrabajo | Computrabajo — https://ar.computrabajo.com | html + JobPosting на странице вакансии | Аргентина, рубрика «Informática y Telecom» | ✅ |
+| indeed, jooble, talent, empleosit | — | — | Аргентина: 403/капча или нет машиночитаемых данных | ✗ |
 | euremotejobs, dailyremote, remoterocketship, wellfound, startup.jobs, 4dayweek, getmanfred | — | — | Cloudflare/403 или лента без вакансий | ✗ |
 | hh | hh.ru | api | анонимный доступ закрыт (403), нужна регистрация приложения с модерацией | ✗ не подключаем |
 | linkedin | LinkedIn | html (браузер Orca) | — | после стабилизации |
@@ -38,6 +42,9 @@
   вакансии и берёт полный текст из schema.org JobPosting. Хабр: компания — `author`, город и зарплата — из заголовка.
 - **yc** — список с `ycombinator.com/jobs/role/...` (страницы — `yc.pages`), описание — со страницы вакансии.
   Даты нет, только «N months ago» → примерный `posted_at`. Отклик — через аккаунт Work at a Startup.
+- **bumeran, zonajobs** — фильтры `filters` в `config/sources.yaml`; описание — простой текст из выдачи. Компания часто
+  скрыта («Confidencial» / «Importante compañía…») → `company_country: null`. Много объявлений кадровых агентств.
+- **computrabajo** — дата в списке только «Hace N horas»; точная — из JobPosting на странице вакансии (грузится после предфильтра).
 - **landingjobs** — офисные вакансии отсеиваются до предфильтра (кроме `office_countries`).
 - **Склейка внутри источника:** одна роль в нескольких локациях (vuejobs, ats, himalayas) — одна запись, локации через `;`.
 - **Окно сбора и свежесть** — `docs/env.md`: окно у каждого источника от прошлого сбора; в скоринг идут только

@@ -108,6 +108,19 @@ workingnomads:
 landingjobs:
   office_countries: []
 
+# Bumeran / ZonaJobs (Аргентина, одна платформа): фильтры поиска как в URL сайта (/empleos-area-<value>.html).
+bumeran:
+  filters:
+    - { id: area, value: tecnologia-sistemas-y-telecomunicaciones }
+zonajobs:
+  filters:
+    - { id: area, value: tecnologia-sistemas-y-telecomunicaciones }
+
+# Computrabajo (Аргентина): страницы списка ar.computrabajo.com (без домена), пагинация ?p=N.
+computrabajo:
+  pages:
+    - /empleos-de-informatica-y-telecom
+
 # Y Combinator: страницы списка ycombinator.com (без домена). Snapshot: пропала со страницы → possibly_closed.
 yc:
   pages:
@@ -130,6 +143,9 @@ freshness_days:
   nodesk: 7
   getonbrd: 7
   habr: 7
+  bumeran: 7
+  zonajobs: 7
+  computrabajo: 7
   # редкие публикации
   hn: 30             # тред раз в месяц, компании пишут в первые дни
   ats: null
