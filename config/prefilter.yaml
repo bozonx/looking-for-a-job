@@ -123,6 +123,20 @@ exclude_title:
   - java developer
   - java engineer
   - .net
+  # язык в заголовке = нужен коммерческий опыт на нём (его нет); ролевые AI-native вакансии проходят по своим ключам
+  - python developer
+  - python engineer
+  - python backend
+  - python-разработчик
+  - django
+  - golang
+  - go developer
+  - go engineer
+  - go backend
+  - go-разработчик
+  - rust developer
+  - rust engineer
+  - rust-разработчик
   - c#
   - php
   - ruby

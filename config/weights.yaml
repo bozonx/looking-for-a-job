@@ -3,6 +3,7 @@
 # Для "inverse" используется (100 - score): чем выше оценка, тем хуже.
 # fit — берётся максимум по трекам из fit_tracks (вес трека 0 — трек игнорируется).
 version: 1
+# Уровень (senior+) и язык в заголовке отсекает предфильтр (prefilter.yaml); форма занятости на оценку не влияет — весов для них нет.
 positive:
   remote: 3
   legitimacy: 2
@@ -17,8 +18,8 @@ inverse:
 fit_tracks:
   vue: 1
   react: 1
-  angular: 0.8
+  angular: 0.8                  # чуть ниже приоритетом
   fullstack: 1
-  ai_engineer: 1
+  ai_engineer: 1                # ролевые AI-native вакансии; Python/Go/Rust в заголовке → низкий fit (playbooks/scoring.md)
 stop_flags: [office_outside_ar, location_restricted, nationality_excluded, ru_corporate, inadequate, scam]   # любой → overall = 0
 scam_legitimacy_below: 30                                        # автоматически ставит флаг scam

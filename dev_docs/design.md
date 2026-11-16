@@ -335,7 +335,7 @@ new ──▶ selected ──▶ applied
 |---|---|
 | `vue`, `react`, `angular` | фронтенд с явным фреймворком |
 | `fullstack` | фронт + бэк с конкретным стеком |
-| `ai_engineer` | «Software / AI engineer» — современный фулстек без жёсткой привязки к фреймворку, база — Node.js. Сюда же: JavaScript developer, Node.js developer, а также вакансии, где суть — разработка с AI-агентами/LLM и язык вторичен; из других языков рассматриваю **Rust, Python, Go** |
+| `ai_engineer` | «Software / AI engineer» — современный фулстек без жёсткой привязки к фреймворку, база — Node.js. Сюда же: JavaScript developer, Node.js developer, а также вакансии, где суть — сеньор делает продукт целиком с AI-агентами и язык вторичен (AI-native / Product / Founding Engineer). Python, Go, Rust — только когда язык вторичен; если язык в заголовке или нужен коммерческий опыт на нём — fit низкий (опыта нет) |
 
 ### 8.4. Регион и язык
 
