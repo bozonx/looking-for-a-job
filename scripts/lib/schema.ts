@@ -86,7 +86,8 @@ export const VacancySchema = z.object({
   attention_details: z.string().nullable().optional(),
   starred: z.boolean().default(false),
   notes: z.string().default(''),
-  possibly_closed: z.boolean().default(false),
+  possibly_closed: z.boolean().default(false), // нет в снимке ATS (collect) или real_url отвечает «нет вакансии» (check-alive)
+  alive_checked_at: date.nullable().optional(), // когда npm run check-alive последний раз проверял real_url
   applied_at: z.string().nullable().optional(),
   apply_log: z.string().nullable().optional(),
   scoring_version: z.number().int().nullable().optional(),

@@ -82,7 +82,7 @@ function saveNotes() {
     </section>
 
     <section v-if="v.stop_flags?.length" class="stop">Стоп-факторы: {{ v.stop_flags.join(', ') }}</section>
-    <section v-if="v.possibly_closed" class="stop">Возможно, вакансия закрыта</section>
+    <section v-if="v.possibly_closed" class="stop">Возможно, вакансия закрыта<template v-if="v.alive_checked_at"> (проверено {{ v.alive_checked_at }})</template></section>
 
     <section v-if="v.summary">
       <p>{{ v.summary }}</p>

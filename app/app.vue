@@ -5,7 +5,7 @@ const { data, refresh } = useFetch<{ items: Row[]; errors: { file: string; error
 const items = computed(() => data.value?.items ?? []);
 
 // ---- filters (remembered per browser) ----
-const defaults = { tab: 'inbox', status: '', minOverall: 0, track: '', source: '', region: '', lang: '', since: '', q: '', sort: 'overall', dir: 'desc' as 'asc' | 'desc' };
+const defaults = { tab: 'inbox', status: '', minOverall: 0, track: '', source: '', region: '', lang: '', since: '', hideClosed: true, q: '', sort: 'overall', dir: 'desc' as 'asc' | 'desc' };
 const f = reactive({ ...defaults });
 onMounted(() => {
   try {
@@ -38,6 +38,7 @@ const rows = computed(() => {
     if (f.source && v.source !== f.source) return false;
     if (f.region && v.region !== f.region) return false;
     if (f.lang && v.vacancy_language !== f.lang) return false;
+    if (f.hideClosed && v.possibly_closed && f.tab !== 'all') return false;
     if (f.since && String(v.posted_at ?? v.collected_at) < f.since) return false;
     if (q && !`${v.title} ${v.company} ${v.location ?? ''}`.toLowerCase().includes(q)) return false;
     return true;
@@ -205,6 +206,7 @@ const tabs = [
           <option v-for="l in uniq('vacancy_language')" :key="l" :value="l">{{ l }}</option>
         </select>
         <label>с <input v-model="f.since" type="date" /></label>
+        <label title="Скрыть вакансии с пометкой «возможно, закрыта» (на вкладке «все» видны всегда)"><input v-model="f.hideClosed" type="checkbox" /> скрыть закрытые</label>
         <select :value="f.sort" @change="sortBy(($event.target as HTMLSelectElement).value)">
           <option value="overall">overall</option>
           <option value="profile">профиль</option>
@@ -256,7 +258,7 @@ const tabs = [
               <td>{{ v.best_resume ?? '—' }}</td>
               <td class="nowrap">{{ (v.posted_at ?? v.collected_at)?.slice(5) }}</td>
               <td class="title">
-                <div><span v-if="v.starred" class="star">★</span>{{ v.title }}</div>
+                <div><span v-if="v.starred" class="star">★</span><s v-if="v.possibly_closed" title="Возможно, закрыта">{{ v.title }}</s><template v-else>{{ v.title }}</template></div>
                 <div class="muted small">{{ v.company }}<template v-if="v.stop_flags?.length"> · <span class="flag">⛔ {{ v.stop_flags.join(', ') }}</span></template></div>
               </td>
               <td>{{ v.region ?? '—' }}</td>

@@ -19,7 +19,8 @@
     "insights": "node --env-file-if-exists=.env scripts/insights.ts",
     "fetch-page": "node --env-file-if-exists=.env scripts/fetch-page.ts",
     "top": "node --env-file-if-exists=.env scripts/top.ts",
-    "cleanup": "node --env-file-if-exists=.env scripts/cleanup.ts"
+    "cleanup": "node --env-file-if-exists=.env scripts/cleanup.ts",
+    "check-alive": "node --env-file-if-exists=.env scripts/check-alive.ts"
   },
   "dependencies": {
     "chokidar": "^6.0.0",
