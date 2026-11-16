@@ -6,265 +6,289 @@ const items = computed(() => data.value?.items ?? []);
 /** «Новая» = собрана последним запуском `npm run collect` (data/state/last-collect.json). */
 const isFresh = (v: Row) => !!v.collected_run && v.collected_run === data.value?.lastRun;
 
-// ---- filters (remembered per browser) ----
-export interface FilterPreset {
+// ---- вкладки: каждая — сохранённый набор фильтров + сортировка; любые изменения сразу пишутся в localStorage ----
+type SortKey = { key: string; dir: 'asc' | 'desc' };
+/** Период: null — всё время, 'last' — последний сбор, число — за N дней. */
+type Period = number | 'last' | null;
+interface Filters {
+  statuses: string[];
+  minOverall: number;
+  tracks: string[];
+  sources: string[];
+  regions: string[];
+  langs: string[];
+  period: Period;
+  sorts: SortKey[];
+}
+interface View {
   id: string;
   name: string;
-  filters: {
-    tab: string;
-    status: string;
-    minOverall: number;
-    tracks: string[];
-    sources: string[];
-    regions: string[];
-    langs: string[];
-    days: number | null;
-    hideClosed: boolean;
-    sort: string;
-    dir: 'asc' | 'desc';
-  };
+  filters: Filters;
+  /** Исходное состояние: к нему возвращает «сброс». */
+  base: Filters;
+  builtin?: boolean;
 }
 
-const defaults = {
-  tab: 'inbox',
-  status: '',
-  minOverall: 0,
-  tracks: [] as string[],
-  sources: [] as string[],
-  regions: [] as string[],
-  langs: [] as string[],
-  days: null as number | null,
-  hideClosed: true,
-  q: '',
-  sort: 'overall',
-  dir: 'desc' as 'asc' | 'desc',
-};
-const f = reactive({ ...defaults });
-const savedPresets = ref<FilterPreset[]>([]);
-const activePresetId = ref<string | null>(null);
-
-const STANDARD_DAYS = [1, 3, 7, 14, 30, 60, 90] as const;
-const isCustomDays = ref(false);
-
-const daysSelectValue = computed(() => {
-  if (f.days == null || f.days <= 0) return isCustomDays.value ? 'custom' : '';
-  if (STANDARD_DAYS.includes(f.days as any)) return String(f.days);
-  return 'custom';
+const blank = (): Filters => ({
+  statuses: [], minOverall: 0, tracks: [], sources: [], regions: [], langs: [], period: null,
+  sorts: [{ key: 'overall', dir: 'desc' }],
+});
+const clone = (x: Filters): Filters => JSON.parse(JSON.stringify(x));
+const BUILTIN: View[] = (
+  [
+    ['all', 'Все', {}],
+    ['new', 'Новые', { period: 'last' }],
+    ['selected', 'Выбранные', { statuses: ['selected'] }],
+    ['flagged', '⚑ Проблемные', { statuses: ['flagged'] }],
+    ['closed', 'Закрытые', { statuses: ['closed'] }],
+  ] as [string, string, Partial<Filters>][]
+).map(([id, name, p]) => {
+  const fl = { ...blank(), ...p };
+  return { id, name, filters: clone(fl), base: clone(fl), builtin: true };
 });
 
-function onDaysSelectChange(val: string) {
-  if (val === '') {
-    isCustomDays.value = false;
-    f.days = null;
-  } else if (val === 'custom') {
-    isCustomDays.value = true;
-    if (f.days == null || f.days <= 0 || STANDARD_DAYS.includes(f.days as any)) {
-      f.days = 5;
-    }
-  } else {
-    isCustomDays.value = false;
-    f.days = Number(val);
-  }
-}
+/** Статусы + псевдостатусы (пометки). */
+const STATUS_OPTIONS = [
+  { value: 'none', label: 'без решения' },
+  ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label })),
+  { value: 'flagged', label: '⚑ проблемные' },
+  { value: 'closed', label: 'закрытые' },
+];
 
-function normalizeFilters(raw: any) {
-  if (!raw || typeof raw !== 'object') return { ...defaults };
-  const tracks = Array.isArray(raw.tracks)
-    ? raw.tracks
-    : typeof raw.track === 'string' && raw.track
-    ? [raw.track]
+function normFilters(raw: any): Filters {
+  const d = blank();
+  if (!raw || typeof raw !== 'object') return d;
+  const arr = (x: any) => (Array.isArray(x) ? x.filter((s) => typeof s === 'string') : []);
+  const sorts = Array.isArray(raw.sorts)
+    ? raw.sorts.filter((s: any) => s && typeof s.key === 'string' && (s.dir === 'asc' || s.dir === 'desc'))
     : [];
-  const sources = Array.isArray(raw.sources)
-    ? raw.sources
-    : typeof raw.source === 'string' && raw.source
-    ? [raw.source]
-    : [];
-  const regions = Array.isArray(raw.regions)
-    ? raw.regions
-    : typeof raw.region === 'string' && raw.region
-    ? [raw.region]
-    : [];
-  const langs = Array.isArray(raw.langs)
-    ? raw.langs
-    : typeof raw.lang === 'string' && raw.lang
-    ? [raw.lang]
-    : [];
-
-  let days = typeof raw.days === 'number' ? raw.days : null;
-  if (days == null && typeof raw.since === 'string' && raw.since) {
-    const sinceDate = new Date(raw.since);
-    if (!isNaN(sinceDate.getTime())) {
-      const diffMs = Date.now() - sinceDate.getTime();
-      days = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
-    }
-  }
-
   return {
-    tab: typeof raw.tab === 'string' ? raw.tab : defaults.tab,
-    status: typeof raw.status === 'string' ? raw.status : defaults.status,
-    minOverall: typeof raw.minOverall === 'number' ? raw.minOverall : defaults.minOverall,
-    tracks,
-    sources,
-    regions,
-    langs,
-    days,
-    hideClosed: typeof raw.hideClosed === 'boolean' ? raw.hideClosed : defaults.hideClosed,
-    sort: typeof raw.sort === 'string' ? raw.sort : defaults.sort,
-    dir: (raw.dir === 'asc' || raw.dir === 'desc' ? raw.dir : defaults.dir) as 'asc' | 'desc',
-    q: typeof raw.q === 'string' ? raw.q : defaults.q,
+    statuses: arr(raw.statuses),
+    minOverall: typeof raw.minOverall === 'number' ? raw.minOverall : 0,
+    tracks: arr(raw.tracks),
+    sources: arr(raw.sources),
+    regions: arr(raw.regions),
+    langs: arr(raw.langs),
+    period: raw.period === 'last' || typeof raw.period === 'number' ? raw.period : typeof raw.days === 'number' ? raw.days : null,
+    sorts: sorts.length ? sorts : d.sorts,
   };
 }
 
-const activePreset = computed(() => savedPresets.value.find((p) => p.id === activePresetId.value) ?? null);
+const views = ref<View[]>(BUILTIN.map((v) => ({ ...v, filters: clone(v.filters), base: clone(v.base) })));
+const activeId = ref('all');
+const view = computed(() => views.value.find((v) => v.id === activeId.value) ?? views.value[0]!);
+const f = computed(() => view.value.filters);
 
-const isPresetModified = computed(() => {
-  if (!activePreset.value) return false;
-  const p = normalizeFilters(activePreset.value.filters);
-  const arrEqual = (a: string[] = [], b: string[] = []) =>
-    a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i]);
-  return (
-    f.tab !== p.tab ||
-    f.status !== p.status ||
-    f.minOverall !== p.minOverall ||
-    !arrEqual(f.tracks, p.tracks) ||
-    !arrEqual(f.sources, p.sources) ||
-    !arrEqual(f.regions, p.regions) ||
-    !arrEqual(f.langs, p.langs) ||
-    f.days !== p.days ||
-    f.hideClosed !== p.hideClosed ||
-    f.sort !== p.sort ||
-    f.dir !== p.dir
-  );
-});
-
+const LS_VIEWS = 'views_v2';
+const LS_ACTIVE = 'active_view';
+const loaded = ref(false);
 onMounted(() => {
   try {
-    const rawPresets = localStorage.getItem('saved_presets');
-    if (rawPresets) {
-      const parsed = JSON.parse(rawPresets);
-      savedPresets.value = parsed.map((p: any) => ({
-        ...p,
-        filters: normalizeFilters(p.filters),
-      }));
-    }
-    const active = localStorage.getItem('active_preset_id');
-    if (active && savedPresets.value.some((p) => p.id === active)) {
-      activePresetId.value = active;
-    }
-    const rawFilters = localStorage.getItem('filters');
-    if (rawFilters) {
-      const norm = normalizeFilters(JSON.parse(rawFilters));
-      Object.assign(f, norm);
-      if (norm.days && !STANDARD_DAYS.includes(norm.days as any)) {
-        isCustomDays.value = true;
+    const raw = localStorage.getItem(LS_VIEWS);
+    if (raw) {
+      const saved: any[] = JSON.parse(raw);
+      const out: View[] = [];
+      for (const b of BUILTIN) {
+        const s = saved.find((x) => x.id === b.id);
+        out.push({ ...b, name: typeof s?.name === 'string' ? s.name : b.name, filters: s ? normFilters(s.filters) : clone(b.filters), base: clone(b.base) });
+      }
+      for (const s of saved) {
+        if (BUILTIN.some((b) => b.id === s.id) || typeof s.id !== 'string') continue;
+        out.push({ id: s.id, name: String(s.name ?? 'вкладка'), filters: normFilters(s.filters), base: normFilters(s.base ?? s.filters) });
+      }
+      // порядок как сохранён
+      out.sort((a, b) => saved.findIndex((x) => x.id === a.id) - saved.findIndex((x) => x.id === b.id));
+      views.value = out;
+    } else {
+      // миграция старых сохранённых фильтров
+      const old = JSON.parse(localStorage.getItem('saved_presets') ?? '[]');
+      for (const p of Array.isArray(old) ? old : []) {
+        const fl = normFilters(p.filters);
+        views.value.push({ id: String(p.id), name: String(p.name), filters: fl, base: clone(fl) });
       }
     }
+    const a = localStorage.getItem(LS_ACTIVE);
+    if (a && views.value.some((v) => v.id === a)) activeId.value = a;
+  } catch {}
+  loaded.value = true;
+});
+watch(
+  views,
+  (v) => {
+    if (!loaded.value) return;
+    try {
+      localStorage.setItem(LS_VIEWS, JSON.stringify(v.map(({ id, name, filters, base }) => ({ id, name, filters, base }))));
+    } catch {}
+  },
+  { deep: true },
+);
+watch(activeId, (id) => {
+  try {
+    localStorage.setItem(LS_ACTIVE, id);
   } catch {}
 });
 
-function persistPresets() {
-  try {
-    localStorage.setItem('saved_presets', JSON.stringify(savedPresets.value));
-  } catch {}
+const isModified = computed(() => JSON.stringify(f.value) !== JSON.stringify(view.value.base));
+function resetView() {
+  view.value.filters = clone(view.value.base);
+}
+function addView() {
+  const name = prompt('Название вкладки (текущие фильтры будут скопированы):')?.trim();
+  if (!name) return;
+  const fl = clone(f.value);
+  const v: View = { id: 'v_' + Date.now(), name, filters: fl, base: clone(fl) };
+  views.value.push(v);
+  activeId.value = v.id;
+}
+function renameView(v: View) {
+  const name = prompt('Новое название вкладки:', v.name)?.trim();
+  if (name) v.name = name;
+}
+function deleteView(v: View) {
+  if (v.builtin || !confirm(`Удалить вкладку «${v.name}»?`)) return;
+  views.value = views.value.filter((x) => x.id !== v.id);
+  if (activeId.value === v.id) activeId.value = 'all';
+}
+/** Зафиксировать текущие фильтры как исходные для вкладки (для «сброса»). */
+function commitView() {
+  view.value.base = clone(f.value);
+  toast.value = `Вкладка «${view.value.name}»: текущие фильтры стали исходными`;
 }
 
-watch(f, () => {
-  try {
-    localStorage.setItem('filters', JSON.stringify(f));
-  } catch {}
+// ---- период ----
+const STANDARD_DAYS = [1, 3, 7, 14, 30, 60, 90];
+const customDays = ref(false);
+const periodValue = computed(() => {
+  const p = f.value.period;
+  if (p === 'last') return 'last';
+  if (p == null) return customDays.value ? 'custom' : '';
+  return STANDARD_DAYS.includes(p) && !customDays.value ? String(p) : 'custom';
+});
+function onPeriod(val: string) {
+  customDays.value = val === 'custom';
+  if (val === '') f.value.period = null;
+  else if (val === 'last') f.value.period = 'last';
+  else if (val === 'custom') f.value.period = typeof f.value.period === 'number' ? f.value.period : 5;
+  else f.value.period = Number(val);
+}
+watch(activeId, () => {
+  const p = f.value.period;
+  customDays.value = typeof p === 'number' && !STANDARD_DAYS.includes(p);
 });
 
-watch(activePresetId, (val) => {
-  try {
-    if (val) localStorage.setItem('active_preset_id', val);
-    else localStorage.removeItem('active_preset_id');
-  } catch {}
-});
-
+// ---- фильтрация ----
 const uniq = (k: string) => [...new Set(items.value.map((v) => v[k]).filter(Boolean))].sort();
-const counts = computed(() => ({
-  inbox: items.value.filter(isFresh).length,
-  flagged: items.value.filter((v) => v.flagged).length,
-  closed: items.value.filter((v) => v.possibly_closed).length,
-  attention: items.value.filter((v) => v.status === 'needs_attention' || v.status === 'apply_failed').length,
-  selected: items.value.filter((v) => v.status === 'selected').length,
-  all: items.value.length,
-}));
 
-function getCutoffDate(days: number): string {
+function cutoff(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function matchRow(v: Row, filter: typeof defaults, q: string) {
-  if (filter.tab === 'inbox' && !isFresh(v)) return false;
-  if (filter.tab === 'flagged' && !v.flagged) return false;
-  if (filter.tab === 'closed' && !v.possibly_closed) return false;
-  if (filter.tab === 'attention' && v.status !== 'needs_attention' && v.status !== 'apply_failed') return false;
-  if (filter.tab === 'selected' && v.status !== 'selected') return false;
-  if (filter.tab === 'all' && filter.status && (v.status ?? 'none') !== filter.status) return false;
-  if (filter.minOverall && (v.scores?.overall ?? 0) < filter.minOverall) return false;
-  if (filter.tracks?.length) {
-    const hasTrack = filter.tracks.includes(v.best_resume) ||
-      (v.role_tracks ?? []).some((t: string) => filter.tracks.includes(t));
-    if (!hasTrack) return false;
+/**
+ * Статусы: выбранные значения объединяются через ИЛИ.
+ * Закрытые видны, только если выбрано «закрытые»; «закрытые» в одиночку — только закрытые.
+ */
+function matchStatus(v: Row, sel: string[]) {
+  const rest = sel.filter((s) => s !== 'closed');
+  const withClosed = rest.length < sel.length;
+  if (v.possibly_closed && !withClosed) return false;
+  if (!rest.length) return !!v.possibly_closed || !withClosed;
+  return rest.includes(v.status ?? 'none') || (rest.includes('flagged') && !!v.flagged);
+}
+
+function matchRow(v: Row, fl: Filters) {
+  if (!matchStatus(v, fl.statuses)) return false;
+  if (fl.minOverall && (v.scores?.overall ?? 0) < fl.minOverall) return false;
+  if (fl.tracks.length && !fl.tracks.includes(v.best_resume) && !(v.role_tracks ?? []).some((t: string) => fl.tracks.includes(t))) return false;
+  if (fl.sources.length && !fl.sources.includes(v.source)) return false;
+  if (fl.regions.length && !fl.regions.includes(v.region)) return false;
+  if (fl.langs.length && !fl.langs.includes(v.vacancy_language)) return false;
+  if (fl.period === 'last' && !isFresh(v)) return false;
+  if (typeof fl.period === 'number' && fl.period > 0) {
+    const d = v.posted_at ?? v.collected_at;
+    if (!d || String(d).slice(0, 10) < cutoff(fl.period)) return false;
   }
-  if (filter.sources?.length && !filter.sources.includes(v.source)) return false;
-  if (filter.regions?.length && !filter.regions.includes(v.region)) return false;
-  if (filter.langs?.length && !filter.langs.includes(v.vacancy_language)) return false;
-  if (filter.hideClosed && v.possibly_closed && filter.tab !== 'all' && filter.tab !== 'closed') return false;
-  if (filter.days != null && filter.days > 0) {
-    const vDate = v.posted_at ?? v.collected_at;
-    if (!vDate) return false;
-    const cutoff = getCutoffDate(filter.days);
-    if (String(vDate).slice(0, 10) < cutoff) return false;
-  }
-  if (q && !`${v.title} ${v.company} ${v.location ?? ''}`.toLowerCase().includes(q)) return false;
   return true;
 }
 
-const presetCounts = computed(() => {
-  const res: Record<string, number> = {};
-  for (const p of savedPresets.value) {
-    res[p.id] = items.value.filter((v) => matchRow(v, { ...defaults, ...normalizeFilters(p.filters) }, '')).length;
-  }
-  return res;
+// поиск — быстрый, внутри вкладки, не сохраняется
+const q = ref('');
+const matchQ = (v: Row, s: string) => !s || `${v.title} ${v.company} ${v.location ?? ''}`.toLowerCase().includes(s);
+
+const viewCounts = computed(() => Object.fromEntries(views.value.map((v) => [v.id, items.value.filter((r) => matchRow(r, v.filters)).length])));
+
+const inView = computed(() => items.value.filter((v) => matchRow(v, f.value)));
+const outsideHits = computed(() => {
+  const s = q.value.trim().toLowerCase();
+  if (!s) return 0;
+  return items.value.filter((v) => matchQ(v, s)).length - inView.value.filter((v) => matchQ(v, s)).length;
 });
+function searchEverywhere() {
+  activeId.value = 'all';
+  const all = views.value.find((v) => v.id === 'all')!;
+  all.filters = { ...blank(), statuses: ['none', ...Object.keys(STATUS_LABEL), 'closed'], sorts: all.filters.sorts };
+}
+
+// ---- сортировка: клик по заголовку; Shift+клик — дополнительный ключ ----
+const SORT_GET: Record<string, (v: Row) => string | number | null> = {
+  overall: (v) => v.scores?.overall ?? null,
+  date: (v) => v.posted_at ?? v.collected_at ?? null,
+  company: (v) => v.company ?? null,
+  profile: (v) => v.best_resume ?? null,
+  region: (v) => v.region ?? null,
+  remote: (v) => v.scores?.remote ?? null,
+  startup: (v) => v.scores?.startup ?? null,
+  corporate: (v) => v.scores?.corporate ?? null,
+  outsource: (v) => v.scores?.outsource ?? null,
+  legitimacy: (v) => v.scores?.legitimacy ?? null,
+};
+const ASC_FIRST = new Set(['company', 'profile', 'region', 'corporate', 'outsource']);
 
 const rows = computed(() => {
-  const q = f.q.trim().toLowerCase();
-  const list = items.value.filter((v) => matchRow(v, f, q));
-  // Ascending comparators; direction is applied on top. Empty values always go last.
-  const key: Record<string, (v: Row) => string | number | null> = {
-    overall: (v) => v.scores?.overall ?? null,
-    date: (v) => v.posted_at ?? v.collected_at ?? null,
-    company: (v) => v.company ?? null,
-    profile: (v) => v.best_resume ?? null,
-    region: (v) => v.region ?? null,
-  };
-  const get = key[f.sort] ?? key.overall!;
-  const sign = f.dir === 'asc' ? 1 : -1;
-  const cmp = (a: Row, b: Row) => {
+  const s = q.value.trim().toLowerCase();
+  const list = inView.value.filter((v) => matchQ(v, s));
+  const cmp1 = (a: Row, b: Row, { key, dir }: SortKey) => {
+    const get = SORT_GET[key];
+    if (!get) return 0;
     const x = get(a), y = get(b);
-    if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;
+    if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1; // пустые всегда в конце
+    const sign = dir === 'asc' ? 1 : -1;
     return sign * (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y)));
   };
-  return [...list].sort((a, b) => Number(!!b.starred) - Number(!!a.starred) || cmp(a, b));
+  return [...list].sort((a, b) => {
+    const st = Number(!!b.starred) - Number(!!a.starred);
+    if (st) return st;
+    for (const k of f.value.sorts) {
+      const c = cmp1(a, b, k);
+      if (c) return c;
+    }
+    return 0;
+  });
 });
 
-// ---- column sort ----
-const DEFAULT_DIR: Record<string, 'asc' | 'desc'> = { overall: 'desc', date: 'desc' };
-function sortBy(k: string) {
-  if (f.sort === k) f.dir = f.dir === 'asc' ? 'desc' : 'asc';
-  else Object.assign(f, { sort: k, dir: DEFAULT_DIR[k] ?? 'asc' });
+function sortBy(key: string, e: MouseEvent) {
+  const sorts = f.value.sorts;
+  const i = sorts.findIndex((s) => s.key === key);
+  const flip = (s: SortKey) => (s.dir = s.dir === 'asc' ? 'desc' : 'asc');
+  if (e.shiftKey) {
+    if (i < 0) sorts.push({ key, dir: ASC_FIRST.has(key) ? 'asc' : 'desc' });
+    else if (sorts.length > 1 && sorts[i]!.dir === (ASC_FIRST.has(key) ? 'desc' : 'asc')) sorts.splice(i, 1); // третий клик — убрать ключ
+    else flip(sorts[i]!);
+  } else if (i === 0 && sorts.length === 1) flip(sorts[0]!);
+  else f.value.sorts = [{ key, dir: ASC_FIRST.has(key) ? 'asc' : 'desc' }];
 }
-const arrow = (k: string) => (f.sort === k ? (f.dir === 'asc' ? ' ▲' : ' ▼') : '');
+function sortMark(key: string) {
+  const i = f.value.sorts.findIndex((s) => s.key === key);
+  if (i < 0) return { arrow: '', n: '' };
+  return { arrow: f.value.sorts[i]!.dir === 'asc' ? '▲' : '▼', n: f.value.sorts.length > 1 ? String(i + 1) : '' };
+}
+const SORT_HINT = 'Клик — сортировать, Shift+клик — добавить ключ сортировки';
+const SCORE_COLS = [
+  ['remote', 'R'], ['startup', 'S'], ['corporate', 'C'], ['outsource', 'O'], ['legitimacy', 'L'],
+] as const;
 
-// ---- bulk mark for auto-apply (visible rows, except already applied) ----
+// ---- массовая отметка для автоотклика (видимые строки, кроме уже откликнутых) ----
 const markable = computed(() => rows.value.filter((v) => v.status !== 'applied'));
 const allMarked = computed(() => markable.value.length > 0 && markable.value.every((v) => v.status === 'selected'));
 const someMarked = computed(() => markable.value.some((v) => v.status === 'selected'));
@@ -273,7 +297,7 @@ async function markAll(on: boolean) {
   for (const id of ids) await patch(id, { status: on ? 'selected' : null });
 }
 
-// ---- selection ----
+// ---- текущая вакансия ----
 const current = ref<string | null>(null);
 watch(rows, (r) => {
   if (!r.length) current.value = null;
@@ -291,7 +315,7 @@ function move(d: number) {
 
 const toast = ref('');
 async function patch(id: string, body: Record<string, unknown>) {
-  // When a row leaves the current list, move to its neighbour instead of jumping to the top.
+  // Если строка уходит из списка — переходим к соседней, а не в начало.
   const r = rows.value;
   const i = r.findIndex((v) => v.id === id);
   try {
@@ -314,7 +338,7 @@ const errText = (e: any) => e?.data?.message ?? e?.data?.statusMessage ?? e?.mes
 async function rescore() {
   try {
     const r = await $fetch<{ rescored: number; failed: { file: string; error: string }[]; weightsVersion: number }>('/api/rescore', { method: 'POST' });
-    toast.value = `Пересчитано: ${r.rescored} (weights v${r.weightsVersion})` + (r.failed.length ? ` · ошибок: ${r.failed.length} — ${r.failed.map((f) => f.error).join('; ')}` : '');
+    toast.value = `Пересчитано: ${r.rescored} (weights v${r.weightsVersion})` + (r.failed.length ? ` · ошибок: ${r.failed.length} — ${r.failed.map((x) => x.error).join('; ')}` : '');
     await refresh();
   } catch (e) {
     toast.value = `Ошибка пересчёта: ${errText(e)}`;
@@ -352,7 +376,7 @@ async function checkAlive(e: MouseEvent) {
 onMounted(pollAlive);
 onUnmounted(() => aliveTimer && clearInterval(aliveTimer));
 
-// Refresh the open card whenever its row changes on disk (agent edits, rescore, own patches).
+// Обновить открытую карточку, когда её строка изменилась на диске (агент, rescore, свои правки).
 watch(
   () => [current.value, JSON.stringify(items.value.find((v) => v.id === current.value) ?? null)] as const,
   ([id, n], [oldId, o]) => {
@@ -361,19 +385,12 @@ watch(
 );
 watch(toast, (t) => t && setTimeout(() => (toast.value = ''), t.length > 80 ? 8000 : 3500));
 
-// Live updates: the server watches files; poll the cheap list endpoint.
+// Живые обновления: сервер следит за файлами, клиент опрашивает дешёвый список.
 let timer: ReturnType<typeof setInterval>;
 onMounted(() => (timer = setInterval(() => document.visibilityState === 'visible' && refresh(), 5000)));
 onUnmounted(() => clearInterval(timer));
 
 function onKey(e: KeyboardEvent) {
-  if (showSaveDialog.value || presetToDelete.value) {
-    if (e.key === 'Escape') {
-      showSaveDialog.value = false;
-      presetToDelete.value = null;
-    }
-    return;
-  }
   const t = e.target as HTMLElement;
   if (e.ctrlKey || e.metaKey || e.altKey || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return;
   const id = current.value;
@@ -397,237 +414,25 @@ function onKey(e: KeyboardEvent) {
 }
 onMounted(() => window.addEventListener('keydown', onKey));
 onUnmounted(() => window.removeEventListener('keydown', onKey));
-
-const tabs = [
-  ['inbox', 'Новые'],
-  ['flagged', 'Проблемные'],
-  ['closed', 'Закрытые'],
-  ['attention', 'Требуют внимания'],
-  ['selected', 'Выбранные'],
-  ['all', 'Все'],
-] as const;
-
-function selectSystemTab(tabKey: string) {
-  activePresetId.value = null;
-  f.tab = tabKey;
-}
-
-function selectPreset(preset: FilterPreset) {
-  activePresetId.value = preset.id;
-  const p = normalizeFilters(preset.filters);
-  Object.assign(f, {
-    tab: p.tab,
-    status: p.status,
-    minOverall: p.minOverall,
-    tracks: [...p.tracks],
-    sources: [...p.sources],
-    regions: [...p.regions],
-    langs: [...p.langs],
-    days: p.days,
-    hideClosed: p.hideClosed,
-    sort: p.sort,
-    dir: p.dir,
-  });
-  if (p.days && !STANDARD_DAYS.includes(p.days as any)) {
-    isCustomDays.value = true;
-  } else {
-    isCustomDays.value = false;
-  }
-}
-
-function updateActivePreset() {
-  if (!activePreset.value) return;
-  activePreset.value.filters = {
-    tab: f.tab,
-    status: f.status,
-    minOverall: f.minOverall,
-    tracks: [...f.tracks],
-    sources: [...f.sources],
-    regions: [...f.regions],
-    langs: [...f.langs],
-    days: f.days,
-    hideClosed: f.hideClosed,
-    sort: f.sort,
-    dir: f.dir,
-  };
-  persistPresets();
-  toast.value = `Фильтр «${activePreset.value.name}» обновлён`;
-}
-
-function revertActivePreset() {
-  if (!activePreset.value) return;
-  selectPreset(activePreset.value);
-}
-
-function resetFilters() {
-  if (activePresetId.value) {
-    activePresetId.value = null;
-  }
-  isCustomDays.value = false;
-  Object.assign(f, {
-    ...defaults,
-    tracks: [],
-    sources: [],
-    regions: [],
-    langs: [],
-    tab: f.tab,
-  });
-}
-
-// ---- Modal: Save Filter ----
-const showSaveDialog = ref(false);
-const newPresetName = ref('');
-
-function openSaveDialog() {
-  newPresetName.value = '';
-  showSaveDialog.value = true;
-  nextTick(() => {
-    (document.getElementById('preset-name-input') as HTMLInputElement)?.focus();
-  });
-}
-
-function savePreset() {
-  const name = newPresetName.value.trim();
-  if (!name) return;
-  const newPreset: FilterPreset = {
-    id: 'preset_' + Date.now(),
-    name,
-    filters: {
-      tab: f.tab,
-      status: f.status,
-      minOverall: f.minOverall,
-      tracks: [...f.tracks],
-      sources: [...f.sources],
-      regions: [...f.regions],
-      langs: [...f.langs],
-      days: f.days,
-      hideClosed: f.hideClosed,
-      sort: f.sort,
-      dir: f.dir,
-    },
-  };
-  savedPresets.value.push(newPreset);
-  persistPresets();
-  activePresetId.value = newPreset.id;
-  showSaveDialog.value = false;
-  toast.value = `Фильтр «${newPreset.name}» сохранён`;
-}
-
-// ---- Modal: Delete Filter ----
-const presetToDelete = ref<FilterPreset | null>(null);
-
-function confirmDeletePreset(preset: FilterPreset) {
-  presetToDelete.value = preset;
-}
-
-function executeDeletePreset() {
-  if (!presetToDelete.value) return;
-  const target = presetToDelete.value;
-  savedPresets.value = savedPresets.value.filter((p) => p.id !== target.id);
-  persistPresets();
-  if (activePresetId.value === target.id) {
-    activePresetId.value = null;
-    f.tab = 'inbox';
-  }
-  presetToDelete.value = null;
-  toast.value = `Фильтр «${target.name}» удалён`;
-}
-
-function pluralDays(n: number): string {
-  const abs = Math.abs(n) % 100;
-  const rem = abs % 10;
-  if (abs > 10 && abs < 20) return 'дней';
-  if (rem > 1 && rem < 5) return 'дня';
-  if (rem === 1) return 'день';
-  return 'дней';
-}
-
-function getFilterTags(filters: FilterPreset['filters']): string[] {
-  const norm = normalizeFilters(filters);
-  const tags: string[] = [];
-  if (norm.tab && norm.tab !== 'all') {
-    const t = tabs.find(([k]) => k === norm.tab);
-    if (t) tags.push(`вкладка: ${t[1]}`);
-  }
-  if (norm.tab === 'all' && norm.status) {
-    tags.push(`статус: ${STATUS_LABEL[norm.status] ?? norm.status}`);
-  }
-  if (norm.minOverall > 0) tags.push(`overall ≥ ${norm.minOverall}`);
-  if (norm.tracks.length) tags.push(`профиль: ${norm.tracks.join(', ')}`);
-  if (norm.sources.length) tags.push(`источник: ${norm.sources.join(', ')}`);
-  if (norm.regions.length) tags.push(`регион: ${norm.regions.join(', ')}`);
-  if (norm.langs.length) tags.push(`язык: ${norm.langs.join(', ')}`);
-  if (norm.days != null && norm.days > 0) {
-    tags.push(`за ${norm.days} ${pluralDays(norm.days)}`);
-  }
-  if (!norm.hideClosed) tags.push(`включая закрытые`);
-  if (norm.sort !== 'overall' || norm.dir !== 'desc') {
-    tags.push(`сортировка: ${norm.sort} ${norm.dir}`);
-  }
-  return tags.length ? tags : ['без ограничений'];
-}
-
-const currentFilterTags = computed(() =>
-  getFilterTags({
-    tab: f.tab,
-    status: f.status,
-    minOverall: f.minOverall,
-    tracks: [...f.tracks],
-    sources: [...f.sources],
-    regions: [...f.regions],
-    langs: [...f.langs],
-    days: f.days,
-    hideClosed: f.hideClosed,
-    sort: f.sort,
-    dir: f.dir,
-  }),
-);
 </script>
 
 <template>
   <div class="layout">
     <aside class="list">
       <nav class="tabs">
-        <div class="tabs-group">
-          <button
-            v-for="[k, l] in tabs"
-            :key="k"
-            :class="{ on: !activePresetId && f.tab === k }"
-            @click="selectSystemTab(k)"
-          >
-            {{ l }} <small>{{ counts[k] }}</small>
-          </button>
-        </div>
-
-        <div v-if="savedPresets.length" class="tabs-divider" />
-
-        <div v-if="savedPresets.length" class="tabs-group presets-group">
-          <div
-            v-for="p in savedPresets"
-            :key="p.id"
-            class="preset-tab"
-            :class="{ on: activePresetId === p.id }"
-            :title="getFilterTags(p.filters).join(' · ')"
-            @click="selectPreset(p)"
-          >
-            <span class="preset-name">
-              <span v-if="activePresetId === p.id && isPresetModified" class="mod-dot" title="Фильтр изменён">●</span>
-              {{ p.name }}
-            </span>
-            <small>{{ presetCounts[p.id] ?? 0 }}</small>
-            <button
-              type="button"
-              class="preset-del"
-              title="Удалить сохранённый фильтр"
-              @click.stop="confirmDeletePreset(p)"
-            >×</button>
-          </div>
-        </div>
-
-        <button class="ghost save-btn" title="Сохранить текущие фильтры как вкладку" @click="openSaveDialog">
-          + Сохранить фильтр
+        <button
+          v-for="v in views"
+          :key="v.id"
+          class="tab"
+          :class="{ on: v.id === activeId }"
+          :title="v.builtin ? 'Двойной клик — переименовать' : 'Двойной клик — переименовать'"
+          @click="activeId = v.id"
+          @dblclick="renameView(v)"
+        >
+          {{ v.name }} <small>{{ viewCounts[v.id] ?? 0 }}</small>
+          <span v-if="!v.builtin" class="tab-del" title="Удалить вкладку" @click.stop="deleteView(v)">×</span>
         </button>
-
+        <button class="ghost add" title="Новая вкладка из текущих фильтров" @click="addView">+</button>
         <span class="spacer" />
         <button
           class="ghost"
@@ -639,75 +444,46 @@ const currentFilterTags = computed(() =>
       </nav>
 
       <div class="filters">
-        <input
-          id="q"
-          v-model="f.q"
-          :placeholder="activePreset ? `Поиск в «${activePreset.name}»... /` : 'Поиск  /'"
-          @keydown.esc="($event.target as HTMLInputElement).blur()"
-        />
-        <select v-if="f.tab === 'all'" v-model="f.status">
-          <option value="">статус: все</option>
-          <option value="none">без решения</option>
-          <option v-for="(l, s) in STATUS_LABEL" :key="s" :value="s">{{ l }}</option>
-        </select>
-        <label>overall ≥ <input v-model.number="f.minOverall" type="number" min="0" max="100" step="5" class="num" /></label>
-        <MultiSelect
-          v-model="f.tracks"
-          title="профиль"
-          :options="TRACKS"
-        />
-        <MultiSelect
-          v-model="f.sources"
-          title="источник"
-          :options="uniq('source')"
-        />
-        <MultiSelect
-          v-model="f.regions"
-          title="регион"
-          :options="REGIONS"
-        />
-        <MultiSelect
-          v-model="f.langs"
-          title="язык"
-          :options="uniq('vacancy_language')"
-        />
-        <select :value="daysSelectValue" @change="onDaysSelectChange(($event.target as HTMLSelectElement).value)">
-          <option value="">период: все</option>
-          <option value="1">за 1 день</option>
-          <option value="3">за 3 дня</option>
-          <option value="7">за 7 дней</option>
-          <option value="14">за 14 дней</option>
-          <option value="30">за 30 дней</option>
-          <option value="60">за 60 дней</option>
-          <option value="90">за 90 дней</option>
-          <option value="custom">свой период...</option>
-        </select>
-        <label v-if="isCustomDays" title="Количество дней назад">
+        <span class="search">
           <input
-            v-model.number="f.days"
-            type="number"
-            min="1"
-            max="365"
-            class="num"
-            placeholder="дней"
-          /> дн.
-        </label>
-        <label title="Скрыть вакансии с пометкой «возможно, закрыта» (на вкладке «все» видны всегда)"><input v-model="f.hideClosed" type="checkbox" /> скрыть закрытые</label>
-        <select :value="f.sort" @change="sortBy(($event.target as HTMLSelectElement).value)">
-          <option value="overall">overall</option>
-          <option value="profile">профиль</option>
-          <option value="date">дата</option>
-          <option value="region">регион</option>
-          <option value="company">компания</option>
+            id="q"
+            v-model="q"
+            placeholder="Поиск во вкладке  /"
+            title="Быстрый поиск по названию, компании, локации внутри текущей вкладки (не сохраняется)"
+            @keydown.esc="q = ''; ($event.target as HTMLInputElement).blur()"
+          />
+          <button v-if="q" class="ghost clear" title="Очистить" @click="q = ''">×</button>
+        </span>
+        <MultiSelect
+          v-model="f.statuses"
+          :class="{ act: f.statuses.length }"
+          title="статус"
+          placeholder="все открытые"
+          :options="STATUS_OPTIONS"
+        />
+        <label :class="{ act: f.minOverall }">overall ≥ <input v-model.number="f.minOverall" type="number" min="0" max="100" step="5" class="num" /></label>
+        <MultiSelect v-model="f.tracks" :class="{ act: f.tracks.length }" title="профиль" :options="TRACKS" />
+        <MultiSelect v-model="f.sources" :class="{ act: f.sources.length }" title="источник" :options="uniq('source')" />
+        <MultiSelect v-model="f.regions" :class="{ act: f.regions.length }" title="регион" :options="REGIONS" />
+        <MultiSelect v-model="f.langs" :class="{ act: f.langs.length }" title="язык" :options="uniq('vacancy_language')" />
+        <select :class="{ act: f.period != null }" :value="periodValue" @change="onPeriod(($event.target as HTMLSelectElement).value)">
+          <option value="">период: всё время</option>
+          <option value="last">последний сбор</option>
+          <option v-for="d in STANDARD_DAYS" :key="d" :value="String(d)">за {{ d }} дн.</option>
+          <option value="custom">свой период…</option>
         </select>
-        <button class="ghost" :title="f.dir === 'asc' ? 'по возрастанию' : 'по убыванию'" @click="f.dir = f.dir === 'asc' ? 'desc' : 'asc'">{{ f.dir === 'asc' ? '▲' : '▼' }}</button>
-        
-        <template v-if="activePreset && isPresetModified">
-          <span class="filter-mod-badge" title="Параметры отличаются от сохранённого пресета">изменён</span>
-          <button class="ghost" title="Перезаписать фильтр текущими параметрами" @click="updateActivePreset">💾 обновить</button>
-          <button class="ghost" title="Сбросить к сохранённым в фильтре значениям" @click="revertActivePreset">↺ откат</button>
+        <label v-if="periodValue === 'custom'" title="Количество дней назад">
+          <input v-model.number="f.period" type="number" min="1" max="365" class="num" /> дн.
+        </label>
+        <template v-if="isModified">
+          <button class="ghost" title="Вернуть вкладку к исходным фильтрам" @click="resetView">↺ сброс</button>
+          <button class="ghost" title="Сделать текущие фильтры исходными для этой вкладки" @click="commitView">✓ закрепить</button>
         </template>
-        <button class="ghost" @click="resetFilters">сброс</button>
+      </div>
+
+      <div v-if="outsideHits > 0" class="hint small">
+        Ещё {{ outsideHits }} совпадений вне вкладки —
+        <a href="#" @click.prevent="searchEverywhere">искать во «Все» (включая закрытые)</a>
       </div>
 
       <div v-if="data?.errors?.length" class="errors">
@@ -728,12 +504,22 @@ const currentFilterTags = computed(() =>
                   @change="markAll(($event.target as HTMLInputElement).checked)"
                 />
               </th>
-              <th class="sortable" @click="sortBy('overall')">overall{{ arrow('overall') }}</th>
-              <th class="sortable" @click="sortBy('profile')">профиль{{ arrow('profile') }}</th>
-              <th class="sortable" @click="sortBy('date')">дата{{ arrow('date') }}</th>
-              <th>Вакансия</th>
-              <th class="sortable" @click="sortBy('region')">регион{{ arrow('region') }}</th>
-              <th>бейджи</th>
+              <th
+                v-for="[k, l] in [['overall', 'overall'], ['profile', 'профиль'], ['date', 'дата'], ['company', 'Вакансия'], ['region', 'регион']]"
+                :key="k"
+                class="sortable"
+                :title="k === 'company' ? 'Сортировка по компании. ' + SORT_HINT : SORT_HINT"
+                @click="sortBy(k!, $event)"
+              >{{ l }}<span class="arr">{{ sortMark(k!).arrow }}<sup>{{ sortMark(k!).n }}</sup></span></th>
+              <th class="score-h">
+                <span
+                  v-for="[k, l] in SCORE_COLS"
+                  :key="k"
+                  class="sortable"
+                  :title="k + '. ' + SORT_HINT"
+                  @click="sortBy(k, $event)"
+                >{{ l }}<span class="arr">{{ sortMark(k).arrow }}<sup>{{ sortMark(k).n }}</sup></span></span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -778,11 +564,11 @@ const currentFilterTags = computed(() =>
               </td>
               <td class="badges">
                 <template v-if="v.scores">
-                  <span class="badge" :class="tone(v.scores.remote)" title="remote">R{{ v.scores.remote }}</span>
-                  <span class="badge" :class="tone(v.scores.startup)" title="startup">S{{ v.scores.startup }}</span>
-                  <span class="badge" :class="tone(v.scores.corporate, true)" title="corporate">C{{ v.scores.corporate }}</span>
-                  <span class="badge" :class="tone(v.scores.outsource, true)" title="outsource">O{{ v.scores.outsource }}</span>
-                  <span class="badge" :class="tone(v.scores.legitimacy)" title="legitimacy">L{{ v.scores.legitimacy }}</span>
+                  <span class="badge" :class="tone(v.scores.remote)" title="remote">{{ v.scores.remote }}</span>
+                  <span class="badge" :class="tone(v.scores.startup)" title="startup">{{ v.scores.startup }}</span>
+                  <span class="badge" :class="tone(v.scores.corporate, true)" title="corporate">{{ v.scores.corporate }}</span>
+                  <span class="badge" :class="tone(v.scores.outsource, true)" title="outsource">{{ v.scores.outsource }}</span>
+                  <span class="badge" :class="tone(v.scores.legitimacy)" title="legitimacy">{{ v.scores.legitimacy }}</span>
                 </template>
               </td>
             </tr>
@@ -790,7 +576,7 @@ const currentFilterTags = computed(() =>
           </tbody>
         </table>
       </div>
-      <footer class="muted small">j/k — навигация · a — откликнуться · u — снять отклик · s — звезда · f — проблемная · / — поиск</footer>
+      <footer class="muted small">j/k — навигация · a — выбрать · u — снять выбор · s — звезда · f — проблемная · / — поиск · Shift+клик по заголовку — доп. сортировка</footer>
     </aside>
 
     <main class="detail">
@@ -798,55 +584,9 @@ const currentFilterTags = computed(() =>
       <p v-else class="muted empty">Выберите вакансию</p>
     </main>
     <div v-if="toast" class="toast">{{ toast }}</div>
-
-    <!-- Модалка: сохранение фильтра -->
-    <div v-if="showSaveDialog" class="modal-backdrop" @click.self="showSaveDialog = false">
-      <div class="modal">
-        <h3>Сохранить фильтр</h3>
-        <form @submit.prevent="savePreset">
-          <div class="modal-field">
-            <label for="preset-name-input">Название фильтра:</label>
-            <input
-              id="preset-name-input"
-              v-model="newPresetName"
-              placeholder="Например: Go Remote 80+"
-              required
-            />
-          </div>
-          <div class="modal-summary">
-            <div class="small muted">Сохраняемые параметры:</div>
-            <div class="tags">
-              <span v-for="tag in currentFilterTags" :key="tag" class="tag">{{ tag }}</span>
-            </div>
-          </div>
-          <div class="modal-actions">
-            <button type="button" class="ghost" @click="showSaveDialog = false">Отмена</button>
-            <button type="submit" class="on" :disabled="!newPresetName.trim()">Сохранить</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Модалка: подтверждение удаления фильтра -->
-    <div v-if="presetToDelete" class="modal-backdrop" @click.self="presetToDelete = null">
-      <div class="modal">
-        <h3>Удалить сохранённый фильтр?</h3>
-        <p class="modal-text">
-          Вы уверены, что хотите удалить фильтр <strong>«{{ presetToDelete.name }}»</strong>?
-        </p>
-        <div class="modal-summary">
-          <div class="tags">
-            <span v-for="tag in getFilterTags(presetToDelete.filters)" :key="tag" class="tag">{{ tag }}</span>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="ghost" @click="presetToDelete = null">Отмена</button>
-          <button type="button" class="btn-danger" @click="executeDeletePreset">Удалить</button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
+
 
 <style>
 :root {
@@ -872,96 +612,29 @@ button.ghost { border-color: transparent; background: transparent; color: var(--
 .tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 12px 6px; align-items: center; }
 .tabs small { opacity: .7; }
 .spacer { flex: 1; }
-.tabs-divider { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }
-.tabs-group { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
-.preset-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  cursor: pointer;
-  font-size: 13px;
-  white-space: nowrap;
-}
-.preset-tab:hover { border-color: var(--muted); }
-.preset-tab.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-.preset-tab.on small { opacity: .8; color: #fff; }
-.preset-del {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: inherit;
-  opacity: .5;
-  border-radius: 3px;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  margin-left: 2px;
-}
-.preset-del:hover { opacity: 1; background: color-mix(in srgb, var(--fg) 15%, transparent); }
-.preset-tab.on .preset-del:hover { background: rgba(255, 255, 255, .3); }
-.mod-dot { color: #e0a800; margin-right: 2px; }
-.preset-tab.on .mod-dot { color: #ffe600; }
-.filter-mod-badge {
-  font-size: 11px;
-  background: var(--mid-bg);
-  color: var(--mid);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 500;
-}
-.save-btn { font-size: 12px; }
-.btn-danger { background: var(--bad); color: #fff; border-color: var(--bad); }
-.btn-danger:hover { opacity: .9; }
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, .45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 16px;
-  backdrop-filter: blur(2px);
-}
-.modal {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 20px;
-  width: 100%;
-  max-width: 440px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .2);
-}
-.modal h3 { margin: 0 0 12px; font-size: 16px; }
-.modal-text { margin: 0 0 12px; }
-.modal-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-.modal-field input { width: 100%; }
-.modal-summary { margin: 12px 0 16px; }
-.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.tag {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--line) 70%, transparent);
-  color: var(--fg);
-}
-.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.tab { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.tab small { opacity: .7; }
+.tab-del { opacity: .45; padding: 0 2px; border-radius: 3px; line-height: 1; }
+.tab-del:hover { opacity: 1; background: color-mix(in srgb, var(--fg) 15%, transparent); }
+.tab:not(.on):not(:hover) .tab-del { visibility: hidden; }
+.add { font-size: 16px; line-height: 1; padding: 2px 8px; }
+.act { outline: 1px solid var(--accent); outline-offset: -1px; border-radius: 6px; }
+label.act { outline: none; color: var(--accent) !important; }
+.search { position: relative; display: inline-flex; }
+.search .clear { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); padding: 0 6px; }
+.hint { padding: 4px 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.arr { display: inline-block; min-width: 1.3em; padding-left: 2px; font-size: 10px; }
+.arr sup { font-size: 9px; }
+.score-h { white-space: nowrap; }
+.score-h > span { display: inline-block; width: 28px; text-align: center; position: relative; }
+.score-h .arr { position: absolute; left: 100%; margin-left: -8px; min-width: 0; padding: 0; }
 .filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 12px 10px; border-bottom: 1px solid var(--line); align-items: center; }
 .filters label { display: flex; gap: 4px; align-items: center; color: var(--muted); }
 .num { width: 64px; }
-#q { width: 160px; }
+#q { width: 180px; padding-right: 22px; }
 .table-wrap { overflow: auto; flex: 1; }
 table { width: 100%; border-collapse: collapse; }
-th { position: sticky; top: 0; background: var(--bg); text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+th { white-space: nowrap; position: sticky; top: 0; background: var(--bg); text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 tbody tr { cursor: pointer; }
 tbody tr:hover { background: color-mix(in srgb, var(--cur) 50%, transparent); }
