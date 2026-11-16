@@ -23,6 +23,17 @@ export const ScoresSchema = z.object({
   overall: nscore.optional(),
 });
 
+/** Сравнение вакансии с резюме best_resume (scoring_version ≥ 2). Навыки — канонические имена из config/skills.yaml. */
+export const ResumeMatchSchema = z.object({
+  resume: z.enum(TRACKS),
+  required: z.array(z.string()).default([]),
+  nice_to_have: z.array(z.string()).default([]),
+  missing_required: z.array(z.string()).default([]),
+  missing_nice: z.array(z.string()).default([]),
+  in_resume_negative: z.array(z.object({ skill: z.string(), evidence: z.string().min(1) })).default([]),
+  ats_keywords_missing: z.array(z.string()).default([]),
+});
+
 export const VacancySchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+-[A-Za-z0-9_-]+$/),
   title: z.string().min(1),
@@ -57,6 +68,7 @@ export const VacancySchema = z.object({
   stop_flags: z.array(z.enum(STOP_FLAGS)).default([]),
   best_resume: z.enum(TRACKS).nullable().optional(),
   score_reasoning: z.string().nullable().optional(),
+  resume_match: ResumeMatchSchema.nullable().optional(),
 
   requirements_special: z
     .array(z.object({ type: z.string(), standard: z.boolean(), details: z.string() }))
@@ -85,4 +97,5 @@ export const ScoredVacancySchema = VacancySchema.extend({
 });
 
 export type Vacancy = z.infer<typeof VacancySchema>;
+export type ResumeMatch = z.infer<typeof ResumeMatchSchema>;
 export type Scores = z.infer<typeof ScoresSchema>;

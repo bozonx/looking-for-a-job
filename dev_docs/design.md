@@ -34,6 +34,7 @@
 - Провайдеры (только открытые API и ленты, `config/sources.md`): **ATS компаний** (Greenhouse/Lever/Ashby — снимок открытых вакансий, пропавшие → `possibly_closed`), **Get on Board**, **HN Who is hiring**, **RemoteOK**, **Himalayas**, **Jobicy**, **Remotive**, стандартные ленты **RSS/Atom/JSON Feed** (We Work Remotely) — без кода, через `config/sources.yaml`. Новый источник = провайдер + строка в реестре + строка в `config/sources.md`.
 - Скоринг: частные оценки агента + детерминированный `overall`, стоп-флаги, регион по справочнику, `apply_target` по `source-priority.yaml`; `npm run score` / `rescore` / `validate` (zod).
 - Обслуживание: `cleanup`, `dedupe` (диагностика), `fetch-page` (HTML → markdown), журнал `data/insights.md`.
+- Обратная связь: `resume_match` в каждой вакансии (сравнение с резюме, словарь `config/skills.yaml`), метрики прогонов `data/runs/stats.jsonl`, отчёт `npm run insights`, разбор — `playbooks/analyze.md`.
 
 **Этап 2 — UI** (`app/`, Nuxt SPA + Nitro). Подробно: `docs/running.md`, раздел «UI».
 

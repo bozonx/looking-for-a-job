@@ -8,7 +8,7 @@ import path from 'node:path';
 import { env, today } from './env.ts';
 import { loadAll, vacancyPath, writeVacancy } from './vacancy.ts';
 import { buildIndex, findDuplicate, key, normUrl, type Index } from './dedupe.ts';
-import { appendRunLog } from './runlog.ts';
+import { appendRunLog, appendRunStats } from './runlog.ts';
 import { pickApplyTarget } from './target.ts';
 import { SeenStore } from './seen.ts';
 import { loadPrefilter } from './prefilter.ts';
@@ -299,6 +299,7 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
 
   if (!opts.dryRun) {
     seen.save();
+    if (!opts.file) appendRunStats({ kind: 'collect', source: SOURCE, ...stats, closed, reopened, failed, stop: stopReason });
     console.log(`Run log: ${rel(appendRunLog('collect', log))}`);
   }
   console.log(log.replace(/<details>[\s\S]*<\/details>\n?/, `(отсеяно предфильтром: ${rejected.length}, список — в логе)\n`));

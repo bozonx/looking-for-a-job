@@ -16,6 +16,7 @@
     "typecheck": "tsc -p . && nuxi prepare app >/dev/null && tsc -p app/.nuxt/tsconfig.server.json --noEmit && tsc -p app/.nuxt/tsconfig.app.json --noEmit",
     "dev": "nuxt dev app",
     "ui:build": "nuxt build app",
+    "insights": "node --env-file-if-exists=.env scripts/insights.ts",
     "fetch-page": "node --env-file-if-exists=.env scripts/fetch-page.ts",
     "cleanup": "node --env-file-if-exists=.env scripts/cleanup.ts"
   },

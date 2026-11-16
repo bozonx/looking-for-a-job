@@ -32,7 +32,36 @@
 | `best_resume` | трек с лучшим fit |
 | `score_reasoning` | 2–4 предложения: на чём основаны ключевые оценки и флаги |
 | `requirements_special` | нестандартные требования отклика (видео, кодовое слово, тест в форме) |
-| `scoring_version` | 1 |
+| `resume_match` | сравнение с резюме `best_resume` — см. раздел ниже |
+| `scoring_version` | 2 |
 
 `scores.overall` не трогай — его считает `npm run score`.
 Неоднозначное (например, «remote, US timezone» без требования резидентства) отражай в оценках и `red_flags`, не додумывай.
+
+## `resume_match` — сравнение с резюме
+
+Сырьё для `npm run insights`: какие навыки массово требуют, а в резюме их нет. Прочитай `profile/resumes/<best_resume>.md`
+(одно резюме на вакансию) и заполни:
+
+```yaml
+resume_match:
+  resume: angular                 # = best_resume
+  required: [angular, rxjs, ngrx, typescript, aws]   # must-have из вакансии
+  nice_to_have: [graphql]         # «plus», «nice to have», «bonus»
+  missing_required: [ngrx, aws]   # из required, чего нет в резюме
+  missing_nice: []                # из nice_to_have, чего нет в резюме
+  in_resume_negative: []          # [{ skill, evidence }] — см. ниже
+  ats_keywords_missing: [state management]
+```
+
+- **Навыки — только канонические имена из `config/skills.yaml`** (`golang` → `go`, `k8s` → `kubernetes`).
+  Нет в словаре — добавь туда ключ (или синоним существующего), а не выдумывай написание.
+- Навык — технология, практика или домен (`fintech`, `accessibility`), не soft skills и не «5+ years».
+  Языки общения и опыт в годах сюда не пиши. Только реальные требования из текста, а не теги агрегатора.
+- `missing_*` — честно: навык считается «есть», если он упомянут в резюме (в Skills или опыте), в том числе синонимом.
+- `ats_keywords_missing` — 0–5 **формулировок** из вакансии, которых нет дословно в тексте резюме, хотя
+  по смыслу опыт есть или близок («state management», «design system», «cross-functional»). Это то, что ATS не найдёт.
+- `in_resume_negative` — только при **явной цитате**: вакансия называет минусом или нежелательным то, что есть
+  в резюме («no agencies», «not looking for AngularJS-only devs», «job hoppers»). `evidence` — цитата на языке вакансии.
+  Локацию, гражданство, возраст сюда не пиши — это `stop_flags`.
+- Вакансия с трудом читается или требований нет — пустые списки и пометка в `score_reasoning`.
