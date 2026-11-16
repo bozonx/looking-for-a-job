@@ -3,6 +3,7 @@
  * Провайдер (scripts/providers/<source>.ts) только загружает страницы списка и переводит
  * вакансию площадки в поля front matter; лимиты, предфильтр, дедупликация, seen и лог — здесь.
  */
+import { freshnessDays } from './freshness.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { env, today } from './env.ts';
@@ -160,7 +161,10 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
   }
 
   // окно сбора: с прошлого полного сбора (+ запас), но не дальше COLLECT_MAX_AGE_DAYS; первый сбор — COLLECT_MAX_AGE_DAYS
-  const capTime = startedAt - env.COLLECT_MAX_AGE_DAYS * 86400e3;
+  // и не дальше freshness_days источника: старее — всё равно не попадёт в очередь скоринга
+  const fresh = freshnessDays(SOURCE);
+  const maxAgeDays = fresh == null ? env.COLLECT_MAX_AGE_DAYS : Math.min(env.COLLECT_MAX_AGE_DAYS, fresh);
+  const capTime = startedAt - maxAgeDays * 86400e3;
   const minTime = prev ? Math.max(capTime, prev - WINDOW_MARGIN_DAYS * 86400e3) : capTime;
   const windowDays = Math.ceil((startedAt - minTime) / 86400e3);
   const windowNote = p.snapshot

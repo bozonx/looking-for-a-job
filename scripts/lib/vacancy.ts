@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import YAML from 'yaml';
 import { VACANCIES_DIR } from './env.ts';
 import { translit } from './translit.ts';
@@ -58,8 +59,16 @@ export function slug(s: string, max = 40): string {
 /** Имя файла: <date>-<source>-<company>-<title>[-<extId>].md; extId защищает от совпадения имён. */
 export function vacancyPath(collectedAt: string, source: string, company: string, title: string, extId?: string): string {
   const [y = '', m = ''] = collectedAt.split('-');
-  const suffix = extId ? `-${slug(extId, 16)}` : '';
-  return path.join(VACANCIES_DIR, y, m, `${collectedAt}-${source}-${slug(company, 30)}-${slug(title, 50)}${suffix}.md`);
+  return path.join(VACANCIES_DIR, y, m, `${collectedAt}-${source}-${slug(company, 30)}-${slug(title, 50)}${extSuffix(extId)}.md`);
+}
+
+/** Суффикс имени из extId: хвост (там номер вакансии, у ATS начало — `<ats>-<компания>`), а если хвост не умещается — с коротким хэшем. */
+function extSuffix(extId?: string): string {
+  if (!extId) return '';
+  const full = slug(extId, 1000);
+  if (full.length <= 16) return `-${full}`;
+  const hash = createHash('sha1').update(extId).digest('hex').slice(0, 6);
+  return `-${full.slice(-9).replace(/^-+/, '')}-${hash}`;
 }
 
 /** Resolve CLI args (ids or paths) into files. */
