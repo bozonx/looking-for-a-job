@@ -4,6 +4,8 @@
  * Отдаёт не больше SCORE_MAX_PER_RUN (по умолчанию) — бюджет токенов на один «собери».
  * Порядок: сначала свежие (posted_at, иначе collected_at), при равенстве — с известным real_url.
  * Остаток остаётся в очереди и берётся следующим запуском: курсор не нужен, очередь — это сами файлы.
+ * `--upgrade` — вместо очереди скоринга: отскоренные релевантные вакансии (без stop_flags, не rejected) со
+ *   scoring_version < 3, по убыванию overall — им нужно дозаполнить поля v3 в resume_match (playbooks/scoring.md).
  * Свежесть: вакансии старше `freshness_days` своего источника (config/sources.yaml) в очередь не попадают —
  * откликаться на них поздно, токены на скоринг не тратим. Файлы остаются (видны в UI); `--stale` — взять и их.
  */
@@ -21,6 +23,19 @@ if (!(limit >= 1)) {
 }
 const onlyPaths = args.includes('--paths');
 const withStale = args.includes('--stale') || args.includes('--all');
+
+if (args.includes('--upgrade')) {
+  const up = loadAll()
+    .filter((v) => v.data.scores && (v.data.scoring_version ?? 0) < 3 && !(v.data.stop_flags ?? []).length && v.data.status !== 'rejected')
+    .sort((a, b) => (b.data.scores.overall ?? 0) - (a.data.scores.overall ?? 0));
+  const batch = up.slice(0, limit);
+  for (const v of batch) {
+    const rel = path.relative(process.cwd(), v.file);
+    console.log(onlyPaths ? rel : `${rel}\n    ${v.data.id} · overall ${v.data.scores.overall ?? '—'} · ${v.data.title} — ${v.data.company}`);
+  }
+  if (!onlyPaths) console.log(`\n# ДОЗАПОЛНЕНИЕ v3\n- выдано: ${batch.length}\n- осталось после: ${up.length - batch.length}`);
+  process.exit(0);
+}
 
 const date = (v: { data: any }) => String(v.data.posted_at ?? v.data.collected_at ?? '');
 const queue = loadAll().filter((v) => v.data.scores == null && v.data.status === 'new');

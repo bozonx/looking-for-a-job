@@ -32,6 +32,13 @@ export const ResumeMatchSchema = z.object({
   missing_nice: z.array(z.string()).default([]),
   in_resume_negative: z.array(z.object({ skill: z.string(), evidence: z.string().min(1) })).default([]),
   ats_keywords_missing: z.array(z.string()).default([]),
+  // scoring_version ≥ 3 — сырьё для блока опыта и формулировок резюме (см. playbooks/scoring.md)
+  responsibilities: z.array(z.string()).default([]), // обязанности: короткие фразы «глагол + объект», en, нижний регистр
+  keyword_spellings: z.record(z.string(), z.array(z.string())).default({}), // канонический навык → написания из текста, если отличаются
+  domain: z.string().nullable().optional(), // предметная область продукта: fintech, e-commerce, healthtech, devtools…
+  product_type: z.string().nullable().optional(), // b2b-saas, b2c, marketplace, internal-tools, agency, platform…
+  soft_requirements: z.array(z.string()).default([]), // ownership, cross-functional, mentoring, async communication…
+  years_required: z.number().nullable().optional(), // минимум лет опыта из текста; нет — null
 });
 
 export const VacancySchema = z.object({

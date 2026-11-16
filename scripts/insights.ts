@@ -6,6 +6,8 @@
  *   ATS-формулировок и «негативных» пунктов резюме. Учитываются только релевантные вакансии:
  *   отскоренные, без stop_flags, не rejected. Вес вакансии = overall/100, selected/starred ×2,
  *   поэтому мусор почти не влияет, а то, куда хочется откликнуться, — сильнее.
+ *   v3 (scoring_version ≥ 3): топ обязанностей (сырьё для bullets опыта), как пишут навыки (для ATS — писать
+ *   самым частым вариантом), домены и типы продукта, soft-требования, медиана требуемых лет.
  * Конвейер: по источникам — объёмы из data/runs/stats.jsonl, доля мусора, стоп-флагов,
  *   отклонённых вручную, утечки предфильтра (fit по всем трекам низкий).
  * Журнал: счётчики тегов data/insights.md за период.
@@ -50,6 +52,32 @@ const table = (c: Counter, total: number, top = 15) => {
   );
 };
 
+const median = (a: number[]) => {
+  const s = [...a].sort((x, y) => x - y);
+  return s.length ? (s.length % 2 ? s[(s.length - 1) / 2]! : (s[s.length / 2 - 1]! + s[s.length / 2]!) / 2) : null;
+};
+/** Раздел v3 по треку: обязанности, написания навыков, контекст. Пусто, если v3-вакансий нет. */
+function v3Block(n3: number, total: number, resp: Counter, spell: Map<string, Map<string, number>>, dom: Counter, prod: Counter, soft: Counter, years: number[]): string[] {
+  if (!n3) return [`_Поля v3 (обязанности, написания, домен) пока ни у одной вакансии — npm run pending -- --upgrade._`, ''];
+  const sp = [...spell].map(([k, m]) => [k, [...m].sort((a, b) => b[1] - a[1])] as const).sort((a, b) => b[1].reduce((x, y) => x + y[1], 0) - a[1].reduce((x, y) => x + y[1], 0));
+  const brief = (c: Counter, top = 8) => [...c].sort((a, b) => b[1].w - a[1].w).slice(0, top).map(([k, e]) => `${k} ×${e.n}`).join(', ') || '—';
+  const y = median(years);
+  return [
+    `**Поля v3** заполнены у ${n3} из ${total}${n3 < total ? ' — доли ниже считаются от всех вакансий трека, дозаполни остальные' : ''}.`,
+    '',
+    '**Обязанности (сырьё для bullets опыта):**',
+    '',
+    table(resp, n3, 25).replace('| навык |', '| обязанность |'),
+    '**Как пишут навыки (используй в резюме самое частое написание):**',
+    '',
+    sp.length ? sp.slice(0, 20).map(([k, vs]) => `- ${k}: ${vs.map(([x, c]) => `${x} ×${c}`).join(', ')}`).join('\n') + '\n' : '_нет расхождений с каноническими именами_\n',
+    `**Контекст:** домены — ${brief(dom)}; тип продукта — ${brief(prod)}.`,
+    '',
+    `**Soft / уровень:** ${brief(soft, 10)}. Требуемый опыт: медиана ${y ?? '—'} лет (указан в ${years.length} вакансиях).`,
+    '',
+  ];
+}
+
 const out: string[] = [`## Отчёт с ${since} по ${today()}`, ''];
 out.push(
   `Вакансий собрано: ${vac.length}, отскорено: ${scored.length}, релевантных (без стоп-флагов, не rejected): ${relevant.length}, ` +
@@ -64,6 +92,9 @@ for (const track of TRACKS) {
   const vs = relevant.filter((v) => v.data.resume_match?.resume === track);
   if (!vs.length) continue;
   const req: Counter = new Map(), miss: Counter = new Map(), missNice: Counter = new Map(), ats: Counter = new Map();
+  const resp: Counter = new Map(), dom: Counter = new Map(), prod: Counter = new Map(), soft: Counter = new Map();
+  const spell = new Map<string, Map<string, number>>();
+  const years: number[] = [];
   const negative: string[] = [];
   for (const v of vs) {
     const d = v.data, rm = d.resume_match, w = weight(d);
@@ -76,6 +107,16 @@ for (const track of TRACKS) {
     for (const s of rm.missing_required ?? []) bump(miss, n(s), w, d.id);
     for (const s of rm.missing_nice ?? []) bump(missNice, n(s), w, d.id);
     for (const s of rm.ats_keywords_missing ?? []) bump(ats, String(s).toLowerCase(), w, d.id);
+    for (const r of rm.responsibilities ?? []) bump(resp, String(r).toLowerCase().trim(), w, d.id);
+    for (const r of rm.soft_requirements ?? []) bump(soft, String(r).toLowerCase().trim(), w, d.id);
+    if (rm.domain) bump(dom, String(rm.domain).toLowerCase(), w, d.id);
+    if (rm.product_type) bump(prod, String(rm.product_type).toLowerCase(), w, d.id);
+    if (typeof rm.years_required === 'number') years.push(rm.years_required);
+    for (const [k, vars] of Object.entries(rm.keyword_spellings ?? {})) {
+      const m = spell.get(n(k)) ?? new Map<string, number>();
+      for (const x of vars as string[]) m.set(String(x), (m.get(String(x)) ?? 0) + 1);
+      spell.set(n(k), m);
+    }
     for (const x of rm.in_resume_negative ?? []) negative.push(`- **${x.skill}** — ${d.id} (${d.company}): «${x.evidence}»`);
   }
   const avgMiss = vs.reduce((a, v) => a + (v.data.resume_match.missing_required?.length ?? 0), 0) / vs.length;
@@ -97,6 +138,7 @@ for (const track of TRACKS) {
     '**Есть в резюме, но вакансия считает минусом:**',
     '',
     negative.length ? negative.join('\n') + '\n' : '_нет_\n',
+    ...v3Block(vs.filter((v) => (v.data.scoring_version ?? 0) >= 3).length, vs.length, resp, spell, dom, prod, soft, years),
     '<details><summary>Самые частые требования (спрос)</summary>',
     '',
     table(req, vs.length, 25),

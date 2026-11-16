@@ -33,7 +33,7 @@
 | `score_reasoning` | 2–4 предложения: на чём основаны ключевые оценки и флаги |
 | `requirements_special` | нестандартные требования отклика (видео, кодовое слово, тест в форме) |
 | `resume_match` | сравнение с резюме `best_resume` — см. раздел ниже |
-| `scoring_version` | 2 |
+| `scoring_version` | 3 |
 
 `scores.overall` не трогай — его считает `npm run score`.
 Неоднозначное (например, «remote, US timezone» без требования резидентства) отражай в оценках и `red_flags`, не додумывай.
@@ -52,6 +52,13 @@ resume_match:
   missing_nice: []                # из nice_to_have, чего нет в резюме
   in_resume_negative: []          # [{ skill, evidence }] — см. ниже
   ats_keywords_missing: [state management]
+  # --- v3: сырьё для блока опыта и формулировок резюме ---
+  responsibilities: [build design system, migrate angularjs to angular, own frontend architecture]
+  keyword_spellings: { ngrx: [NgRx], aws: [Amazon Web Services] }
+  domain: fintech                 # null, если неясно
+  product_type: b2b-saas          # null, если неясно
+  soft_requirements: [ownership, cross-functional collaboration]
+  years_required: 5               # null, если не указано
 ```
 
 - **Навыки — только канонические имена из `config/skills.yaml`** (`golang` → `go`, `k8s` → `kubernetes`).
@@ -64,4 +71,23 @@ resume_match:
 - `in_resume_negative` — только при **явной цитате**: вакансия называет минусом или нежелательным то, что есть
   в резюме («no agencies», «not looking for AngularJS-only devs», «job hoppers»). `evidence` — цитата на языке вакансии.
   Локацию, гражданство, возраст сюда не пиши — это `stop_flags`.
+- `responsibilities` — 3–8 обязанностей из блока «what you'll do / responsibilities / задачи» (если его нет —
+  из описания роли). Каждая — короткая фраза «глагол + объект» **на английском, нижним регистром**, без названий
+  компаний и цифр: `build reusable ui components`, `integrate rest apis`, `mentor junior developers`.
+  Формулируй единообразно, чтобы одинаковые задачи из разных вакансий склеивались при подсчёте (не
+  «create components» в одной и «build components» в другой — выбирай `build`). Требования к навыкам сюда не пиши.
+- `keyword_spellings` — только для навыков из `required`/`nice_to_have`, которые в тексте написаны **не так**, как
+  каноническое имя (`Vue.js`, `Node.js`, `K8s`, `Postgres`). Значение — написания дословно, как в тексте. Совпадает — не пиши.
+- `domain` — предметная область продукта одним-двумя словами (`fintech`, `e-commerce`, `healthtech`, `edtech`,
+  `devtools`, `adtech`, `gaming`, `logistics`, `crypto`, `ai`); для аутсорса — домен проекта, если назван.
+- `product_type` — `b2b-saas`, `b2c`, `marketplace`, `platform`, `internal-tools`, `agency`, `outsourcing`.
+- `soft_requirements` — 0–5 нетехнических ожиданий, явно названных в тексте: `ownership`, `cross-functional collaboration`,
+  `mentoring`, `async communication`, `product mindset`, `stakeholder communication`. Языки сюда не пиши.
+- `years_required` — минимальное число лет из текста («5+ years» → 5, «3–5 years» → 3); не указано — null.
 - Вакансия с трудом читается или требований нет — пустые списки и пометка в `score_reasoning`.
+
+## Дозаполнение v3 у уже отскоренных
+
+`npm run pending -- --upgrade [--limit N | --all]` — релевантные вакансии со `scoring_version` < 3 (по убыванию overall).
+Для каждой: прочитай текст, допиши в `resume_match` только поля v3, поставь `scoring_version: 3`. Остальные оценки
+не меняй, `npm run score` не нужен. Потом `npm run validate`.
