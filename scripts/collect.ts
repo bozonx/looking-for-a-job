@@ -4,6 +4,7 @@
  * Новые вакансии сохраняются со `scores: null` — их скорит агент (playbooks/scoring.md).
  */
 import { collect, type CollectResult } from './lib/collect.ts';
+import { insertRunLog, runLogOffset } from './lib/runlog.ts';
 
 /**
  * Итог запуска — точные цифры и дословные ошибки/предупреждения по всем источникам.
@@ -63,13 +64,16 @@ async function main() {
   let total = 0;
   let failed = 0;
   const results: CollectResult[] = [];
+  const logOffset = runLogOffset('collect');
   for (const n of list) {
     const r = await collect(providers[n]!, { dryRun, limit, file });
     results.push(r);
     total += r.saved;
     if (r.failed) failed++;
   }
-  console.log(summary(results, dryRun));
+  const itog = summary(results, dryRun);
+  if (!dryRun && !file) insertRunLog('collect', itog.replace('# ИТОГ СБОРА', `## ИТОГ СБОРА — ${new Date().toISOString().slice(11, 16)} UTC`), logOffset);
+  console.log(itog);
   if (total && !dryRun) console.log(`NEXT: отскорить ${total} вакансий (npm run pending), поискать real_url, затем npm run score && npm run validate; дописать data/insights.md`);
   if (failed) {
     console.error(`Источников с ошибкой загрузки: ${failed} (см. лог)`);

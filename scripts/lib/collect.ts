@@ -287,7 +287,7 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
 
           data.apply_target = pickApplyTarget(data);
           let file = vacancyPath(data.collected_at, SOURCE, data.company, data.title, j.extId);
-          if (fs.existsSync(file)) throw new Error(`file exists: ${file}`);
+          if (fs.existsSync(file)) throw new Error(`[bug] коллизия имени файла (другая вакансия уже записана под этим именем): ${path.relative(process.cwd(), file)}`);
           if (!opts.dryRun) writeVacancy(file, data, built.body);
           const vf = { file, data, body: built.body };
           idx.byId.set(id, vf);

@@ -42,6 +42,7 @@ for (const v of batch) {
 }
 if (!onlyPaths) {
   const rest = pending.length - batch.length;
+  console.log(`\n# ИТОГ ОЧЕРЕДИ\n- выдано к скорингу: ${batch.length}\n- останется в очереди: ${pending.length - batch.length}\n- несвежих не выдано: ${stale.length}`);
   console.log(`\nК скорингу сейчас: ${batch.length} из ${pending.length}` + (rest ? ` (остальные ${rest} — следующим запуском; лимит SCORE_MAX_PER_RUN=${env.SCORE_MAX_PER_RUN})` : ''));
   if (stale.length) {
     const by: Record<string, number> = {};
