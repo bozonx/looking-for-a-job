@@ -13,7 +13,7 @@
 | «проверь проблемные» | `playbooks/flagged.md` (вакансии с `flagged: true`, отмеченные в UI) |
 | «проверь, живы ли вакансии» | `npm run check-alive` (по real_url, пишет `possibly_closed`) |
 | «найди прямые ссылки» | `npm run resolve-urls` (real_url со страниц агрегаторов) |
-| «откликнись …» | пока не реализовано (этап 3) — сообщи об этом |
+| «откликнись», «откликнись выбранным», «откликнись по скорингу», «повтори отклики» | пока не реализовано (этап 3, `dev_docs/design.md`) — сообщи об этом |
 
 ## Общие правила
 
@@ -27,5 +27,7 @@
 - Код скриптов — только TypeScript; после изменений — `npm run typecheck`.
 - `data/` и `profile/` — личное, в git не коммитить.
 - `status` — решение: `null` (нет решения), `selected` (на отклик), `applied`/`needs_attention`/`apply_failed` (агент). Неотскоренная = `scores: null`.
-- Новизна — `collected_run` == `data/state/last-collect.json`. Чистка (`cleanup`, и после `collect` при `CLEANUP_ON_COLLECT`) удаляет только `status: null` без ★ и без `flagged`.
+- Новизна — `collected_run` == `data/state/last-collect.json`. ★ — личная пометка, в скоринге и анализе не учитывается.
+- Чистка (`cleanup`; автоматически после `collect` при `CLEANUP_ON_COLLECT`): закрытые (`possibly_closed`) — сразу, кроме ★; `status: null` без ★/⚑ — старше `CLEANUP_DEFAULT_DAYS`.
+- Жизненный цикл вакансии — `dev_docs/design.md`.
 - UI (`app/`, Nuxt) пишет в front matter только `status` (`null`/`selected`), `starred`, `flagged`, `notes`; плюс кнопка rescore — то же, что `npm run rescore`. Остальное — агент/скрипты. UI подхватывает изменения файлов на лету.

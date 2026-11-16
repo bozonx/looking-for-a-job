@@ -33,14 +33,14 @@
 - Двухфазный сбор: скрипт `npm run collect` (общий конвейер `scripts/lib/collect.ts` + провайдеры `scripts/providers/`) — лимиты, предфильтр, дедуп, `seen`, запись, лог; затем агент скорит `npm run pending` в пределах `SCORE_MAX_PER_RUN`.
 - Провайдеры (только открытые API и ленты, `config/sources.md`): **ATS компаний** (Greenhouse/Lever/Ashby — снимок открытых вакансий, пропавшие → `possibly_closed`), **Get on Board**, **HN Who is hiring**, **RemoteOK**, **Himalayas**, **Jobicy**, **Remotive**, стандартные ленты **RSS/Atom/JSON Feed** (We Work Remotely) — без кода, через `config/sources.yaml`. Новый источник = провайдер + строка в реестре + строка в `config/sources.md`.
 - Скоринг: частные оценки агента + детерминированный `overall`, стоп-флаги, регион по справочнику, `apply_target` по `source-priority.yaml`; `npm run score` / `rescore` / `validate` (zod).
-- Обслуживание: `cleanup` (вакансии без решения старше `CLEANUP_DEFAULT_DAYS`; автоматически после `collect`, если `CLEANUP_ON_COLLECT`), `dedupe` (диагностика), `fetch-page` (HTML → markdown), журнал `data/insights.md`.
+- Обслуживание: `cleanup` (закрытые — кроме ★; без решения — старше `CLEANUP_DEFAULT_DAYS`; автоматически после `collect`, если `CLEANUP_ON_COLLECT`), `dedupe` (диагностика), `fetch-page` (HTML → markdown), журнал `data/insights.md`.
 - Обратная связь: `resume_match` в каждой вакансии (сравнение с резюме, словарь `config/skills.yaml`), метрики прогонов `data/runs/stats.jsonl`, отчёт `npm run insights`, разбор — `playbooks/analyze.md`.
 
 **Этап 2 — UI** (`app/`, Nuxt SPA + Nitro). Подробно: `docs/running.md`, раздел «UI».
 
 - Кэш вакансий в памяти + `chokidar`, опрос раз в 5 с, ошибки разбора видны в UI.
 - Вкладки, фильтры, сортировка, карточка, горячие клавиши, rescore из UI.
-- Запись только `status` (`null`/`selected`), `starred`, `flagged` (⚑ «проблемная» → агент перепроверяет), `notes` — с перечитыванием файла и атомарной записью.
+- Запись только `status` (`null`/`selected`), `starred`, `flagged`, `notes` — с перечитыванием файла и атомарной записью.
 
 ## 5. Что предстоит
 
@@ -64,14 +64,14 @@
 
 | Фраза | Набор вакансий |
 |---|---|
-| «откликнись» | `selected` ∪ (`status: null` и `overall ≥ APPLY_SCORE_THRESHOLD`) |
+| «откликнись» | оба набора сразу: `selected` ∪ (`status: null` и `overall ≥ APPLY_SCORE_THRESHOLD`) |
 | «откликнись выбранным» | только `selected` |
-| «откликнись по скорингу» | только по порогу |
-| «откликнись на проблемные» | `needs_attention` + `apply_failed` — повтор с обновлёнными `answers.md` / медиа |
+| «откликнись по скорингу» | только по порогу: `status: null` и `overall ≥ APPLY_SCORE_THRESHOLD` |
+| «повтори отклики» | `needs_attention` + `apply_failed` — повтор с обновлёнными `answers.md` / медиа |
 
 **Алгоритм:**
 
-1. Сформировать список: без `possibly_closed`, с учётом `APPLY_MAX_PER_RUN` и `LINKEDIN_APPLY_MAX_PER_DAY`. Отобранные только по скорингу — показать и ждать подтверждения (`APPLY_CONFIRM_SCORED`); `selected` — без подтверждения.
+1. `npm run check-alive` по набору (закрытые не откликаем). Сформировать список: без `possibly_closed`, без ⚑, с учётом `APPLY_MAX_PER_RUN` и `LINKEDIN_APPLY_MAX_PER_DAY`. Отобранные только по скорингу — показать и ждать подтверждения (`APPLY_CONFIRM_SCORED`); `selected` — без подтверждения.
 2. Предпроверка (по тексту вакансии или открыв форму, но не отправляя): нестандартные медиа-требования → `needs_attention: special_media`; вопросы формы, на которые нет ответа в `about.md` / `answers.md` → `needs_attention: unknown_question` с полным текстом. Стандартные видео/аудио-визитки — из `profile/media/`.
 3. Адаптировать резюме и письмо, сгенерировать PDF в `data/generated/<id>/`.
 4. Открыть `apply_target` (fallback: `real_url` → `source_url`), заполнить, приложить, отправить.
@@ -92,12 +92,23 @@
 - Проверка типов `.vue`-файлов — когда `vue-tsc` станет совместим с TypeScript 7.
 - Поиск `real_url` для вакансий с агрегаторов — сейчас вручную агентом; можно автоматически сверять с ATS-провайдером, если компания есть в `config/sources.yaml`.
 
+### Жизненный цикл вакансии
+
+1. `collect` сохраняет вакансию с `collected_run` — вкладка «Новые» в UI = вакансии последнего запуска сбора.
+2. Пользователь отмечает только нужное: «Откликнуться» (`selected`), ⚑ «Проблемная» (`flagged`, причина — в `notes`),
+   ★ (`starred`) — личная пометка «не потерять», ни на что, кроме защиты от чистки, не влияет. Неотмеченное = неинтересное.
+3. Автоотклик (этап 3): `selected` и/или вакансии по порогу скоринга → `applied` / `needs_attention` / `apply_failed`.
+4. «проверь проблемные» (`playbooks/flagged.md`): агент исправляет скоринг/данные, записывает разбор в `data/flagged-cases.md`
+   и снимает ⚑; дальше вакансия живёт по общим правилам.
+5. Чистка после каждого сбора: закрытые (`possibly_closed`) — сразу, кроме ★; без статуса/★/⚑ — старше `CLEANUP_DEFAULT_DAYS`.
+   Закрытость выясняют `collect` (вакансия пропала из снимка ATS) и `check-alive` (404/410/«not found» по real_url).
+
 ### 5.4. После MVP
 
 - Сбор из Telegram-каналов.
 - Посты «we are hiring» / «ищем» на LinkedIn (`apply_method: comment`); отклик комментарием — только мной или после подтверждения.
 - Анализ скриптом с прямым вызовом LLM (дешёвая модель — предфильтр, сильная — скоринг).
-- Калибровка весов по моим решениям `selected`/★/⚑ (неотмеченные = неинтересные).
+- Калибровка весов по моим решениям `selected` и разборам ⚑ (неотмеченные = неинтересные).
 - Трекинг воронки (ответы, интервью, офферы) и конверсия по источникам и профилям.
 
 ## 6. Риски
