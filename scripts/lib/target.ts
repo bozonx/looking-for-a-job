@@ -20,6 +20,9 @@ const BOARDS: Record<string, string> = {
   'hh.ru': 'hh',
   'himalayas.app': 'himalayas',
   'weworkremotely.com': 'weworkremotely',
+  'remotive.com': 'remotive',
+  'jobicy.com': 'jobicy',
+  'news.ycombinator.com': 'hn',
 };
 
 function host(url: string): string {

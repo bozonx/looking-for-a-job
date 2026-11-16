@@ -1,5 +1,14 @@
-/** Реестр провайдеров сбора. Новый источник: scripts/providers/<id>.ts + строка здесь + config/sources.md. */
+/**
+ * Реестр провайдеров сбора. Новый источник: scripts/providers/<id>.ts + строка здесь + config/sources.md
+ * и config/source-priority.yaml. Стандартные ленты (RSS/Atom/JSON Feed) добавляются без кода —
+ * секция `feeds` в config/sources.yaml.
+ */
 import type { Provider } from '../lib/collect.ts';
 import { remoteok } from './remoteok.ts';
+import { ats } from './ats.ts';
+import { getonbrd } from './getonbrd.ts';
+import { hn } from './hn.ts';
+import { himalayas, jobicy, remotive } from './remote-boards.ts';
+import { feedProviders } from './feed.ts';
 
-export const providers: Record<string, Provider> = { remoteok };
+export const providers: Record<string, Provider> = { ats, getonbrd, hn, remoteok, himalayas, jobicy, remotive, ...feedProviders() };

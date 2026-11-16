@@ -1,0 +1,68 @@
+# Настройки провайдеров сбора (описание источников — config/sources.md).
+
+# Стандартные ленты: RSS 2.0, Atom 1.0, JSON Feed. Каждая лента — отдельный источник с этим id.
+# id — латиница в нижнем регистре; добавь его в config/source-priority.yaml.
+# title_format: как разбирать заголовок элемента —
+#   "company: title" (We Work Remotely), "title at company", "title" (компания из author/поля company_field).
+# location_field / company_field / tags_field — имя дополнительного XML-поля элемента (если есть).
+feeds:
+  - id: weworkremotely
+    name: We Work Remotely
+    title_format: "company: title"
+    location_field: region
+    tags_field: skills
+    employment_field: type
+    urls:
+      - https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss
+      - https://weworkremotely.com/categories/remote-front-end-programming-jobs.rss
+      - https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss
+
+# Публичные API систем найма: полный список открытых вакансий компании.
+# Список слагов или словарь «слаг: название» (Lever и Ashby название компании не отдают).
+# Вакансия пропала из списка → possibly_closed: true. Слаг — из адреса страницы вакансий:
+#   greenhouse: boards.greenhouse.io/<slug> · lever: jobs.lever.co/<slug> · ashby: jobs.ashbyhq.com/<slug>
+# Подбор: удалёнка, продуктовые стартапы, стек JS/TS/AI. Крупные корпорации — сознательно не включены.
+ats:
+  greenhouse: [vercel, gitlab, grafanalabs, contentful, storyblok, netlify, airtable, wikimedia]
+  ashby:
+    linear: Linear
+    supabase: Supabase
+    posthog: PostHog
+    zapier: Zapier
+    n8n: n8n
+    clerk: Clerk
+    neon: Neon
+    railway: Railway
+    mintlify: Mintlify
+    resend: Resend
+    replit: Replit
+    vapi: Vapi
+    elevenlabs: ElevenLabs
+    cursor: Cursor
+    langchain: LangChain
+    lovable: Lovable
+    pylon: Pylon
+    sanity: Sanity
+    zed: Zed Industries
+    warp: Warp
+  lever:
+    toptal: Toptal
+
+# Himalayas: поисковые запросы (по 20 вакансий на страницу, свежие первыми).
+himalayas:
+  queries: [vue, nuxt, react, typescript, full stack, ai engineer]
+
+# Get on Board: категории и какие форматы работы брать.
+# remote_modality: fully_remote | remote_local | hybrid | no_remote; не-удалённые берутся только в этих странах.
+getonbrd:
+  categories: [programming]
+  remote: [fully_remote, remote_local]
+  office_countries: [Argentina]
+
+# Remotive: категории API (данные с задержкой ~24 ч; по правилам — не чаще 4 запросов в день).
+remotive:
+  categories: [software-dev]
+
+# Jobicy: параметр industry API.
+jobicy:
+  industries: [dev]

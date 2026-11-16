@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "chokidar": "^6.0.0",
+    "fast-xml-parser": "^5.12.1",
     "marked": "^18.2.0",
     "nuxt": "^4.6.4",
     "turndown": "^7.2.5",

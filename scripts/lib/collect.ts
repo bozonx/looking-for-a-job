@@ -23,6 +23,8 @@ export interface RawJob {
   title: string;
   company: string;
   tags: string[];
+  /** причина отсеять ещё до предфильтра (формат работы, не вакансия) — учитывается как отсеянная */
+  skip?: string;
   /** поля front matter сверх blankVacancy() и markdown-тело */
   build(): Promise<{ data: Partial<VacancyData>; body: string }> | { data: Partial<VacancyData>; body: string };
 }
@@ -33,10 +35,22 @@ export interface Provider {
   paginated: boolean;
   /** страница списка (с 0), новые сверху; пустой массив — конец списка */
   fetchPage(page: number): Promise<RawJob[]>;
-  /** разбор сохранённого ответа площадки (флаг --file) */
-  parse(json: unknown): RawJob[];
+  /** разбор сохранённого ответа площадки (флаг --file): разобранный JSON или текст (XML-ленты) */
+  parse(input: unknown): RawJob[];
   /** пауза между страницами, мс (по умолчанию 1000) */
   pageDelayMs?: number;
+  /**
+   * Список — снимок всех открытых вакансий (ATS компаний), а не лента «новые сверху»:
+   * нет отсечки по возрасту и остановки на известных; известные продлевают запись в seen.
+   */
+  snapshot?: boolean;
+  /**
+   * Только для snapshot: покрывает ли успешно загруженный список вакансию с этим extId.
+   * Покрытые, но отсутствующие в списке вакансии помечаются possibly_closed: true.
+   */
+  covers?(extId: string): boolean;
+  /** некритичные проблемы последней загрузки (например, одна компания из списка не ответила) */
+  takeWarnings?(): string[];
 }
 
 export type VacancyData = ReturnType<typeof blankVacancy>;
@@ -100,7 +114,14 @@ export interface CollectResult {
 
 async function* pages(p: Provider, opts: CollectOptions, onStop: (r: string) => void): AsyncGenerator<RawJob[]> {
   if (opts.file) {
-    const list = p.parse(JSON.parse(fs.readFileSync(opts.file, 'utf8')));
+    const text = fs.readFileSync(opts.file, 'utf8');
+    let input: unknown = text;
+    try {
+      input = JSON.parse(text);
+    } catch {
+      /* не JSON — отдаём текст (RSS/Atom) */
+    }
+    const list = p.parse(input);
     if (!list.length) throw new Error(`в файле ${opts.file} нет вакансий`);
     yield list;
     return;
@@ -135,11 +156,15 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
   const dupLines: string[] = [];
   const maybeDup: string[] = [];
   const errors: string[] = [];
+  const listedIds = new Set<string>();
+  let closed = 0;
+  let reopened = 0;
 
   outer: try {
     for await (const list of pages(p, opts, (r) => (stopReason = r))) {
       stats.pages++;
       stats.listed += list.length;
+      for (const j of list) listedIds.add(`${SOURCE}-${j.extId}`);
       for (const j of list) {
         if (saved.length >= opts.limit) {
           stopReason = `--limit ${opts.limit}`;
@@ -155,8 +180,13 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
 
         // старая (по дате) или известная — пропускаем и считаем подряд: одна закреплённая/промо-вакансия
         // наверху ленты не должна останавливать сбор
-        const old = j.postedAt != null && j.postedAt < minTime;
+        const old = !p.snapshot && j.postedAt != null && j.postedAt < minTime;
         const known = idx.byId.has(id) || seen.has(id);
+        if (p.snapshot && known) {
+          stats.known++;
+          seen.add(id); // вакансия всё ещё открыта — не даём записи устареть
+          continue;
+        }
         if (old || known) {
           if (known) stats.known++;
           else stats.old++;
@@ -169,7 +199,7 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
         seenStreak = 0;
 
         try {
-          const f = prefilter(j.title, j.tags);
+          const f = j.skip ? { ok: false, reason: j.skip } : prefilter(j.title, j.tags);
           if (!f.ok) {
             stats.prefiltered++;
             seen.add(id);
@@ -232,6 +262,24 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
     errors.push(`- список (страница ${stats.pages}): ${(e as Error).message}`);
   }
 
+  warnings.push(...(p.takeWarnings?.() ?? []).map((w) => `- ${w}`));
+
+  // snapshot: вакансии источника, пропавшие из полного списка, вероятно закрыты (и наоборот)
+  if (p.snapshot && p.covers && !failed && !opts.file) {
+    for (const v of all) {
+      const d = v.data;
+      if (d.source !== SOURCE) continue;
+      const ext = String(d.id).slice(SOURCE.length + 1);
+      if (!p.covers(ext)) continue;
+      const gone = !listedIds.has(d.id);
+      if (gone === !!d.possibly_closed) continue;
+      d.possibly_closed = gone;
+      if (gone) closed++;
+      else reopened++;
+      if (!opts.dryRun) writeVacancy(v.file, d, v.body);
+    }
+  }
+
   const rel = (f: string) => path.relative(process.cwd(), f);
   const log =
     `## ${SOURCE} — ${new Date().toISOString().slice(11, 16)} UTC${opts.dryRun ? ' (dry-run)' : ''}\n\n` +
@@ -239,6 +287,7 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
     `- отсеяно предфильтром: ${stats.prefiltered}\n` +
     `- уже известных (вкл. отсеянные и удалённые ранее): ${stats.known}, старше ${env.COLLECT_MAX_AGE_DAYS} дн.: ${stats.old}, дублей с других площадок: ${stats.duplicates}\n` +
     `- сохранено новых: ${stats.saved}\n` +
+    (p.snapshot ? `- помечено possibly_closed (нет в списке): ${closed}, снова открыто: ${reopened}\n` : '') +
     `- ошибок: ${stats.errors}\n` +
     `- причина остановки: ${stopReason}\n\n` +
     (warnings.length ? `### ⚠ Предупреждения\n${warnings.join('\n')}\n\n` : '') +
