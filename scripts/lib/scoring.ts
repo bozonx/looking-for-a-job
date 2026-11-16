@@ -16,8 +16,23 @@ export function loadWeights(): Weights {
   return YAML.parse(fs.readFileSync(path.join(CONFIG_DIR, 'weights.yaml'), 'utf8')) as Weights;
 }
 
-export function loadRegions(): Record<string, number> {
-  return YAML.parse(fs.readFileSync(path.join(CONFIG_DIR, 'regions.yaml'), 'utf8')) as Record<string, number>;
+export interface RegionGroup {
+  score: number;
+  countries: string[];
+}
+export type Regions = Record<string, RegionGroup>;
+
+export function loadRegions(): Regions {
+  return (YAML.parse(fs.readFileSync(path.join(CONFIG_DIR, 'regions.yaml'), 'utf8')) as { groups: Regions }).groups;
+}
+
+/** Группа работодателя: русскоязычная команда > страна из списка > other; страна неизвестна → unknown. */
+export function regionGroup(R: Regions, country: string | null | undefined, ruTeam: boolean | null | undefined): string {
+  if (ruTeam) return 'ru_speaking_team';
+  if (!country) return 'unknown';
+  const c = country.toUpperCase();
+  for (const [g, def] of Object.entries(R)) if (def.countries?.includes(c)) return g;
+  return 'other';
 }
 
 export function computeOverall(W: Weights, scores: Record<string, any>, stopFlags: string[]): { overall: number; flags: string[] } {

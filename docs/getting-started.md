@@ -50,14 +50,14 @@ cp resumes/vue.example.md resumes/vue.md
 |---|---|
 | `config/preferences.md` | текстом: что для вас важно, какие стоп-факторы. Это читает агент |
 | `config/weights.yaml` | те же предпочтения числами — веса критериев, веса треков, стоп-флаги. Это читает `npm run score` |
-| `config/regions.yaml` | оценка 0–100 для каждого региона |
+| `config/regions.yaml` | группы стран работодателя: оценка 0–100 и список ISO-кодов |
 | `config/prefilter.yaml` | слова в заголовке, которые сразу отсеивают / пропускают вакансию (без LLM) |
 | `config/source-priority.yaml` | порядок площадок для отклика при дублях |
 | `config/sources.md` | список площадок и их статус (✅ = собирается) |
 
 Важно: `preferences.md` и `weights.yaml` должны говорить одно и то же. Поменяли смысл в одном — поправьте второй. Подробно о том, как веса превращаются в балл, — [how-it-works.md](how-it-works.md#скоринг).
 
-Стоп-факторы (`office_outside_ar`, `ru_corporate`) и список регионов зашиты под конкретную ситуацию (живу в Аргентине). Если ваша другая — поменяйте описание в `preferences.md`, `playbooks/scoring.md`, `dev_docs/design.md §8.1`; для нового значения флага или региона нужно также расширить enum в `scripts/lib/schema.ts`.
+Стоп-факторы (`office_outside_ar`, `location_restricted`, `nationality_excluded`, `ru_corporate`) и список регионов зашиты под конкретную ситуацию (живу в Аргентине). Если ваша другая — поменяйте описание в `preferences.md`, `playbooks/scoring.md`, `dev_docs/design.md §8.1`; для нового значения флага или региона нужно также расширить enum в `scripts/lib/schema.ts`.
 
 ## 4. Первый сбор
 

@@ -13,7 +13,7 @@
 Схема — `scripts/lib/schema.ts` (zod), общая для скриптов и UI. Проверка — `npm run validate`.
 Две ступени строгости:
 - `scores: null` (ещё не отскорена) — базовая схема `VacancySchema`;
-- `scores` заполнены — `ScoredVacancySchema`: дополнительно обязательны `region`, `summary`, `best_resume`, `score_reasoning`, `scoring_version`, все частные оценки и посчитанный `scores.overall`.
+- `scores` заполнены — `ScoredVacancySchema`: дополнительно обязательны `region` (вычисляется), `company_country` (код или `null`), `summary`, `best_resume`, `score_reasoning`, `scoring_version`, все частные оценки и посчитанный `scores.overall`.
 
 ## Кто что пишет
 
@@ -90,8 +90,11 @@ scoring_version: 1
 ### `title`, `company` · С · обязательно
 Как на площадке, с исправленной кодировкой и HTML-сущностями. Если площадка не отдала компанию — `Unknown`. Пара нормализованных `company + title` — третий ключ дедупликации: из компании убираются `Inc/LLC/GmbH…`, из заголовка — `senior/junior/lead/remote…` и скобки. Поэтому «Senior Vue Developer (Remote)» и «Vue Developer» у одной компании считаются дублями.
 
-### `company_country` · А
-ISO-код страны **работодателя** (не кандидата, не офиса клиента). `null`, если неясно. Помогает определить `ru_corporate` и требования к документам.
+### `company_country` · А · обязательно после скоринга (код или `null`)
+ISO 3166-1 alpha-2 заглавными (`US`, `CY`) — страна **регистрации нанимающей стороны** (не кандидата, не локация вакансии, не офис клиента; для аутстафа — аутстаф-компания). `null`, если неясно. Из него `score.ts` вычисляет `region`; помогает определить `ru_corporate`.
+
+### `ru_speaking_team` · А
+`true`, если явно видно, что компания/команда русскоязычная (текст на русском, основатели из СНГ, «русскоязычная команда») — тогда высший приоритет региона, где бы ни была компания. Иначе `null`.
 
 ### `source`, `source_url` · С · обязательно
 Площадка, откуда пришла каноническая запись, и ссылка на вакансию на ней. `source` должен совпадать с id площадки в `config/sources.md` и `config/source-priority.yaml`.
@@ -123,16 +126,10 @@ ISO-код страны **работодателя** (не кандидата, �
 ## Условия работы
 
 ### `location` · С
-Строка с площадки как есть («Remote (EU)», «Worldwide», «Buenos Aires, hybrid»). Сырьё для `region` и `scores.remote`.
+Строка с площадки как есть («Remote (EU)», «Worldwide», «Buenos Aires, hybrid»). Сырьё для `scores.remote` и стоп-флагов `office_outside_ar` / `location_restricted`.
 
-### `region` · А · обязательно после скоринга
-Откуда **можно работать** (а не где офис компании): `argentina | cyprus | cis | europe | asia | other | global`.
-- `global` — реально из любой точки мира.
-- «Remote, only US» → `other` (а не `global`), и это же снижает `scores.remote`.
-- `cyprus` — отдельно, потому что там много русскоязычных компаний.
-- `cis` включает Россию.
-
-Агент выбирает только значение; числовой `scores.region` скрипт берёт из `config/regions.yaml`.
+### `region` · Р
+Группа работодателя: `argentina | ru_speaking_team | ru_speaking | anglo | spanish | europe | uae | asia | other | unknown`. Вычисляет `score.ts` по `config/regions.yaml`: `ru_speaking_team: true` → `ru_speaking_team`; иначе по списку стран группы; страна не в списках → `other`; `company_country: null` → `unknown`. Числовой `scores.region` — оттуда же.
 
 ### `salary` · С/А
 `{ min, max, currency, period }`, `period ∈ year | month | hour`; любая граница может быть `null`. Нет данных — весь объект `null` (и это обычно `red_flags`). У RemoteOK зарплата всегда годовая в USD. В скоринг не входит — показывается для решения.
@@ -172,7 +169,7 @@ ISO-код страны **работодателя** (не кандидата, �
 | `outsource` | А | наниматель — аутсорс/аутстаф/body-shop/агентство «our client» | EPAM-подобные и мелкие конторы 80–100 |
 | `end_client_corporate` | А | **только при `outsource ≥ 50`**: крупный ли конечный клиент. Иначе `null` | аутстаф на проект банка → 90 |
 | `legitimacy` | А | реальность компании и вакансии (обратное к скаму) | сайт, LinkedIn-страница, внятное описание → высоко. **< 30 автоматически ставит `scam`** |
-| `region` | Р | из `config/regions.yaml` по полю `region` | агент не заполняет |
+| `region` | Р | из `config/regions.yaml` по `company_country` / `ru_speaking_team` | агент не заполняет |
 | `language` | А | подходит ли язык общения | ru/en/es → 100; требуется другой → 0–40 |
 | `fit.vue/react/angular/fullstack/ai_engineer` | А | соответствие **каждому** треку; все пять ключей обязательны | см. ниже |
 | `overall` | Р | итоговый балл | только `npm run score` |
@@ -191,7 +188,9 @@ ISO-код страны **работодателя** (не кандидата, �
 
 | Флаг | Когда |
 |---|---|
-| `office_outside_ar` | офис/гибрид **вне** Буэнос-Айреса и Мар-дель-Платы |
+| `office_outside_ar` | офис/гибрид без варианта удалёнки **вне** AMBA (Буэнос-Айрес, Ла-Плата и др. спутники) и Мар-дель-Платы. «Hybrid/remote» и «сначала удалённо, потом релокация» — удалёнка |
+| `location_restricted` | **обязательная** авторизация на работу / проживание в стране без Аргентины (US only, EU work permit). «Preferred» — не флаг |
+| `nationality_excluded` | явный запрет на кандидатов из Аргентины или с гражданством РФ |
 | `ru_corporate` | российская корпорация как **нанимающая** сторона. Аутстаф на такого клиента — не флаг |
 | `inadequate` | общий созвон со всеми кандидатами, платное «обучение», многодневное бесплатное тестовое, неуважение к кандидату |
 | `scam` | `legitimacy < 30` — ставит расчёт автоматически |

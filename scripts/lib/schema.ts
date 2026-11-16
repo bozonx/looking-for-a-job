@@ -4,10 +4,11 @@ const score = z.number().min(0).max(100);
 const nscore = score.nullable();
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 
-export const REGIONS = ['argentina', 'cyprus', 'cis', 'europe', 'asia', 'other', 'global'] as const;
+/** Группы работодателя из config/regions.yaml; поле region вычисляет score.ts. */
+export const REGIONS = ['argentina', 'ru_speaking_team', 'ru_speaking', 'anglo', 'spanish', 'europe', 'uae', 'asia', 'other', 'unknown'] as const;
 export const TRACKS = ['vue', 'react', 'angular', 'fullstack', 'ai_engineer'] as const;
 export const STATUSES = ['new', 'selected', 'rejected', 'needs_attention', 'applied', 'apply_failed'] as const;
-export const STOP_FLAGS = ['office_outside_ar', 'ru_corporate', 'inadequate', 'scam'] as const;
+export const STOP_FLAGS = ['office_outside_ar', 'location_restricted', 'nationality_excluded', 'ru_corporate', 'inadequate', 'scam'] as const;
 
 export const ScoresSchema = z.object({
   remote: score,
@@ -16,7 +17,7 @@ export const ScoresSchema = z.object({
   outsource: score,
   end_client_corporate: nscore,
   legitimacy: score,
-  region: nscore.optional(), // считает score.ts из regions.yaml
+  region: nscore.optional(), // считает score.ts из regions.yaml по company_country / ru_speaking_team
   language: score,
   fit: z.object(Object.fromEntries(TRACKS.map((t) => [t, score])) as Record<(typeof TRACKS)[number], typeof score>),
   overall: nscore.optional(),
@@ -26,7 +27,8 @@ export const VacancySchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+-[A-Za-z0-9_-]+$/),
   title: z.string().min(1),
   company: z.string().min(1),
-  company_country: z.string().nullable().optional(),
+  company_country: z.string().regex(/^[A-Z]{2}$/, 'ISO 3166-1 alpha-2').nullable().optional(), // страна регистрации нанимающей стороны
+  ru_speaking_team: z.boolean().nullable().optional(), // явно русскоязычная компания/команда
   source: z.string().min(1),
   source_url: z.string().url(),
   real_url: z.string().url().nullable().optional(),
@@ -36,7 +38,7 @@ export const VacancySchema = z.object({
   collected_at: date,
   posted_at: date.nullable().optional(),
   location: z.string().nullable().optional(),
-  region: z.enum(REGIONS).nullable().optional(),
+  region: z.enum(REGIONS).nullable().optional(), // вычисляет score.ts из company_country / ru_speaking_team
   salary: z
     .object({ min: z.number().nullable(), max: z.number().nullable(), currency: z.string(), period: z.enum(['year', 'month', 'hour']) })
     .nullable()
@@ -75,6 +77,7 @@ export const VacancySchema = z.object({
 export const ScoredVacancySchema = VacancySchema.extend({
   scores: ScoresSchema,
   region: z.enum(REGIONS),
+  company_country: z.string().regex(/^[A-Z]{2}$/).nullable(), // агент обязан решить: код или явный null
   summary: z.string().min(1),
   best_resume: z.enum(TRACKS),
   score_reasoning: z.string().min(1),

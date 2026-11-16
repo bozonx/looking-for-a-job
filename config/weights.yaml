@@ -20,5 +20,5 @@ fit_tracks:
   angular: 0.8
   fullstack: 1
   ai_engineer: 1
-stop_flags: [office_outside_ar, ru_corporate, inadequate, scam]   # любой → overall = 0
+stop_flags: [office_outside_ar, location_restricted, nationality_excluded, ru_corporate, inadequate, scam]   # любой → overall = 0
 scam_legitimacy_below: 30                                        # автоматически ставит флаг scam

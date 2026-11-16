@@ -1,9 +1,45 @@
-# Оценка scores.region (0–100) по региону вакансии.
-global: 100       # работа из любой точки
-argentina: 100
-usa: 100
-cyprus: 90        # русскоязычные компании
-cis: 85           # включая Россию
-europe: 85
-asia: 40
-other: 40
+# Приоритет работодателя по стране регистрации → scores.region (0–100).
+#
+# Агент заполняет только факты: company_country (ISO 3166-1 alpha-2 страны регистрации
+# нанимающей стороны) и ru_speaking_team (true, если явно видно, что компания/команда
+# русскоязычная). Группу (поле region) и scores.region вычисляет `npm run score`:
+#   1) ru_speaking_team: true      → группа ru_speaking_team (где бы ни была компания);
+#   2) company_country есть в списке группы → эта группа;
+#   3) страна известна, но нигде не указана → other;
+#   4) company_country: null       → unknown.
+#
+# Офис/гибрид сюда не относится: допустим только в Аргентине (AMBA, Мар-дель-Плата),
+# иначе стоп-флаг office_outside_ar. Для удалённой работы — эти веса.
+
+groups:
+  argentina:
+    score: 100
+    countries: [AR]
+  ru_speaking_team:          # по признаку ru_speaking_team, страна не важна
+    score: 100
+    countries: []
+  ru_speaking:               # русскоязычные страны и хабы релокантов
+    score: 100
+    countries: [RU, BY, KZ, UZ, KG, TJ, AM, GE, AZ, MD, CY, IL, RS, ME]
+  anglo:                     # англоязычные (в т.ч. английский как второй официальный)
+    score: 100
+    countries: [US, CA, AU, NZ]
+  spanish:                   # другие испаноязычные
+    score: 85
+    countries: [ES, MX, CL, UY, CO, PE, EC, BO, PY, VE, CR, PA, GT, HN, SV, NI, DO, CU, PR]
+  europe:                    # включая всё Соединённое Королевство и Ирландию
+    score: 70
+    countries: [GB, IE, DE, FR, NL, BE, LU, CH, AT, IT, PT, PL, CZ, SK, HU, RO, BG, GR, HR, SI,
+                EE, LV, LT, FI, SE, NO, DK, IS, MT, UA, AL, BA, MK, XK]
+  uae:
+    score: 60
+    countries: [AE]
+  asia:
+    score: 45
+    countries: [CN, HK, TW, JP, KR, SG, MY, TH, VN, ID, PH, IN, PK, BD, LK, NP, MN, TR]
+  other:                     # страна известна, но не попала ни в одну группу
+    score: 40
+    countries: []
+  unknown:                   # страна не определена — нейтрально
+    score: 60
+    countries: []

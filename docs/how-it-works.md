@@ -56,7 +56,7 @@
 
 ### Двухуровневая схема
 
-1. **Агент** ставит частные оценки 0–100 (`remote`, `startup`, `corporate`, `outsource`, `end_client_corporate`, `legitimacy`, `language`, `fit.*`), определяет `region`, стоп-флаги и пишет обоснование. Методика — `playbooks/scoring.md`, поля — [vacancy-format.md](vacancy-format.md#оценки--scores).
+1. **Агент** ставит частные оценки 0–100 (`remote`, `startup`, `corporate`, `outsource`, `end_client_corporate`, `legitimacy`, `language`, `fit.*`), определяет `company_country` / `ru_speaking_team`, стоп-флаги и пишет обоснование. Методика — `playbooks/scoring.md`, поля — [vacancy-format.md](vacancy-format.md#оценки--scores).
 2. **`npm run score`** (`scripts/lib/scoring.ts` + `rescore.ts`) считает итог по `config/weights.yaml`.
 
 Агент не видит и не пишет `overall`. Это убирает соблазн «подогнать» итог и делает веса единственным рычагом.
@@ -85,29 +85,29 @@
 
 ### Пример расчёта
 
-Оценки: remote 95, startup 80, corporate 10, outsource 0, end_client_corporate null, legitimacy 85, region 85 (europe), language 100, fit {vue 90, react 20, angular 0, fullstack 55, ai_engineer 70}.
+Оценки: remote 95, startup 80, corporate 10, outsource 0, end_client_corporate null, legitimacy 85, region 70 (europe), language 100, fit {vue 90, react 20, angular 0, fullstack 55, ai_engineer 70}.
 
 | Слагаемое | w | v | w·v |
 |---|---|---|---|
 | remote | 3 | 95 | 285 |
 | legitimacy | 2 | 85 | 170 |
 | fit (max: vue 1·90) | 4 | 90 | 360 |
-| region | 1 | 85 | 85 |
+| region | 1 | 70 | 70 |
 | language | 2 | 100 | 200 |
 | startup | 1 | 80 | 80 |
 | corporate (inv) | 2 | 100−10 = 90 | 180 |
 | outsource (inv) | 0.5 | 100−0 = 100 | 50 |
 | end_client_corporate | — | null | пропуск |
-| **Σ** | **15.5** | | **1410** |
+| **Σ** | **15.5** | | **1395** |
 
-overall = 1410 / 15.5 ≈ **91**.
+overall = 1395 / 15.5 = **90**.
 
 Та же вакансия, но «только гибрид в Берлине»: агент ставит `office_outside_ar` → overall = 0 независимо от остального.
 
 ### Что ещё делает `score`
 
 Кроме `overall`, пересчитывает производные поля:
-- `scores.region` — из `config/regions.yaml` по полю `region` (справочник, а не суждение агента — чтобы одинаковые регионы всегда получали одинаковую оценку);
+- `region` и `scores.region` — из `config/regions.yaml` по `company_country` / `ru_speaking_team` (справочник, а не суждение агента — чтобы одинаковые регионы всегда получали одинаковую оценку);
 - `apply_method` — если был `unknown`, а `real_url` найден;
 - `apply_target` — см. ниже;
 - `stop_flags` — дополняется `scam`.
