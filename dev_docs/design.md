@@ -58,6 +58,8 @@
 
 ### 5.2. Этап 3 — отклик («откликнись»)
 
+Детальный план (полуавтомат: агент заполняет, отправляю я) — `dev_docs/apply-plan.md`; он приоритетнее описанного ниже.
+
 Не реализован: нет `playbooks/apply.md` (резюме уже есть: `playbooks/tailor.md`, `scripts/render-resume.ts`); переменные `APPLY_*`, `LINKEDIN_APPLY_MAX_PER_DAY`, `TYPE_DELAY_MS` зарезервированы (`docs/env.md`). При реализации — добавить маршрут в `AGENTS.md`.
 
 **Команды:**
