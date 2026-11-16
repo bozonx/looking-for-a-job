@@ -26,12 +26,6 @@ include_title:
   - ai engineer
   - llm
   - genai
-  - rust
-  - golang
-  - go developer
-  - go engineer
-  - python developer
-  - python engineer
   - backend engineer
   - backend developer
   - ui engineer
@@ -65,7 +59,7 @@ include_title:
   - фулстек
   - фуллстек
   - инженер-программист
-include_tags: [vue, vuejs, nuxt, nuxtjs, react, reactjs, next.js, nextjs, angular, svelte, javascript, typescript, node, nodejs, nestjs, tauri, electron, frontend, front end, full stack, fullstack, llm, ai, ai-native, agents, rust, golang, go, python]
+include_tags: [vue, vuejs, nuxt, nuxtjs, react, reactjs, next.js, nextjs, angular, svelte, javascript, typescript, node, nodejs, nestjs, tauri, electron, frontend, front end, full stack, fullstack, llm, ai, ai-native, agents]
 exclude_title:
   - sales
   - marketing
