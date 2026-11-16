@@ -59,6 +59,20 @@ include_title:
   - фулстек
   - фуллстек
   - инженер-программист
+  # испаноязычные вакансии (женские формы ловятся по началу слова: desarrollador → desarrolladora)
+  - desarrollador
+  - programador
+  - ingeniero de software
+  - ingeniera de software
+  - ingeniero full
+  - ingeniera full
+  - ingeniero front
+  - ingeniera front
+  - ingeniero back
+  - ingeniera back
+  - ingeniero de ia
+  - ingeniera de ia
+  - analista programador
 include_tags: [vue, vuejs, nuxt, nuxtjs, react, reactjs, next.js, nextjs, angular, svelte, javascript, typescript, node, nodejs, nestjs, tauri, electron, frontend, front end, full stack, fullstack, llm, ai, ai-native, agents]
 exclude_title:
   - sales
@@ -120,3 +134,30 @@ exclude_title:
   - director
   - vp
   - head of
+  - trainee
+  # испанский
+  - ventas
+  - vendedor
+  - comercial
+  - reclutador
+  - gerente
+  - jefe de
+  - analista de datos
+  - analista funcional
+  - analista de negocio
+  - analista qa
+  - diseñador
+  - soporte
+  - mesa de ayuda
+  - tester
+  - contador
+  - abogado
+  - pasante
+  - pasantía
+  - practicante
+  - prácticas
+  - becario
+  - desarrollador java$
+  - programador java$
+  - desarrollador movil
+  - desarrollador móvil
