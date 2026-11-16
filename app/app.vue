@@ -240,7 +240,8 @@ const tabs = [
               <th class="sortable" @click="sortBy('profile')">профиль{{ arrow('profile') }}</th>
               <th class="sortable" @click="sortBy('date')">дата{{ arrow('date') }}</th>
               <th>Вакансия</th>
-              <th class="sortable" @click="sortBy('region')">регион{{ arrow('region') }}</th><th>бейджи</th><th>яз.</th><th>статус</th><th>дубли</th>
+              <th class="sortable" @click="sortBy('region')">регион{{ arrow('region') }}</th>
+              <th>бейджи</th>
             </tr>
           </thead>
           <tbody>
@@ -256,12 +257,33 @@ const tabs = [
               </td>
               <td><span class="badge big" :class="tone(v.scores?.overall)">{{ v.scores?.overall ?? '…' }}</span></td>
               <td>{{ v.best_resume ?? '—' }}</td>
-              <td class="nowrap">{{ (v.posted_at ?? v.collected_at)?.slice(5) }}</td>
+              <td class="col-date">
+                <div class="nowrap date-line">
+                  <span v-if="v.status === 'new'" class="dot-new" title="Новая"></span>
+                  <span>{{ (v.posted_at ?? v.collected_at)?.slice(5) }}</span>
+                </div>
+                <div v-if="v.status !== 'new'" class="status-line">
+                  <span class="status mini" :data-s="v.status">{{ STATUS_LABEL[v.status] ?? v.status }}</span>
+                </div>
+              </td>
               <td class="title">
                 <div><span v-if="v.starred" class="star">★</span><s v-if="v.possibly_closed" title="Возможно, закрыта">{{ v.title }}</s><template v-else>{{ v.title }}</template></div>
-                <div class="muted small">{{ v.company }}<template v-if="v.stop_flags?.length"> · <span class="flag">⛔ {{ v.stop_flags.join(', ') }}</span></template></div>
+                <div class="muted small">
+                  {{ v.company }}
+                  <template v-if="v.duplicates?.length"> · <span class="badge dup-badge" :title="'Дубликатов: ' + v.duplicates.length">⧉ {{ v.duplicates.length }}</span></template>
+                  <template v-if="v.stop_flags?.length"> · <span class="flag">⛔ {{ v.stop_flags.join(', ') }}</span></template>
+                </div>
               </td>
-              <td>{{ v.region ?? '—' }}</td>
+              <td class="col-region">
+                <div class="region-line">
+                  <span>{{ v.region ?? '—' }}</span>
+                  <span
+                    v-if="v.vacancy_language"
+                    class="badge lang-badge"
+                    :title="v.work_languages?.length ? `язык: ${v.vacancy_language}, рабочие: ${v.work_languages.join(', ')}` : `язык: ${v.vacancy_language}`"
+                  >{{ v.vacancy_language }}</span>
+                </div>
+              </td>
               <td class="badges">
                 <template v-if="v.scores">
                   <span class="badge" :class="tone(v.scores.remote)" title="remote">R{{ v.scores.remote }}</span>
@@ -271,11 +293,8 @@ const tabs = [
                   <span class="badge" :class="tone(v.scores.legitimacy)" title="legitimacy">L{{ v.scores.legitimacy }}</span>
                 </template>
               </td>
-              <td>{{ v.vacancy_language ?? '' }}<template v-if="v.work_languages?.length">/{{ v.work_languages.join(',') }}</template></td>
-              <td><span class="status" :data-s="v.status">{{ STATUS_LABEL[v.status] ?? v.status }}</span></td>
-              <td>{{ v.duplicates?.length || '' }}</td>
             </tr>
-            <tr v-if="!rows.length"><td colspan="10" class="muted empty">Пусто</td></tr>
+            <tr v-if="!rows.length"><td colspan="7" class="muted empty">Пусто</td></tr>
           </tbody>
         </table>
       </div>
@@ -342,9 +361,17 @@ th.sortable:hover { color: var(--fg); }
 .star { color: #e0a800; margin-right: 4px; }
 .flag { color: var(--bad); }
 .status { font-size: 12px; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--line); white-space: nowrap; }
+.status.mini { font-size: 10px; padding: 0 4px; border-radius: 4px; line-height: 1.3; }
 .status[data-s='selected'], .status[data-s='applied'] { color: var(--good); border-color: currentColor; }
 .status[data-s='rejected'] { color: var(--muted); }
 .status[data-s='needs_attention'], .status[data-s='apply_failed'] { color: var(--bad); border-color: currentColor; }
+.dot-new { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 4px; }
+.date-line { display: flex; align-items: center; }
+.status-line { margin-top: 2px; }
+.col-region { white-space: nowrap; }
+.region-line { display: flex; align-items: center; gap: 4px; }
+.lang-badge { min-width: auto; padding: 0 4px; font-size: 11px; font-weight: 500; background: color-mix(in srgb, var(--line) 80%, transparent); color: var(--fg); border-radius: 3px; text-transform: uppercase; margin: 0; }
+.dup-badge { min-width: auto; padding: 0 4px; font-size: 11px; background: color-mix(in srgb, var(--line) 70%, transparent); color: var(--muted); border-radius: 3px; margin: 0; }
 .empty { text-align: center; padding: 40px; }
 .errors { padding: 6px 12px; color: var(--bad); font-size: 12px; }
 footer { padding: 6px 12px; border-top: 1px solid var(--line); }
