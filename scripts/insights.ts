@@ -4,7 +4,7 @@
  *
  * Резюме: по каждому треку (resume_match.resume) — частота требований, нехватающих навыков,
  *   ATS-формулировок и «негативных» пунктов резюме. Учитываются только релевантные вакансии:
- *   отскоренные, без stop_flags, не rejected. Вес вакансии = overall/100, selected/starred ×2,
+ *   отскоренные, без stop_flags. Вес вакансии = overall/100, selected/starred ×2,
  *   поэтому мусор почти не влияет, а то, куда хочется откликнуться, — сильнее.
  *   v3 (scoring_version ≥ 3): топ обязанностей (сырьё для bullets опыта), как пишут навыки (для ATS — писать
  *   самым частым вариантом), домены и типы продукта, soft-требования, медиана требуемых лет.
@@ -30,7 +30,7 @@ const save = !args.includes('--no-save');
 const dict = loadSkills();
 const vac = loadAll().filter((v) => String(v.data.collected_at) >= since);
 const scored = vac.filter((v) => v.data.scores);
-const relevant = scored.filter((v) => !(v.data.stop_flags ?? []).length && v.data.status !== 'rejected');
+const relevant = scored.filter((v) => !(v.data.stop_flags ?? []).length);
 const weight = (d: any) => ((d.scores?.overall ?? 0) / 100) * (d.status === 'selected' || d.starred ? 2 : 1);
 const pct = (a: number, b: number) => (b ? `${Math.round((100 * a) / b)}%` : '—');
 
@@ -80,7 +80,7 @@ function v3Block(n3: number, total: number, resp: Counter, spell: Map<string, Ma
 
 const out: string[] = [`## Отчёт с ${since} по ${today()}`, ''];
 out.push(
-  `Вакансий собрано: ${vac.length}, отскорено: ${scored.length}, релевантных (без стоп-флагов, не rejected): ${relevant.length}, ` +
+  `Вакансий собрано: ${vac.length}, отскорено: ${scored.length}, релевантных (без стоп-флагов): ${relevant.length}, ` +
     `с resume_match: ${relevant.filter((v) => v.data.resume_match).length}.`,
   '',
 );
@@ -164,7 +164,7 @@ if (fs.existsSync(statsFile))
     }
 const sources = [...new Set([...vac.map((v) => v.data.source as string), ...runs.filter((r) => r.date >= since).map((r) => r.source as string)])].sort();
 out.push(
-  '| источник | прогонов (ошибок) | в ленте | просмотрено | предфильтр | сохранено | отскорено | ср. overall | overall<40 | стоп-флаги | rejected вручную | selected/★ |',
+  '| источник | прогонов (ошибок) | в ленте | просмотрено | предфильтр | сохранено | отскорено | ср. overall | overall<40 | стоп-флаги | ⚑ проблемные | selected/★ |',
   '|---|---|---|---|---|---|---|---|---|---|---|---|',
 );
 for (const s of sources) {
@@ -176,7 +176,7 @@ for (const s of sources) {
   out.push(
     `| ${s} | ${r.length} (${r.filter((x) => x.failed).length}) | ${sum('listed')} | ${sum('viewed')} | ${sum('prefiltered')} (${pct(sum('prefiltered'), sum('viewed'))}) | ${sum('saved')} | ${sv.length} | ${avg} | ` +
       `${pct(sv.filter((v) => (v.data.scores.overall ?? 0) < 40).length, sv.length)} | ${pct(sv.filter((v) => (v.data.stop_flags ?? []).length).length, sv.length)} | ` +
-      `${pct(all.filter((v) => v.data.status === 'rejected').length, all.length)} | ${all.filter((v) => v.data.status === 'selected' || v.data.starred).length} |`,
+      `${pct(all.filter((v) => v.data.flagged).length, all.length)} | ${all.filter((v) => v.data.status === 'selected' || v.data.starred).length} |`,
   );
 }
 if (!runs.length) out.push('', '_data/runs/stats.jsonl пуст — метрики прогонов появятся после следующего «собери»._');

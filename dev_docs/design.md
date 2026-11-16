@@ -33,14 +33,14 @@
 - Двухфазный сбор: скрипт `npm run collect` (общий конвейер `scripts/lib/collect.ts` + провайдеры `scripts/providers/`) — лимиты, предфильтр, дедуп, `seen`, запись, лог; затем агент скорит `npm run pending` в пределах `SCORE_MAX_PER_RUN`.
 - Провайдеры (только открытые API и ленты, `config/sources.md`): **ATS компаний** (Greenhouse/Lever/Ashby — снимок открытых вакансий, пропавшие → `possibly_closed`), **Get on Board**, **HN Who is hiring**, **RemoteOK**, **Himalayas**, **Jobicy**, **Remotive**, стандартные ленты **RSS/Atom/JSON Feed** (We Work Remotely) — без кода, через `config/sources.yaml`. Новый источник = провайдер + строка в реестре + строка в `config/sources.md`.
 - Скоринг: частные оценки агента + детерминированный `overall`, стоп-флаги, регион по справочнику, `apply_target` по `source-priority.yaml`; `npm run score` / `rescore` / `validate` (zod).
-- Обслуживание: `cleanup`, `dedupe` (диагностика), `fetch-page` (HTML → markdown), журнал `data/insights.md`.
+- Обслуживание: `cleanup` (вакансии без решения старше `CLEANUP_DEFAULT_DAYS`; автоматически после `collect`, если `CLEANUP_ON_COLLECT`), `dedupe` (диагностика), `fetch-page` (HTML → markdown), журнал `data/insights.md`.
 - Обратная связь: `resume_match` в каждой вакансии (сравнение с резюме, словарь `config/skills.yaml`), метрики прогонов `data/runs/stats.jsonl`, отчёт `npm run insights`, разбор — `playbooks/analyze.md`.
 
 **Этап 2 — UI** (`app/`, Nuxt SPA + Nitro). Подробно: `docs/running.md`, раздел «UI».
 
 - Кэш вакансий в памяти + `chokidar`, опрос раз в 5 с, ошибки разбора видны в UI.
 - Вкладки, фильтры, сортировка, карточка, горячие клавиши, rescore из UI.
-- Запись только `status` (`new`/`selected`/`rejected`), `starred`, `notes` — с перечитыванием файла и атомарной записью.
+- Запись только `status` (`null`/`selected`), `starred`, `flagged` (⚑ «проблемная» → агент перепроверяет), `notes` — с перечитыванием файла и атомарной записью.
 
 ## 5. Что предстоит
 
@@ -64,7 +64,7 @@
 
 | Фраза | Набор вакансий |
 |---|---|
-| «откликнись» | `selected` ∪ (`new` и `overall ≥ APPLY_SCORE_THRESHOLD`) |
+| «откликнись» | `selected` ∪ (`status: null` и `overall ≥ APPLY_SCORE_THRESHOLD`) |
 | «откликнись выбранным» | только `selected` |
 | «откликнись по скорингу» | только по порогу |
 | «откликнись на проблемные» | `needs_attention` + `apply_failed` — повтор с обновлёнными `answers.md` / медиа |
@@ -97,7 +97,7 @@
 - Сбор из Telegram-каналов.
 - Посты «we are hiring» / «ищем» на LinkedIn (`apply_method: comment`); отклик комментарием — только мной или после подтверждения.
 - Анализ скриптом с прямым вызовом LLM (дешёвая модель — предфильтр, сильная — скоринг).
-- Калибровка весов по моим решениям `selected`/`rejected`.
+- Калибровка весов по моим решениям `selected`/★/⚑ (неотмеченные = неинтересные).
 - Трекинг воронки (ответы, интервью, офферы) и конверсия по источникам и профилям.
 
 ## 6. Риски

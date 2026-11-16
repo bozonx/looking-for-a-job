@@ -2,7 +2,7 @@
  * Топ вакансий по scores.overall — для отчёта «собери» (playbooks/collect.md, шаг 7).
  * `npm run top -- [N] [--all]`
  * По умолчанию — отскоренные сегодня (`npm run score`, data/state/last-scored.json), N = 5.
- * --all — среди всех открытых (status не rejected, не possibly_closed).
+ * --all — среди всех открытых (не possibly_closed).
  */
 import { loadAll } from './lib/vacancy.ts';
 import { readLastScored } from './lib/lastscored.ts';
@@ -23,7 +23,7 @@ if (!all && !ids.size) console.log('Сегодня `npm run score` ничего 
 
 const list = loadAll()
   .filter((v) => typeof v.data.scores?.overall === 'number')
-  .filter((v) => (all ? v.data.status !== 'rejected' && !v.data.possibly_closed : ids.has(String(v.data.id))))
+  .filter((v) => (all ? !v.data.possibly_closed : ids.has(String(v.data.id))))
   .sort((a, b) => b.data.scores!.overall! - a.data.scores!.overall!);
 
 const top = list.slice(0, n);

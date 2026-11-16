@@ -21,6 +21,7 @@ export const env = {
   COLLECT_MAX_NEW: num('COLLECT_MAX_NEW', 300),
   SCORE_MAX_PER_RUN: num('SCORE_MAX_PER_RUN', 50),
   CLEANUP_DEFAULT_DAYS: num('CLEANUP_DEFAULT_DAYS', 30),
+  CLEANUP_ON_COLLECT: !['false', '0', 'no'].includes((process.env.CLEANUP_ON_COLLECT ?? 'true').toLowerCase()),
 };
 
 export function today(): string {

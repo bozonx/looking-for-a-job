@@ -3,7 +3,10 @@
  * Без источников — все из scripts/providers/index.ts. --file — только с одним источником.
  * Новые вакансии сохраняются со `scores: null` — их скорит агент (playbooks/scoring.md).
  */
-import { collect, collectContext, type CollectResult } from './lib/collect.ts';
+import { collect, collectContext, COLLECT_RUN, type CollectResult } from './lib/collect.ts';
+import { writeLastCollect } from './lib/lastcollect.ts';
+import { cleanup } from './lib/cleanup.ts';
+import { env } from './lib/env.ts';
 
 /**
  * Сколько источников собирать одновременно. Разные площадки — разные хосты, так что параллельность
@@ -89,7 +92,14 @@ async function main() {
     total += r.saved;
     if (r.failed) failed++;
   }
-  const itog = summary(results, dryRun);
+  let itog = summary(results, dryRun);
+  if (!dryRun && !file) {
+    writeLastCollect(COLLECT_RUN);
+    if (env.CLEANUP_ON_COLLECT) {
+      const removed = cleanup(env.CLEANUP_DEFAULT_DAYS, false, () => {});
+      itog += `\n### Очистка (CLEANUP_ON_COLLECT)\n- удалено вакансий без решения старше ${env.CLEANUP_DEFAULT_DAYS} дн.: ${removed.length}\n`;
+    }
+  }
   if (!dryRun && !file) insertRunLog('collect', itog.replace('# ИТОГ СБОРА', `## ИТОГ СБОРА — ${new Date().toISOString().slice(11, 16)} UTC`), logOffset);
   console.log(itog);
   if (total && !dryRun) console.log(`NEXT: отскорить ${total} вакансий (npm run pending), поискать real_url, затем npm run score && npm run validate; дописать data/insights.md`);

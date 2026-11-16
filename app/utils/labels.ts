@@ -1,7 +1,5 @@
 export const STATUS_LABEL: Record<string, string> = {
-  new: 'новая',
   selected: 'выбрана',
-  rejected: 'отклонена',
   needs_attention: 'внимание',
   applied: 'отклик',
   apply_failed: 'ошибка',

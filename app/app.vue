@@ -1,8 +1,10 @@
 <script setup lang="ts">
 type Row = Record<string, any>;
 
-const { data, refresh } = useFetch<{ items: Row[]; errors: { file: string; error: string }[] }>('/api/vacancies');
+const { data, refresh } = useFetch<{ items: Row[]; errors: { file: string; error: string }[]; lastRun: string | null }>('/api/vacancies');
 const items = computed(() => data.value?.items ?? []);
+/** «Новая» = собрана последним запуском `npm run collect` (data/state/last-collect.json). */
+const isFresh = (v: Row) => !!v.collected_run && v.collected_run === data.value?.lastRun;
 
 // ---- filters (remembered per browser) ----
 export interface FilterPreset {
@@ -82,17 +84,19 @@ watch(activePresetId, (val) => {
 
 const uniq = (k: string) => [...new Set(items.value.map((v) => v[k]).filter(Boolean))].sort();
 const counts = computed(() => ({
-  inbox: items.value.filter((v) => v.status === 'new').length,
+  inbox: items.value.filter(isFresh).length,
+  flagged: items.value.filter((v) => v.flagged).length,
   attention: items.value.filter((v) => v.status === 'needs_attention' || v.status === 'apply_failed').length,
   selected: items.value.filter((v) => v.status === 'selected').length,
   all: items.value.length,
 }));
 
 function matchRow(v: Row, filter: typeof defaults, q: string) {
-  if (filter.tab === 'inbox' && v.status !== 'new') return false;
+  if (filter.tab === 'inbox' && !isFresh(v)) return false;
+  if (filter.tab === 'flagged' && !v.flagged) return false;
   if (filter.tab === 'attention' && v.status !== 'needs_attention' && v.status !== 'apply_failed') return false;
   if (filter.tab === 'selected' && v.status !== 'selected') return false;
-  if (filter.tab === 'all' && filter.status && v.status !== filter.status) return false;
+  if (filter.tab === 'all' && filter.status && (v.status ?? 'none') !== filter.status) return false;
   if (filter.minOverall && (v.scores?.overall ?? 0) < filter.minOverall) return false;
   if (filter.track && v.best_resume !== filter.track && !(v.role_tracks ?? []).includes(filter.track)) return false;
   if (filter.source && v.source !== filter.source) return false;
@@ -147,7 +151,7 @@ const allMarked = computed(() => markable.value.length > 0 && markable.value.eve
 const someMarked = computed(() => markable.value.some((v) => v.status === 'selected'));
 async function markAll(on: boolean) {
   const ids = markable.value.filter((v) => (v.status === 'selected') !== on).map((v) => v.id);
-  for (const id of ids) await patch(id, { status: on ? 'selected' : 'new' });
+  for (const id of ids) await patch(id, { status: on ? 'selected' : null });
 }
 
 // ---- selection ----
@@ -230,9 +234,9 @@ function onKey(e: KeyboardEvent) {
     k: () => move(-1),
     ArrowUp: () => move(-1),
     a: () => id && patch(id, { status: 'selected' }),
-    x: () => id && patch(id, { status: 'rejected' }),
+    f: () => id && patch(id, { flagged: !cur?.flagged }),
     s: () => id && patch(id, { starred: !cur?.starred }),
-    u: () => id && patch(id, { status: 'new' }),
+    u: () => id && cur?.status === 'selected' && patch(id, { status: null }),
     '/': () => (document.querySelector('#q') as HTMLInputElement)?.focus(),
   };
   const fn = map[e.key];
@@ -246,6 +250,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
 
 const tabs = [
   ['inbox', 'Новые'],
+  ['flagged', 'Проблемные'],
   ['attention', 'Требуют внимания'],
   ['selected', 'Выбранные'],
   ['all', 'Все'],
@@ -459,6 +464,7 @@ const currentFilterTags = computed(() =>
         />
         <select v-if="f.tab === 'all'" v-model="f.status">
           <option value="">статус: все</option>
+          <option value="none">без решения</option>
           <option v-for="(l, s) in STATUS_LABEL" :key="s" :value="s">{{ l }}</option>
         </select>
         <label>overall ≥ <input v-model.number="f.minOverall" type="number" min="0" max="100" step="5" class="num" /></label>
@@ -531,22 +537,22 @@ const currentFilterTags = computed(() =>
                   :checked="v.status === 'selected' || v.status === 'applied'"
                   :disabled="v.status === 'applied'"
                   title="Отметить для автоотклика"
-                  @change="patch(v.id, { status: ($event.target as HTMLInputElement).checked ? 'selected' : 'new' })"
+                  @change="patch(v.id, { status: ($event.target as HTMLInputElement).checked ? 'selected' : null })"
                 />
               </td>
               <td><span class="badge big" :class="tone(v.scores?.overall)">{{ v.scores?.overall ?? '…' }}</span></td>
               <td>{{ v.best_resume ?? '—' }}</td>
               <td class="col-date">
                 <div class="nowrap date-line">
-                  <span v-if="v.status === 'new'" class="dot-new" title="Новая"></span>
+                  <span v-if="isFresh(v)" class="dot-new" title="Новая — из последнего сбора"></span>
                   <span>{{ (v.posted_at ?? v.collected_at)?.slice(5) }}</span>
                 </div>
-                <div v-if="v.status !== 'new'" class="status-line">
+                <div v-if="v.status" class="status-line">
                   <span class="status mini" :data-s="v.status">{{ STATUS_LABEL[v.status] ?? v.status }}</span>
                 </div>
               </td>
               <td class="title">
-                <div><span v-if="v.starred" class="star">★</span><s v-if="v.possibly_closed" title="Возможно, закрыта">{{ v.title }}</s><template v-else>{{ v.title }}</template></div>
+                <div><span v-if="v.starred" class="star">★</span><span v-if="v.flagged" class="flag" title="Проблемная">⚑</span><s v-if="v.possibly_closed" title="Возможно, закрыта">{{ v.title }}</s><template v-else>{{ v.title }}</template></div>
                 <div class="muted small">
                   {{ v.company }}
                   <template v-if="v.duplicates?.length"> · <span class="badge dup-badge" :title="'Дубликатов: ' + v.duplicates.length">⧉ {{ v.duplicates.length }}</span></template>
@@ -577,7 +583,7 @@ const currentFilterTags = computed(() =>
           </tbody>
         </table>
       </div>
-      <footer class="muted small">j/k — навигация · a — откликнуться · x — отклонить · s — звезда · u — вернуть в new · / — поиск</footer>
+      <footer class="muted small">j/k — навигация · a — откликнуться · u — снять отклик · s — звезда · f — проблемная · / — поиск</footer>
     </aside>
 
     <main class="detail">
@@ -772,7 +778,7 @@ th.sortable:hover { color: var(--fg); }
 .status { font-size: 12px; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--line); white-space: nowrap; }
 .status.mini { font-size: 10px; padding: 0 4px; border-radius: 4px; line-height: 1.3; }
 .status[data-s='selected'], .status[data-s='applied'] { color: var(--good); border-color: currentColor; }
-.status[data-s='rejected'] { color: var(--muted); }
+.flag { color: var(--bad); margin-right: 4px; }
 .status[data-s='needs_attention'], .status[data-s='apply_failed'] { color: var(--bad); border-color: currentColor; }
 .dot-new { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 4px; }
 .date-line { display: flex; align-items: center; }

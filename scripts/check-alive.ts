@@ -1,6 +1,6 @@
 /**
  * Проверка, жива ли вакансия по прямой ссылке (real_url) — без браузера и без агента, обычными HTTP-запросами.
- * `npm run check-alive -- [--status new,selected,needs_attention] [--force] [--dry-run] [id|путь …]`
+ * `npm run check-alive -- [--status none,selected,needs_attention] [--force] [--dry-run] [id|путь …]`
  *
  * Правила по ATS (публичные API, 404 = вакансии нет):
  * - Workable:   apply.workable.com/<acc>/j/<id>      → api/v2/accounts/<acc>/jobs/<id>
@@ -31,7 +31,7 @@ const val = (n: string) => {
 };
 const force = args.includes('--force');
 const dryRun = args.includes('--dry-run');
-const statuses = new Set((val('--status') ?? 'new,selected,needs_attention').split(',').map((s) => s.trim()).filter(Boolean));
+const statuses = new Set((val('--status') ?? 'none,selected,needs_attention').split(',').map((s) => s.trim()).filter(Boolean));
 const positional = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--status');
 const today = new Date().toISOString().slice(0, 10);
 
@@ -101,11 +101,11 @@ export async function checkUrl(raw: string): Promise<{ verdict: Verdict; how: st
 async function main() {
   const files = positional.length ? resolveTargets(positional).map(parseVacancy) : loadAll();
   const queue = files.filter((v) => {
-    if (!positional.length && !statuses.has(v.data.status)) return false;
+    if (!positional.length && !statuses.has(v.data.status ?? 'none')) return false;
     if (!targetUrl(v.data)) return false;
     return force || positional.length > 0 || v.data.alive_checked_at !== today;
   });
-  const skippedNoUrl = files.filter((v) => (positional.length || statuses.has(v.data.status)) && !targetUrl(v.data)).length;
+  const skippedNoUrl = files.filter((v) => (positional.length || statuses.has(v.data.status ?? 'none')) && !targetUrl(v.data)).length;
   console.log(`Проверяю ${queue.length} вакансий (без ссылки для проверки пропущено: ${skippedNoUrl})…`);
 
   const stat = { open: 0, closed: 0, unknown: 0, error: 0 };

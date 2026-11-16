@@ -28,7 +28,7 @@
       `apply_method` и `apply_target` пересчитает `npm run score`.
 5. `npm run score` — посчитает `overall`, `scores.region`, `apply_target`; `npm run validate` — исправь ошибки.
    Затем `npm run resolve-urls` — найдёт real_url на страницах агрегаторов (vuejobs, WWR; бережно: пауза ~3 с,
-   ≤ 40 страниц с площадки за запуск, 403/429 → площадка пропускается), и `npm run check-alive` — проверит по real_url, не закрыты ли вакансии (new/selected/needs_attention;
+   ≤ 40 страниц с площадки за запуск, 403/429 → площадка пропускается), и `npm run check-alive` — проверит по real_url, не закрыты ли вакансии (без статуса/selected/needs_attention;
    закрытые получат `possibly_closed: true` и скроются в UI). Затем `npm run top` — топ-5 отскоренных в этом запуске (для отчёта).
    Не исправилось за 2 попытки — остановись и опиши проблему в отчёте.
 6. **Обязательно** допиши наблюдения в `data/insights.md` (создай файл, если нет) — раздел `## <дата>`, строки

@@ -60,6 +60,9 @@ export interface Provider {
   minIntervalHours?: number;
 }
 
+/** Идентификатор текущего запуска сбора — время старта процесса; см. lastcollect.ts. */
+export const COLLECT_RUN = new Date().toISOString();
+
 export type VacancyData = ReturnType<typeof blankVacancy>;
 
 export function blankVacancy(source: string, extId: string) {
@@ -75,6 +78,7 @@ export function blankVacancy(source: string, extId: string) {
     duplicates: [] as { source: string; url: string; seen_at?: string; id?: string }[],
     apply_target: null as string | null,
     collected_at: today(),
+    collected_run: COLLECT_RUN as string | null,
     posted_at: null as string | null,
     location: null as string | null,
     region: null as string | null,
@@ -92,10 +96,11 @@ export function blankVacancy(source: string, extId: string) {
     best_resume: null,
     score_reasoning: null,
     requirements_special: [] as string[],
-    status: 'new',
+    status: null as string | null,
     attention_reason: null,
     attention_details: null,
     starred: false,
+    flagged: false,
     notes: '',
     possibly_closed: false,
     applied_at: null,

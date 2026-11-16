@@ -1,6 +1,6 @@
 /**
  * Поиск прямой ссылки отклика (real_url) на странице агрегатора — обычным GET, без браузера и агента.
- * `npm run resolve-urls -- [--limit 40] [--status new,selected] [--dry-run] [--force] [id|путь …]`
+ * `npm run resolve-urls -- [--limit 40] [--status none,selected] [--dry-run] [--force] [id|путь …]`
  *
  * Бережно к площадкам (без бана):
  * - запросы к одной площадке строго последовательно, пауза GAP_MS (+ случайный разброс); разные площадки — параллельно;
@@ -30,7 +30,7 @@ const val = (n: string) => {
 const force = args.includes('--force');
 const dryRun = args.includes('--dry-run');
 const limit = Number(val('--limit') ?? 40);
-const statuses = new Set((val('--status') ?? 'new,selected').split(',').map((s) => s.trim()).filter(Boolean));
+const statuses = new Set((val('--status') ?? 'none,selected').split(',').map((s) => s.trim()).filter(Boolean));
 const positional = args.filter((a, i) => !a.startsWith('--') && !['--status', '--limit'].includes(args[i - 1] ?? ''));
 const today = new Date().toISOString().slice(0, 10);
 
@@ -96,7 +96,7 @@ async function main() {
   const files: VacancyFile[] = positional.length ? resolveTargets(positional).map(parseVacancy) : loadAll();
   const date = (v: VacancyFile) => String(v.data.posted_at ?? v.data.collected_at ?? '');
   const queue = files
-    .filter((v) => positional.length || (statuses.has(v.data.status) && !v.data.real_url && (force || !v.data.real_url_tried_at)))
+    .filter((v) => positional.length || (statuses.has(v.data.status ?? 'none') && !v.data.real_url && (force || !v.data.real_url_tried_at)))
     .filter((v) => v.data.source_url && !SKIP_HOSTS.has(new URL(v.data.source_url).hostname))
     .sort((a, b) => date(b).localeCompare(date(a)));
 

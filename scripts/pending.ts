@@ -1,10 +1,10 @@
 /**
- * Очередь вакансий, ожидающих скоринга агентом (scores: null, status: new).
+ * Очередь вакансий, ожидающих скоринга агентом (scores: null).
  * `npm run pending -- [--paths] [--limit N | --all]`
  * Отдаёт не больше SCORE_MAX_PER_RUN (по умолчанию) — бюджет токенов на один «собери».
  * Порядок: сначала свежие (posted_at, иначе collected_at), при равенстве — с известным real_url.
  * Остаток остаётся в очереди и берётся следующим запуском: курсор не нужен, очередь — это сами файлы.
- * `--upgrade` — вместо очереди скоринга: отскоренные релевантные вакансии (без stop_flags, не rejected) со
+ * `--upgrade` — вместо очереди скоринга: отскоренные релевантные вакансии (без stop_flags) со
  *   scoring_version < 3, по убыванию overall — им нужно дозаполнить поля v3 в resume_match (playbooks/scoring.md).
  * Свежесть: вакансии старше `freshness_days` своего источника (config/sources.yaml) в очередь не попадают —
  * откликаться на них поздно, токены на скоринг не тратим. Файлы остаются (видны в UI); `--stale` — взять и их.
@@ -26,7 +26,7 @@ const withStale = args.includes('--stale') || args.includes('--all');
 
 if (args.includes('--upgrade')) {
   const up = loadAll()
-    .filter((v) => v.data.scores && (v.data.scoring_version ?? 0) < 3 && !(v.data.stop_flags ?? []).length && v.data.status !== 'rejected')
+    .filter((v) => v.data.scores && (v.data.scoring_version ?? 0) < 3 && !(v.data.stop_flags ?? []).length )
     .sort((a, b) => (b.data.scores.overall ?? 0) - (a.data.scores.overall ?? 0));
   const batch = up.slice(0, limit);
   for (const v of batch) {
@@ -38,7 +38,7 @@ if (args.includes('--upgrade')) {
 }
 
 const date = (v: { data: any }) => String(v.data.posted_at ?? v.data.collected_at ?? '');
-const queue = loadAll().filter((v) => v.data.scores == null && v.data.status === 'new');
+const queue = loadAll().filter((v) => v.data.scores == null);
 const now = Date.now();
 const isStale = (v: { data: any }) => {
   const days = freshnessDays(v.data.source);

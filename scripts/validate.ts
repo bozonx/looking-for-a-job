@@ -38,7 +38,7 @@ function checkResumeMatch(data: Record<string, any>, errs: string[], warns: stri
   if ((data.scoring_version ?? 0) >= 3) {
     if (!(rm.responsibilities ?? []).length) warns.push('resume_match.responsibilities: пусто (scoring_version 3)');
     if (rm.domain === undefined) warns.push('resume_match.domain: не заполнено (null, если неясно)');
-  } else if ((data.scoring_version ?? 0) === 2 && !(data.stop_flags ?? []).length && data.status !== 'rejected') warns.push('scoring_version 2: нет responsibilities/keyword_spellings/domain — дозаполни через npm run pending -- --upgrade');
+  } else if ((data.scoring_version ?? 0) === 2 && !(data.stop_flags ?? []).length) warns.push('scoring_version 2: нет responsibilities/keyword_spellings/domain — дозаполни через npm run pending -- --upgrade');
   for (const r of rm.responsibilities ?? []) if (String(r).length > 80) warns.push(`resume_match.responsibilities: слишком длинно «${String(r).slice(0, 40)}…» — сократи до «глагол + объект»`);
   for (const k of Object.keys(rm.keyword_spellings ?? {})) {
     if (!req.has(k.toLowerCase()) && !nice.has(k.toLowerCase())) errs.push(`resume_match.keyword_spellings: «${k}» нет в required/nice_to_have`);
