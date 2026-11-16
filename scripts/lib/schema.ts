@@ -6,7 +6,7 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 
 /** Группы работодателя из config/regions.yaml; поле region вычисляет score.ts. */
 export const REGIONS = ['argentina', 'ru_speaking_team', 'ru_speaking', 'anglo', 'spanish', 'europe', 'uae', 'asia', 'other', 'unknown'] as const;
-export const TRACKS = ['vue', 'react', 'angular', 'fullstack', 'ai_engineer'] as const;
+export const TRACKS = ['vue', 'react', 'angular', 'fullstack', 'ai_engineer', 'automation'] as const;
 /** Решение по вакансии. Нет статуса (null) — решения нет: такие вакансии со временем удаляет cleanup. */
 export const STATUSES = ['selected', 'needs_attention', 'applied', 'apply_failed'] as const;
 export const STOP_FLAGS = ['office_outside_ar', 'location_restricted', 'nationality_excluded', 'ru_corporate', 'inadequate', 'scam'] as const;
@@ -20,7 +20,8 @@ export const ScoresSchema = z.object({
   legitimacy: score,
   region: nscore.optional(), // считает score.ts из regions.yaml по company_country / ru_speaking_team
   language: score,
-  fit: z.object(Object.fromEntries(TRACKS.map((t) => [t, score])) as Record<(typeof TRACKS)[number], typeof score>),
+  // automation добавлен позже: в старых вакансиях ключа нет — допускаем отсутствие
+  fit: z.object(Object.fromEntries(TRACKS.map((t) => [t, t === 'automation' ? nscore.optional() : score])) as Record<(typeof TRACKS)[number], typeof score>),
   overall: nscore.optional(),
 });
 

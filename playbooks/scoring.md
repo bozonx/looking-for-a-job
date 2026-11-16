@@ -10,7 +10,7 @@
 | `employment` | уточни: full-time / contract / b2b / eor / unknown |
 | `vacancy_language` | язык текста (en/ru/es/…) |
 | `work_languages` | только если язык общения указан ЯВНО; иначе null |
-| `role_tracks` | подмножество vue, react, angular, fullstack, ai_engineer |
+| `role_tracks` | подмножество vue, react, angular, fullstack, ai_engineer, automation |
 | `summary` | 1–3 предложения по-русски: что за компания и роль |
 | `key_points` | 3–6 пунктов: стек, формат, таймзона, зарплата |
 | `red_flags` | что настораживает (пустой список, если ничего) |
@@ -22,7 +22,7 @@
 | `scores.legitimacy` | реальность компании и вакансии; < 30 = скам |
 | `scores.region` | не заполняй — `npm run score` проставит из `config/regions.yaml` |
 | `scores.language` | ru/en/es → 100; требуется другой язык → 0–40 |
-| `scores.fit.*` | соответствие каждому треку (design.md §8.3), все пять ключей обязательны. `ai_engineer` высокий только для ролевых вакансий, где язык вторичен; Python/Go/Rust как основной язык или в заголовке → `ai_engineer` ≤ 30 (коммерческого опыта нет), отметь в `score_reasoning`. Слова «AI» или «LLM» сами по себе fit не поднимают. Node.js/TS в стеке не делает роль fullstack: узкий бэкенд-домен без фронтенда (игровые движки и игровая математика, RTP/симуляции, C++/низкоуровневое, data/ML-инфраструктура) → все треки ≤ 30. Индустрия (iGaming, беттинг и т.п.) сама по себе fit не снижает — оценивай роль **Уровень ниже middle** (junior, Jr., entry-level, early-career, intern, «1–2 years» как основное требование) → все треки ≤ 30, пункт в `red_flags` — даже если «junior» есть только в тексте, а не в заголовке |
+| `scores.fit.*` | соответствие каждому треку (design.md §8.3), все шесть ключей обязательны. `automation` высокий для ролей про n8n / Make / Zapier / low-code, ИИ-агентов и ассистентов для бизнеса, интеграции сервисов через API/вебхуки, Telegram-ботов, VPS и self-hosted, IoT; разовые проекты и part-time — норм. Чистый RPA (UiPath и т.п.), QA-автоматизация (Selenium/«automation QA») и DevOps-инфраструктура уровня Kubernetes/Terraform — не этот трек, `automation` ≤ 30. `ai_engineer` высокий только для ролевых вакансий, где язык вторичен; Python/Go/Rust как основной язык или в заголовке → `ai_engineer` ≤ 30 (коммерческого опыта нет), отметь в `score_reasoning`. **Бэкенд-язык без коммерческого опыта** (C#/.NET, Java/Kotlin, PHP, Ruby, Python, Go, Rust) в заголовке или с требованием «N+ years» при вторичном фронтенде (jQuery, Knockout, Razor/Blade, «HTML/CSS/JS» без фреймворка) → все треки ≤ 30, даже если в заголовке «Fullstack»; язык — в `red_flags`. Слова «AI» или «LLM» сами по себе fit не поднимают. Node.js/TS в стеке не делает роль fullstack: узкий бэкенд-домен без фронтенда (игровые движки и игровая математика, RTP/симуляции, C++/низкоуровневое, data/ML-инфраструктура) → все треки ≤ 30. Индустрия (iGaming, беттинг и т.п.) сама по себе fit не снижает — оценивай роль **Уровень ниже middle** (junior, Jr., entry-level, early-career, intern, «1–2 years» как основное требование) → все треки ≤ 30, пункт в `red_flags` — даже если «junior» есть только в тексте, а не в заголовке |
 | `stop_flags` | только при явных признаках, обоснуй в `score_reasoning`: |
 | ↳ `office_outside_ar` | офис/гибрид без варианта удалёнки, и место — не AMBA (Буэнос-Айрес, Ла-Плата и др. спутники) и не Мар-дель-Плата; а также обязательный переезд до начала работы (даже с помощью в релокации) |
 | ↳ `location_restricted` | **обязательная** авторизация на работу / проживание в стране или регионе без Аргентины (US only, EU work permit required). Сюда же неявный найм только из США: «Any State», «US remote», «remote (US)», список штатов, 401k/US benefits как единственный вариант — без упоминания найма из других стран (contractor/EOR) это US only. «Preferred» или «nice to have» — не флаг, а минус в `scores.remote` и пункт в `red_flags` |
@@ -60,10 +60,11 @@
 | AI Developer (аутсорс): RAG, MCP, Ollama, но «3–5+ years … production-level Python for building real services» | `ai_engineer: 70` («LLM/RAG совпадают, Python допустим») | Python — основной язык с требованием по годам → `ai_engineer` ≤ 30. RAG/MCP/LLM в стеке fit не поднимают |
 | Senior Agentic AI Engineer: агенты, LangGraph, MCP, но «Strong Python development skills … production-grade applications» | `ai_engineer: 80` | то же: AI-домен при обязательном сильном Python → ≤ 30 |
 | Kubernetes Control Plane (Go) | `ai_engineer: 35` | Go в заголовке → ≤ 30; системная инфраструктура без фронтенда → все треки ≤ 30 |
+| C#/.NET Fullstack developer (Netevia): «4+ years of commercial C#/.NET», .NET Framework 4.8 обязателен, фронтенд — HTML/JS + Knockout.js | `fullstack: 55`, `react: 55` → overall 67; React/Angular додуманы в `key_points` | бэкенд на C# с вторичным legacy-фронтендом → все треки ≤ 30 (`fullstack: 25`) → `fit_cap`, overall 35. Стек бери только из текста |
 | Любая бэкенд-роль, где в требованиях есть «use coding agents / AI assistants day to day» | рост `ai_engineer` | работа с coding agents — общий навык, роль AI-native не делает |
 
-`ai_engineer` высокий — когда роль строит AI-продукты и стек вторичен или совпадает с профилем (TS/Node, «any language»), например AI product engineer на TypeScript. Если обязателен глубокий опыт в Python/Go/Rust/Java, оценка ≤ 30.
-Fullstack с бэкендом на Go/Python и сильным React/TS-фронтендом (например, «4+ лет TS-фронтенда + 5+ лет бэкенда на Python или Go») — fullstack средний (≈ 50–65), а не ≤ 30: фронтенд совпадает, бэкенд-язык — пробел, отметь его в `red_flags`.
+`ai_engineer` высокий — когда роль строит AI-продукты и стек вторичен или совпадает с профилем (TS/Node, «any language»), например AI product engineer на TypeScript. Если обязателен глубокий опыт в Python/Go/Rust/Java/C#/Kotlin/PHP/Ruby, оценка ≤ 30.
+Fullstack с бэкендом на Go/Python/C#/Java/Kotlin/PHP/Ruby и сильным React/Vue/Angular + TS-фронтендом (например, «4+ лет TS-фронтенда + 5+ лет бэкенда на Python или .NET») — fullstack средний (≈ 50–65), а не ≤ 30: фронтенд совпадает, бэкенд-язык — пробел, отметь его в `red_flags`.
 Неоднозначное (например, «remote, US timezone» без требования резидентства) отражай в оценках и `red_flags`, не додумывай.
 
 ## `resume_match` — сравнение с резюме

@@ -34,6 +34,8 @@ feeds:
       - https://career.habr.com/vacancies/rss?type=all&remote=true&q=typescript
       - https://career.habr.com/vacancies/rss?type=all&remote=true&q=fullstack
       - https://career.habr.com/vacancies/rss?type=all&remote=true&q=frontend
+      - https://career.habr.com/vacancies/rss?type=all&remote=true&q=n8n
+      - https://career.habr.com/vacancies/rss?type=all&remote=true&q=%D0%B0%D0%B2%D1%82%D0%BE%D0%BC%D0%B0%D1%82%D0%B8%D0%B7%D0%B0%D1%86%D0%B8%D1%8F
 
   # VueJobs: все активные вакансии одной лентой (~900, свежие сверху). Компания и локация — в начале описания.
   - id: vuejobs
@@ -98,7 +100,7 @@ ats:
 
 # Himalayas: поисковые запросы (по 20 вакансий на страницу, свежие первыми).
 himalayas:
-  queries: [vue, nuxt, react, typescript, full stack, ai engineer]
+  queries: [vue, nuxt, react, typescript, full stack, ai engineer, n8n, ai automation]
 
 # Get on Board: категории и какие форматы работы брать.
 # remote_modality: fully_remote | remote_local | hybrid | no_remote; не-удалённые берутся только в этих странах.
@@ -145,7 +147,7 @@ yc:
 # areas — id регионов hh: 40 Казахстан, 97 Узбекистан, 16 Беларусь, 48 Кыргызстан, 9 Азербайджан, 28 Грузия,
 # 1001 другие регионы (113 Россия не включена; пусто — все регионы). remote_only — только «удалённо».
 hh:
-  queries: [vue, nuxt, react, typescript, fullstack, frontend]
+  queries: [vue, nuxt, react, typescript, fullstack, frontend, n8n, автоматизация бизнес-процессов]
   areas: ["40", "97", "16", "48", "9", "28", "1001"]
   remote_only: true
 

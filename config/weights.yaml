@@ -20,7 +20,8 @@ fit_tracks:
   react: 0.9                    # 2-й приоритет
   angular: 0.8                  # 3-й приоритет
   fullstack: 0.9                # 2-й приоритет
-  ai_engineer: 1                # 1-й приоритет; ролевые AI-native вакансии; Python/Go/Rust в заголовке → низкий fit (playbooks/scoring.md)
+  ai_engineer: 1                # 1-й приоритет; ролевые AI-native вакансии; бэкенд-язык без опыта (Python/Go/Rust/C#/Java/PHP/Ruby) в заголовке → низкий fit (playbooks/scoring.md)
+  automation: 0.8               # 3-й приоритет; n8n / Make / Zapier, ИИ-агенты, бизнес-автоматизация, VPS (playbooks/scoring.md)
 # Нерелевантная роль: если лучший взвешенный fit < below — overall не выше cap.
 fit_cap:
   below: 40

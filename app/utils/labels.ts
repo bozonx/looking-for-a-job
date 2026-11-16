@@ -12,7 +12,7 @@ export const ATTENTION_LABEL: Record<string, string> = {
   ambiguous: 'неоднозначно',
   other: 'другое',
 };
-export const TRACKS = ['vue', 'react', 'angular', 'fullstack', 'ai_engineer'] as const;
+export const TRACKS = ['vue', 'react', 'angular', 'fullstack', 'ai_engineer', 'automation'] as const;
 export const REGIONS = ['argentina', 'cyprus', 'cis', 'europe', 'asia', 'other', 'global'] as const;
 
 /** Badge tone for a 0–100 score; `inverse` = high is bad. */
