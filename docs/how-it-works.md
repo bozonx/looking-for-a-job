@@ -75,7 +75,7 @@
 |---|---|---|
 | `positive` | оценка как есть | remote 3, fit 4, legitimacy 2, language 2, region 1, startup 1.5 |
 | `inverse` | `100 − оценка` (чем выше, тем хуже) | corporate 2, outsource 0, end_client_corporate 0 (оценки ставятся, но не влияют) |
-| `fit` | `max` по трекам от `fit_tracks[трек] · fit[трек]` | vue 1, react 1, angular 0.8, fullstack 1, ai_engineer 1 |
+| `fit` | `max` по трекам от `fit_tracks[трек] · fit[трек]` | vue 1, ai_engineer 1, fullstack 0.9, react 0.9, angular 0.8 |
 
 Детали, которые важны:
 - Это **взвешенное среднее**, а не сумма: итог всегда 0–100, и абсолютный масштаб весов не важен — важны пропорции. `fit: 4` при сумме весов 15.5 значит, что fit даёт ~26 % балла.

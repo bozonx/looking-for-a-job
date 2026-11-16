@@ -16,10 +16,10 @@ inverse:
   outsource: 0                  # аутсорс/аутстаф — норм; оценку агент всё равно ставит
   end_client_corporate: 0       # крупный конечный клиент — норм (кроме РФ-госа/банков → стоп-флаг ru_corporate)
 fit_tracks:
-  vue: 1
-  react: 1
-  angular: 0.8                  # чуть ниже приоритетом
-  fullstack: 1
-  ai_engineer: 1                # ролевые AI-native вакансии; Python/Go/Rust в заголовке → низкий fit (playbooks/scoring.md)
+  vue: 1                        # 1-й приоритет
+  react: 0.9                    # 2-й приоритет
+  angular: 0.8                  # 3-й приоритет
+  fullstack: 0.9                # 2-й приоритет
+  ai_engineer: 1                # 1-й приоритет; ролевые AI-native вакансии; Python/Go/Rust в заголовке → низкий fit (playbooks/scoring.md)
 stop_flags: [office_outside_ar, location_restricted, nationality_excluded, ru_corporate, inadequate, scam]   # любой → overall = 0
 scam_legitimacy_below: 30                                        # автоматически ставит флаг scam
