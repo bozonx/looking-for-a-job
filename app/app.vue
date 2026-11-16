@@ -5,16 +5,78 @@ const { data, refresh } = useFetch<{ items: Row[]; errors: { file: string; error
 const items = computed(() => data.value?.items ?? []);
 
 // ---- filters (remembered per browser) ----
+export interface FilterPreset {
+  id: string;
+  name: string;
+  filters: {
+    tab: string;
+    status: string;
+    minOverall: number;
+    track: string;
+    source: string;
+    region: string;
+    lang: string;
+    since: string;
+    hideClosed: boolean;
+    sort: string;
+    dir: 'asc' | 'desc';
+  };
+}
+
 const defaults = { tab: 'inbox', status: '', minOverall: 0, track: '', source: '', region: '', lang: '', since: '', hideClosed: true, q: '', sort: 'overall', dir: 'desc' as 'asc' | 'desc' };
 const f = reactive({ ...defaults });
+const savedPresets = ref<FilterPreset[]>([]);
+const activePresetId = ref<string | null>(null);
+
+const activePreset = computed(() => savedPresets.value.find((p) => p.id === activePresetId.value) ?? null);
+
+const isPresetModified = computed(() => {
+  if (!activePreset.value) return false;
+  const p = activePreset.value.filters;
+  return (
+    f.tab !== p.tab ||
+    f.status !== p.status ||
+    f.minOverall !== p.minOverall ||
+    f.track !== p.track ||
+    f.source !== p.source ||
+    f.region !== p.region ||
+    f.lang !== p.lang ||
+    f.since !== p.since ||
+    f.hideClosed !== p.hideClosed ||
+    f.sort !== p.sort ||
+    f.dir !== p.dir
+  );
+});
+
 onMounted(() => {
   try {
-    Object.assign(f, JSON.parse(localStorage.getItem('filters') || '{}'));
+    const rawPresets = localStorage.getItem('saved_presets');
+    if (rawPresets) savedPresets.value = JSON.parse(rawPresets);
+    const active = localStorage.getItem('active_preset_id');
+    if (active && savedPresets.value.some((p) => p.id === active)) {
+      activePresetId.value = active;
+    }
+    const rawFilters = localStorage.getItem('filters');
+    if (rawFilters) Object.assign(f, JSON.parse(rawFilters));
   } catch {}
 });
+
+function persistPresets() {
+  try {
+    localStorage.setItem('saved_presets', JSON.stringify(savedPresets.value));
+  } catch {}
+}
+
 watch(f, () => {
   try {
     localStorage.setItem('filters', JSON.stringify(f));
+  } catch {}
+});
+
+watch(activePresetId, (val) => {
+  try {
+    if (val) localStorage.setItem('active_preset_id', val);
+    else localStorage.removeItem('active_preset_id');
   } catch {}
 });
 
@@ -26,23 +88,33 @@ const counts = computed(() => ({
   all: items.value.length,
 }));
 
+function matchRow(v: Row, filter: typeof defaults, q: string) {
+  if (filter.tab === 'inbox' && v.status !== 'new') return false;
+  if (filter.tab === 'attention' && v.status !== 'needs_attention' && v.status !== 'apply_failed') return false;
+  if (filter.tab === 'selected' && v.status !== 'selected') return false;
+  if (filter.tab === 'all' && filter.status && v.status !== filter.status) return false;
+  if (filter.minOverall && (v.scores?.overall ?? 0) < filter.minOverall) return false;
+  if (filter.track && v.best_resume !== filter.track && !(v.role_tracks ?? []).includes(filter.track)) return false;
+  if (filter.source && v.source !== filter.source) return false;
+  if (filter.region && v.region !== filter.region) return false;
+  if (filter.lang && v.vacancy_language !== filter.lang) return false;
+  if (filter.hideClosed && v.possibly_closed && filter.tab !== 'all') return false;
+  if (filter.since && String(v.posted_at ?? v.collected_at) < filter.since) return false;
+  if (q && !`${v.title} ${v.company} ${v.location ?? ''}`.toLowerCase().includes(q)) return false;
+  return true;
+}
+
+const presetCounts = computed(() => {
+  const res: Record<string, number> = {};
+  for (const p of savedPresets.value) {
+    res[p.id] = items.value.filter((v) => matchRow(v, { ...defaults, ...p.filters }, '')).length;
+  }
+  return res;
+});
+
 const rows = computed(() => {
   const q = f.q.trim().toLowerCase();
-  const list = items.value.filter((v) => {
-    if (f.tab === 'inbox' && v.status !== 'new') return false;
-    if (f.tab === 'attention' && v.status !== 'needs_attention' && v.status !== 'apply_failed') return false;
-    if (f.tab === 'selected' && v.status !== 'selected') return false;
-    if (f.tab === 'all' && f.status && v.status !== f.status) return false;
-    if (f.minOverall && (v.scores?.overall ?? 0) < f.minOverall) return false;
-    if (f.track && v.best_resume !== f.track && !(v.role_tracks ?? []).includes(f.track)) return false;
-    if (f.source && v.source !== f.source) return false;
-    if (f.region && v.region !== f.region) return false;
-    if (f.lang && v.vacancy_language !== f.lang) return false;
-    if (f.hideClosed && v.possibly_closed && f.tab !== 'all') return false;
-    if (f.since && String(v.posted_at ?? v.collected_at) < f.since) return false;
-    if (q && !`${v.title} ${v.company} ${v.location ?? ''}`.toLowerCase().includes(q)) return false;
-    return true;
-  });
+  const list = items.value.filter((v) => matchRow(v, f, q));
   // Ascending comparators; direction is applied on top. Empty values always go last.
   const key: Record<string, (v: Row) => string | number | null> = {
     overall: (v) => v.scores?.overall ?? null,
@@ -139,6 +211,13 @@ onMounted(() => (timer = setInterval(() => document.visibilityState === 'visible
 onUnmounted(() => clearInterval(timer));
 
 function onKey(e: KeyboardEvent) {
+  if (showSaveDialog.value || presetToDelete.value) {
+    if (e.key === 'Escape') {
+      showSaveDialog.value = false;
+      presetToDelete.value = null;
+    }
+    return;
+  }
   const t = e.target as HTMLElement;
   if (e.ctrlKey || e.metaKey || e.altKey || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName)) return;
   const id = current.value;
@@ -169,21 +248,213 @@ const tabs = [
   ['selected', 'Выбранные'],
   ['all', 'Все'],
 ] as const;
+
+function selectSystemTab(tabKey: string) {
+  activePresetId.value = null;
+  f.tab = tabKey;
+}
+
+function selectPreset(preset: FilterPreset) {
+  activePresetId.value = preset.id;
+  Object.assign(f, {
+    tab: preset.filters.tab,
+    status: preset.filters.status,
+    minOverall: preset.filters.minOverall,
+    track: preset.filters.track,
+    source: preset.filters.source,
+    region: preset.filters.region,
+    lang: preset.filters.lang,
+    since: preset.filters.since,
+    hideClosed: preset.filters.hideClosed,
+    sort: preset.filters.sort,
+    dir: preset.filters.dir,
+  });
+}
+
+function updateActivePreset() {
+  if (!activePreset.value) return;
+  activePreset.value.filters = {
+    tab: f.tab,
+    status: f.status,
+    minOverall: f.minOverall,
+    track: f.track,
+    source: f.source,
+    region: f.region,
+    lang: f.lang,
+    since: f.since,
+    hideClosed: f.hideClosed,
+    sort: f.sort,
+    dir: f.dir,
+  };
+  persistPresets();
+  toast.value = `Фильтр «${activePreset.value.name}» обновлён`;
+}
+
+function revertActivePreset() {
+  if (!activePreset.value) return;
+  selectPreset(activePreset.value);
+}
+
+function resetFilters() {
+  if (activePresetId.value) {
+    activePresetId.value = null;
+  }
+  Object.assign(f, { ...defaults, tab: f.tab });
+}
+
+// ---- Modal: Save Filter ----
+const showSaveDialog = ref(false);
+const newPresetName = ref('');
+
+function openSaveDialog() {
+  newPresetName.value = '';
+  showSaveDialog.value = true;
+  nextTick(() => {
+    (document.getElementById('preset-name-input') as HTMLInputElement)?.focus();
+  });
+}
+
+function savePreset() {
+  const name = newPresetName.value.trim();
+  if (!name) return;
+  const newPreset: FilterPreset = {
+    id: 'preset_' + Date.now(),
+    name,
+    filters: {
+      tab: f.tab,
+      status: f.status,
+      minOverall: f.minOverall,
+      track: f.track,
+      source: f.source,
+      region: f.region,
+      lang: f.lang,
+      since: f.since,
+      hideClosed: f.hideClosed,
+      sort: f.sort,
+      dir: f.dir,
+    },
+  };
+  savedPresets.value.push(newPreset);
+  persistPresets();
+  activePresetId.value = newPreset.id;
+  showSaveDialog.value = false;
+  toast.value = `Фильтр «${newPreset.name}» сохранён`;
+}
+
+// ---- Modal: Delete Filter ----
+const presetToDelete = ref<FilterPreset | null>(null);
+
+function confirmDeletePreset(preset: FilterPreset) {
+  presetToDelete.value = preset;
+}
+
+function executeDeletePreset() {
+  if (!presetToDelete.value) return;
+  const target = presetToDelete.value;
+  savedPresets.value = savedPresets.value.filter((p) => p.id !== target.id);
+  persistPresets();
+  if (activePresetId.value === target.id) {
+    activePresetId.value = null;
+    f.tab = 'inbox';
+  }
+  presetToDelete.value = null;
+  toast.value = `Фильтр «${target.name}» удалён`;
+}
+
+function getFilterTags(filters: FilterPreset['filters']): string[] {
+  const tags: string[] = [];
+  if (filters.tab && filters.tab !== 'all') {
+    const t = tabs.find(([k]) => k === filters.tab);
+    if (t) tags.push(`вкладка: ${t[1]}`);
+  }
+  if (filters.tab === 'all' && filters.status) {
+    tags.push(`статус: ${STATUS_LABEL[filters.status] ?? filters.status}`);
+  }
+  if (filters.minOverall > 0) tags.push(`overall ≥ ${filters.minOverall}`);
+  if (filters.track) tags.push(`профиль: ${filters.track}`);
+  if (filters.source) tags.push(`источник: ${filters.source}`);
+  if (filters.region) tags.push(`регион: ${filters.region}`);
+  if (filters.lang) tags.push(`язык: ${filters.lang}`);
+  if (filters.since) tags.push(`с ${filters.since}`);
+  if (!filters.hideClosed) tags.push(`включая закрытые`);
+  if (filters.sort !== 'overall' || filters.dir !== 'desc') {
+    tags.push(`сортировка: ${filters.sort} ${filters.dir}`);
+  }
+  return tags.length ? tags : ['без ограничений'];
+}
+
+const currentFilterTags = computed(() =>
+  getFilterTags({
+    tab: f.tab,
+    status: f.status,
+    minOverall: f.minOverall,
+    track: f.track,
+    source: f.source,
+    region: f.region,
+    lang: f.lang,
+    since: f.since,
+    hideClosed: f.hideClosed,
+    sort: f.sort,
+    dir: f.dir,
+  }),
+);
 </script>
 
 <template>
   <div class="layout">
     <aside class="list">
       <nav class="tabs">
-        <button v-for="[k, l] in tabs" :key="k" :class="{ on: f.tab === k }" @click="f.tab = k">
-          {{ l }} <small>{{ counts[k] }}</small>
+        <div class="tabs-group">
+          <button
+            v-for="[k, l] in tabs"
+            :key="k"
+            :class="{ on: !activePresetId && f.tab === k }"
+            @click="selectSystemTab(k)"
+          >
+            {{ l }} <small>{{ counts[k] }}</small>
+          </button>
+        </div>
+
+        <div v-if="savedPresets.length" class="tabs-divider" />
+
+        <div v-if="savedPresets.length" class="tabs-group presets-group">
+          <div
+            v-for="p in savedPresets"
+            :key="p.id"
+            class="preset-tab"
+            :class="{ on: activePresetId === p.id }"
+            :title="getFilterTags(p.filters).join(' · ')"
+            @click="selectPreset(p)"
+          >
+            <span class="preset-name">
+              <span v-if="activePresetId === p.id && isPresetModified" class="mod-dot" title="Фильтр изменён">●</span>
+              {{ p.name }}
+            </span>
+            <small>{{ presetCounts[p.id] ?? 0 }}</small>
+            <button
+              type="button"
+              class="preset-del"
+              title="Удалить сохранённый фильтр"
+              @click.stop="confirmDeletePreset(p)"
+            >×</button>
+          </div>
+        </div>
+
+        <button class="ghost save-btn" title="Сохранить текущие фильтры как вкладку" @click="openSaveDialog">
+          + Сохранить фильтр
         </button>
+
         <span class="spacer" />
         <button class="ghost" title="Пересчитать overall по weights.yaml" @click="rescore">⟳ rescore</button>
       </nav>
 
       <div class="filters">
-        <input id="q" v-model="f.q" placeholder="Поиск  /" @keydown.esc="($event.target as HTMLInputElement).blur()" />
+        <input
+          id="q"
+          v-model="f.q"
+          :placeholder="activePreset ? `Поиск в «${activePreset.name}»... /` : 'Поиск  /'"
+          @keydown.esc="($event.target as HTMLInputElement).blur()"
+        />
         <select v-if="f.tab === 'all'" v-model="f.status">
           <option value="">статус: все</option>
           <option v-for="(l, s) in STATUS_LABEL" :key="s" :value="s">{{ l }}</option>
@@ -215,7 +486,13 @@ const tabs = [
           <option value="company">компания</option>
         </select>
         <button class="ghost" :title="f.dir === 'asc' ? 'по возрастанию' : 'по убыванию'" @click="f.dir = f.dir === 'asc' ? 'desc' : 'asc'">{{ f.dir === 'asc' ? '▲' : '▼' }}</button>
-        <button class="ghost" @click="Object.assign(f, { ...defaults, tab: f.tab })">сброс</button>
+        
+        <template v-if="activePreset && isPresetModified">
+          <span class="filter-mod-badge" title="Параметры отличаются от сохранённого пресета">изменён</span>
+          <button class="ghost" title="Перезаписать фильтр текущими параметрами" @click="updateActivePreset">💾 обновить</button>
+          <button class="ghost" title="Сбросить к сохранённым в фильтре значениям" @click="revertActivePreset">↺ откат</button>
+        </template>
+        <button class="ghost" @click="resetFilters">сброс</button>
       </div>
 
       <div v-if="data?.errors?.length" class="errors">
@@ -306,6 +583,53 @@ const tabs = [
       <p v-else class="muted empty">Выберите вакансию</p>
     </main>
     <div v-if="toast" class="toast">{{ toast }}</div>
+
+    <!-- Модалка: сохранение фильтра -->
+    <div v-if="showSaveDialog" class="modal-backdrop" @click.self="showSaveDialog = false">
+      <div class="modal">
+        <h3>Сохранить фильтр</h3>
+        <form @submit.prevent="savePreset">
+          <div class="modal-field">
+            <label for="preset-name-input">Название фильтра:</label>
+            <input
+              id="preset-name-input"
+              v-model="newPresetName"
+              placeholder="Например: Go Remote 80+"
+              required
+            />
+          </div>
+          <div class="modal-summary">
+            <div class="small muted">Сохраняемые параметры:</div>
+            <div class="tags">
+              <span v-for="tag in currentFilterTags" :key="tag" class="tag">{{ tag }}</span>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="ghost" @click="showSaveDialog = false">Отмена</button>
+            <button type="submit" class="on" :disabled="!newPresetName.trim()">Сохранить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Модалка: подтверждение удаления фильтра -->
+    <div v-if="presetToDelete" class="modal-backdrop" @click.self="presetToDelete = null">
+      <div class="modal">
+        <h3>Удалить сохранённый фильтр?</h3>
+        <p class="modal-text">
+          Вы уверены, что хотите удалить фильтр <strong>«{{ presetToDelete.name }}»</strong>?
+        </p>
+        <div class="modal-summary">
+          <div class="tags">
+            <span v-for="tag in getFilterTags(presetToDelete.filters)" :key="tag" class="tag">{{ tag }}</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="ghost" @click="presetToDelete = null">Отмена</button>
+          <button type="button" class="btn-danger" @click="executeDeletePreset">Удалить</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -330,9 +654,92 @@ button.on { background: var(--accent); color: #fff; border-color: var(--accent);
 button.ghost { border-color: transparent; background: transparent; color: var(--muted); }
 .layout { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); height: 100vh; }
 .list { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); }
-.tabs { display: flex; gap: 4px; padding: 10px 12px 6px; align-items: center; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 12px 6px; align-items: center; }
 .tabs small { opacity: .7; }
 .spacer { flex: 1; }
+.tabs-divider { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }
+.tabs-group { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.preset-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.preset-tab:hover { border-color: var(--muted); }
+.preset-tab.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+.preset-tab.on small { opacity: .8; color: #fff; }
+.preset-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: .5;
+  border-radius: 3px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  margin-left: 2px;
+}
+.preset-del:hover { opacity: 1; background: color-mix(in srgb, var(--fg) 15%, transparent); }
+.preset-tab.on .preset-del:hover { background: rgba(255, 255, 255, .3); }
+.mod-dot { color: #e0a800; margin-right: 2px; }
+.preset-tab.on .mod-dot { color: #ffe600; }
+.filter-mod-badge {
+  font-size: 11px;
+  background: var(--mid-bg);
+  color: var(--mid);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.save-btn { font-size: 12px; }
+.btn-danger { background: var(--bad); color: #fff; border-color: var(--bad); }
+.btn-danger:hover { opacity: .9; }
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  backdrop-filter: blur(2px);
+}
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .2);
+}
+.modal h3 { margin: 0 0 12px; font-size: 16px; }
+.modal-text { margin: 0 0 12px; }
+.modal-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.modal-field input { width: 100%; }
+.modal-summary { margin: 12px 0 16px; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.tag {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+  color: var(--fg);
+}
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 12px 10px; border-bottom: 1px solid var(--line); align-items: center; }
 .filters label { display: flex; gap: 4px; align-items: center; color: var(--muted); }
 .num { width: 64px; }
