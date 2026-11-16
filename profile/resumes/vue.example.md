@@ -1,17 +1,24 @@
-# Иван Иванов — Senior Frontend Developer (Vue)
+---
+track: vue
+title: Senior Frontend Developer (Vue)
+projects: [my-project]
+---
 
-Buenos Aires, Argentina · ivan@example.com · github.com/example
+<!-- Без контактов (они в about.md) и без пет-проектов (они в projects.md, выбираются по `projects`). Английский — источник истины. -->
 
 ## Summary
-Frontend-разработчик, 8 лет опыта, из них 6 — Vue (2/3, Nuxt). TypeScript, Node.js.
-
-## Experience
-### Acme Inc — Senior Frontend Developer (2022 — н.в.)
-- Перевёл SPA с Vue 2 на Vue 3 + Vite, время сборки −70 %.
-- …
+Frontend developer with 8 years of experience, 6 of them with Vue (Nuxt, Pinia), TypeScript, Node.js.
 
 ## Skills
-Vue 3, Nuxt, Pinia, TypeScript, Vite, Node.js, PostgreSQL, Docker
+- **Core:** Vue.js, Nuxt, Pinia, TypeScript, Vite
+- **Backend:** Node.js, PostgreSQL, Docker
+
+## Experience
+
+### Acme Inc — Senior Frontend Developer
+Jan 2022 — Present · https://acme.example
+SaaS product. Stack: Vue, Nuxt, TypeScript
+- Migrated the SPA from Vue 2 to Vue 3 + Vite, cutting build time by 70%.
 
 ## Education
-…
+- 2012–2016 — University, Computer Science

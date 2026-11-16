@@ -175,5 +175,5 @@ overall = 1385 / 15.5 = 89.4 → **89**.
 
 ## Что пока не реализовано
 
-- Этап 3 — отклик (`playbooks/apply.md`, `tailor.md`, `render-resume.ts`), переменные `APPLY_*`.
+- Этап 3 — отклик (`playbooks/apply.md`), переменные `APPLY_*`. Резюме уже готово: `playbooks/tailor.md`, `npm run render-resume`.
 - Источники кроме RemoteOK.

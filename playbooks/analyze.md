@@ -10,7 +10,7 @@
 | Сводка (навыки, ATS, источники, утечки фильтра) | `npm run insights` (по умолчанию 30 дней; `-- --days N` / `-- --since YYYY-MM-DD`). Сохраняется в `data/runs/<дата>-insights.md` |
 | Качественные наблюдения | `data/insights.md` (теги `[noise] [filter] [source] [scoring] [resume] [bug]`) |
 | Прошлые отчёты анализа | `data/runs/*-insights.md` — сравни с прошлым: что изменилось после правок |
-| Резюме | `profile/resumes/*.md`, профиль — `profile/about.md`, предпочтения — `config/preferences.md` |
+| Резюме | `profile/resumes/*.md`, банк фактов `profile/facts.md` (чем подтверждать bullets), пет-проекты `profile/projects.md`, профиль — `profile/about.md`, предпочтения — `config/preferences.md` |
 | Фильтры | `config/prefilter.yaml`, `config/sources.yaml`, `playbooks/scoring.md` |
 
 ## Шаги
@@ -39,7 +39,8 @@
    - **summary**: домены и типы продукта из «Контекст» и топ soft-требований — какие из них честно подходят под опыт
      и стоит назвать в summary; медиана лет — сравни с указанным в резюме опытом;
    - сравни треки между собой: может, какой-то трек стоит объединить или вакансий под него почти нет.
-   Не предлагай приписать опыт, которого нет.
+   Не предлагай приписать опыт, которого нет. Факт для bullet ищи и в `profile/facts.md`.
+   После принятых правок трека — обнови переводы (`playbooks/tailor.md` §2).
 5. **Система**:
    - источники с высокой долей `overall<40`/стоп-флагов и малым числом selected/★ (⚑ — см. `data/flagged-cases.md`: повторяющиеся ошибки скоринга → правки `playbooks/scoring.md`) — сузить или отключить;
    - утечки предфильтра — конкретные правила для `config/prefilter.yaml` (`exclude_title` / сужение `include_title`);

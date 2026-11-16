@@ -21,7 +21,8 @@
     "top": "node --env-file-if-exists=.env scripts/top.ts",
     "cleanup": "node --env-file-if-exists=.env scripts/cleanup.ts",
     "check-alive": "node --env-file-if-exists=.env scripts/check-alive.ts",
-    "resolve-urls": "node --env-file-if-exists=.env scripts/resolve-urls.ts"
+    "resolve-urls": "node --env-file-if-exists=.env scripts/resolve-urls.ts",
+    "render-resume": "node --env-file-if-exists=.env scripts/render-resume.ts"
   },
   "dependencies": {
     "chokidar": "^6.0.0",
