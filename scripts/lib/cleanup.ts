@@ -1,35 +1,24 @@
 /**
- * Чистка вакансий (design.md §5.4). Удаляются:
- * - закрытые (`possibly_closed: true`) — сразу, любого статуса, кроме ★;
- * - старше N дней (по collected_at) без решения: нет статуса, нет ★, нет ⚑.
+ * Чистка вакансий (design.md §5.4): удаляются вакансии старше N дней (по collected_at) без решения —
+ * нет статуса, нет ★, нет ⚑. Закрытые (`possibly_closed`) отдельно не удаляются — по тем же правилам, что и все.
  * selected / applied / needs_attention / apply_failed, ★ и ⚑ хранятся, пока отметку не снимут.
- * История откликов остаётся в data/runs/*-apply.md, разборы проблемных — в data/flagged-cases.md.
  * Id остаётся в data/state/seen-*.json, так что удалённая вакансия не вернётся при сборе.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadAll, type VacancyFile } from './vacancy.ts';
+import { loadAll } from './vacancy.ts';
 import { appendRunLog } from './runlog.ts';
 
-export function cleanupReason(d: Record<string, any>, cutoff: string): string | null {
-  if (d.starred) return null;
-  if (d.possibly_closed) return 'закрыта';
-  if (d.status == null && !d.flagged && String(d.collected_at) < cutoff) return 'старая без решения';
-  return null;
-}
+export const isDisposable = (d: Record<string, any>, cutoff: string) => d.status == null && !d.starred && !d.flagged && String(d.collected_at) < cutoff;
 
-export function cleanup(days: number, dryRun: boolean, log: (s: string) => void = console.log): { closed: number; old: number } {
+export function cleanup(days: number, dryRun: boolean, log: (s: string) => void = console.log): number {
   const cutoff = new Date(Date.now() - days * 86400e3).toISOString().slice(0, 10);
-  const victims = loadAll()
-    .map((v) => ({ v, why: cleanupReason(v.data, cutoff) }))
-    .filter((x): x is { v: VacancyFile; why: string } => !!x.why);
+  const victims = loadAll().filter((v) => isDisposable(v.data, cutoff));
   const rel = (f: string) => path.relative(process.cwd(), f);
-  const lines = victims.map(({ v, why }) => `${rel(v.file)} (${why}, ${v.data.status ?? 'без статуса'}, ${v.data.collected_at})`);
+  const lines = victims.map((v) => `${rel(v.file)} (${v.data.collected_at}${v.data.possibly_closed ? ', закрыта' : ''})`);
   for (const l of lines) log(`${dryRun ? '[dry-run] ' : ''}rm ${l}`);
-  if (!dryRun) for (const { v } of victims) fs.unlinkSync(v.file);
-  const closed = victims.filter((x) => x.why === 'закрыта').length;
-  const old = victims.length - closed;
-  log(`${dryRun ? 'Будет удалено' : 'Удалено'}: закрытых ${closed}, старых без решения ${old} (старше ${days} дн.)`);
-  if (!dryRun && victims.length) appendRunLog('cleanup', `## cleanup\n\n- закрытых: ${closed}, старых без решения (> ${days} дн.): ${old}\n\n${lines.map((l) => `- ${l}`).join('\n')}`);
-  return { closed, old };
+  if (!dryRun) for (const v of victims) fs.unlinkSync(v.file);
+  log(`${dryRun ? 'Будет удалено' : 'Удалено'} вакансий без решения старше ${days} дн.: ${victims.length}`);
+  if (!dryRun && victims.length) appendRunLog('cleanup', `## cleanup\n\n- без решения, старше ${days} дн.: ${victims.length}\n\n${lines.map((l) => `- ${l}`).join('\n')}`);
+  return victims.length;
 }

@@ -86,6 +86,7 @@ const uniq = (k: string) => [...new Set(items.value.map((v) => v[k]).filter(Bool
 const counts = computed(() => ({
   inbox: items.value.filter(isFresh).length,
   flagged: items.value.filter((v) => v.flagged).length,
+  closed: items.value.filter((v) => v.possibly_closed).length,
   attention: items.value.filter((v) => v.status === 'needs_attention' || v.status === 'apply_failed').length,
   selected: items.value.filter((v) => v.status === 'selected').length,
   all: items.value.length,
@@ -94,6 +95,7 @@ const counts = computed(() => ({
 function matchRow(v: Row, filter: typeof defaults, q: string) {
   if (filter.tab === 'inbox' && !isFresh(v)) return false;
   if (filter.tab === 'flagged' && !v.flagged) return false;
+  if (filter.tab === 'closed' && !v.possibly_closed) return false;
   if (filter.tab === 'attention' && v.status !== 'needs_attention' && v.status !== 'apply_failed') return false;
   if (filter.tab === 'selected' && v.status !== 'selected') return false;
   if (filter.tab === 'all' && filter.status && (v.status ?? 'none') !== filter.status) return false;
@@ -102,7 +104,7 @@ function matchRow(v: Row, filter: typeof defaults, q: string) {
   if (filter.source && v.source !== filter.source) return false;
   if (filter.region && v.region !== filter.region) return false;
   if (filter.lang && v.vacancy_language !== filter.lang) return false;
-  if (filter.hideClosed && v.possibly_closed && filter.tab !== 'all') return false;
+  if (filter.hideClosed && v.possibly_closed && filter.tab !== 'all' && filter.tab !== 'closed') return false;
   if (filter.since && String(v.posted_at ?? v.collected_at) < filter.since) return false;
   if (q && !`${v.title} ${v.company} ${v.location ?? ''}`.toLowerCase().includes(q)) return false;
   return true;
@@ -202,6 +204,37 @@ async function rescore() {
   }
 }
 
+// ---- check-alive: фоновая проверка живости (server/utils/checkAlive.ts) ----
+const alive = ref<{ running: boolean; summary: string; last: string; exitCode: number | null } | null>(null);
+let aliveTimer: ReturnType<typeof setInterval> | undefined;
+async function pollAlive() {
+  try {
+    const s = await $fetch<NonNullable<typeof alive.value>>('/api/check-alive');
+    const wasRunning = alive.value?.running;
+    alive.value = s;
+    if (s.running && !aliveTimer) aliveTimer = setInterval(pollAlive, 2000);
+    if (!s.running && aliveTimer) {
+      clearInterval(aliveTimer);
+      aliveTimer = undefined;
+    }
+    if (wasRunning && !s.running) {
+      const line = s.summary.split('\n').find((l) => l.includes('проверено:')) ?? s.summary;
+      toast.value = s.exitCode === 0 ? `Проверка живости: ${line.replace(/^- /, '')}` : `Ошибка проверки: ${s.summary}`;
+      await refresh();
+    }
+  } catch {}
+}
+async function checkAlive(e: MouseEvent) {
+  try {
+    alive.value = await $fetch('/api/check-alive', { method: 'POST', body: { force: e.shiftKey } });
+    if (!aliveTimer) aliveTimer = setInterval(pollAlive, 2000);
+  } catch (err) {
+    toast.value = `Не удалось запустить проверку: ${errText(err)}`;
+  }
+}
+onMounted(pollAlive);
+onUnmounted(() => aliveTimer && clearInterval(aliveTimer));
+
 // Refresh the open card whenever its row changes on disk (agent edits, rescore, own patches).
 watch(
   () => [current.value, JSON.stringify(items.value.find((v) => v.id === current.value) ?? null)] as const,
@@ -251,6 +284,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
 const tabs = [
   ['inbox', 'Новые'],
   ['flagged', 'Проблемные'],
+  ['closed', 'Закрытые'],
   ['attention', 'Требуют внимания'],
   ['selected', 'Выбранные'],
   ['all', 'Все'],
@@ -452,6 +486,12 @@ const currentFilterTags = computed(() =>
         </button>
 
         <span class="spacer" />
+        <button
+          class="ghost"
+          :disabled="alive?.running"
+          :title="alive?.running ? alive.last : 'Проверить по ссылкам, не закрыты ли вакансии (без статуса, на отклик, требующие внимания). Shift+клик — перепроверить и проверенные сегодня'"
+          @click="checkAlive"
+        >{{ alive?.running ? '⏳ проверяю…' : '✓ живость' }}</button>
         <button class="ghost" title="Пересчитать overall по weights.yaml" @click="rescore">⟳ rescore</button>
       </nav>
 

@@ -33,7 +33,7 @@
 - Двухфазный сбор: скрипт `npm run collect` (общий конвейер `scripts/lib/collect.ts` + провайдеры `scripts/providers/`) — лимиты, предфильтр, дедуп, `seen`, запись, лог; затем агент скорит `npm run pending` в пределах `SCORE_MAX_PER_RUN`.
 - Провайдеры (только открытые API и ленты, `config/sources.md`): **ATS компаний** (Greenhouse/Lever/Ashby — снимок открытых вакансий, пропавшие → `possibly_closed`), **Get on Board**, **HN Who is hiring**, **RemoteOK**, **Himalayas**, **Jobicy**, **Remotive**, стандартные ленты **RSS/Atom/JSON Feed** (We Work Remotely) — без кода, через `config/sources.yaml`. Новый источник = провайдер + строка в реестре + строка в `config/sources.md`.
 - Скоринг: частные оценки агента + детерминированный `overall`, стоп-флаги, регион по справочнику, `apply_target` по `source-priority.yaml`; `npm run score` / `rescore` / `validate` (zod).
-- Обслуживание: `cleanup` (закрытые — кроме ★; без решения — старше `CLEANUP_DEFAULT_DAYS`; автоматически после `collect`, если `CLEANUP_ON_COLLECT`), `dedupe` (диагностика), `fetch-page` (HTML → markdown), журнал `data/insights.md`.
+- Обслуживание: `cleanup` (без решения — старше `CLEANUP_DEFAULT_DAYS`; автоматически после `collect`, если `CLEANUP_ON_COLLECT`), `dedupe` (диагностика), `fetch-page` (HTML → markdown), журнал `data/insights.md`.
 - Обратная связь: `resume_match` в каждой вакансии (сравнение с резюме, словарь `config/skills.yaml`), метрики прогонов `data/runs/stats.jsonl`, отчёт `npm run insights`, разбор — `playbooks/analyze.md`.
 
 **Этап 2 — UI** (`app/`, Nuxt SPA + Nitro). Подробно: `docs/running.md`, раздел «UI».
@@ -100,8 +100,9 @@
 3. Автоотклик (этап 3): `selected` и/или вакансии по порогу скоринга → `applied` / `needs_attention` / `apply_failed`.
 4. «проверь проблемные» (`playbooks/flagged.md`): агент исправляет скоринг/данные, записывает разбор в `data/flagged-cases.md`
    и снимает ⚑; дальше вакансия живёт по общим правилам.
-5. Чистка после каждого сбора: закрытые (`possibly_closed`) — сразу, кроме ★; без статуса/★/⚑ — старше `CLEANUP_DEFAULT_DAYS`.
-   Закрытость выясняют `collect` (вакансия пропала из снимка ATS) и `check-alive` (404/410/«not found» по real_url).
+5. Чистка после каждого сбора: без статуса/★/⚑ — старше `CLEANUP_DEFAULT_DAYS`.
+   Закрытость (`possibly_closed`) выясняют `collect` (вакансия пропала из снимка ATS) и `check-alive` (404/410/«not found»;
+   запускается в «собери» и кнопкой в UI). Закрытые только помечаются — вкладка «Закрытые» — и удаляются по общему правилу.
 
 ### 5.4. После MVP
 
