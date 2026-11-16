@@ -1,8 +1,9 @@
 import type { VacancyFile } from './vacancy.ts';
 import { translit } from './translit.ts';
+import { stripLocationSegments } from './location.ts';
 
 // (после транслитерации: starshiy/veduschiy/mladshiy/udalenno/udalenka — «старший», «ведущий», «младший», «удалённо»)
-const STOP = /\b(remote|senior|sr|junior|jr|middle|mid|lead|staff|principal|the|a|an|and|of|for|with|starshiy|veduschiy|mladshiy|udalenno|udalenka|\(.*?\))\b/g;
+const STOP = /\b(remote|senior|sr|junior|jr|middle|mid|lead|staff|principal|the|a|an|and|of|for|with|starshiy|veduschiy|mladshiy|udalenno|udalenka)\b/g;
 
 export function normCompany(s: string): string {
   return translit(s)
@@ -11,7 +12,8 @@ export function normCompany(s: string): string {
 }
 
 export function normTitle(s: string): string {
-  return translit(s).replace(/[^a-z0-9 ]+/g, ' ').replace(STOP, ' ').replace(/\s+/g, ' ').trim();
+  // локации в заголовке («(Poland)», «| UK | Remote») убираются ДО чистки символов — иначе разделители уже потеряны
+  return translit(stripLocationSegments(s)).replace(/[^a-z0-9 ]+/g, ' ').replace(STOP, ' ').replace(/\s+/g, ' ').trim();
 }
 
 export function normUrl(u: string): string {

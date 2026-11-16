@@ -13,11 +13,13 @@ const skills = loadSkills();
 const unknownSkills = new Map<string, number>();
 let warned = 0;
 
-/** Проверки resume_match: обязателен при scoring_version ≥ 2, навыки канонические, missing ⊆ required/nice. */
+/** Проверки resume_match: обязателен при scoring_version ≥ 2 (кроме вакансий со stop_flags), навыки канонические, missing ⊆ required/nice. */
 function checkResumeMatch(data: Record<string, any>, errs: string[], warns: string[]): void {
   const rm = data.resume_match;
   if (data.scores == null) return;
   if (!rm) {
+    // стоп-флаг — короткий скоринг без resume_match (playbooks/scoring.md)
+    if ((data.stop_flags ?? []).length) return;
     if ((data.scoring_version ?? 0) >= 2) errs.push('resume_match: обязателен при scoring_version ≥ 2');
     else warns.push('resume_match: нет (scoring_version 1) — перескорь по playbooks/scoring.md');
     return;

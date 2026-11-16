@@ -13,6 +13,7 @@ import path from 'node:path';
 import { env } from './lib/env.ts';
 import { loadAll } from './lib/vacancy.ts';
 import { freshnessDays } from './lib/freshness.ts';
+import { regionUnlikely } from './lib/location.ts';
 
 const args = process.argv.slice(2);
 const li = args.indexOf('--limit');
@@ -38,7 +39,10 @@ if (args.includes('--upgrade')) {
 }
 
 const date = (v: { data: any }) => String(v.data.posted_at ?? v.data.collected_at ?? '');
-const queue = loadAll().filter((v) => v.data.scores == null);
+const unscored = loadAll().filter((v) => v.data.scores == null);
+const closed = unscored.filter((v) => v.data.possibly_closed);
+const queue = unscored.filter((v) => !v.data.possibly_closed);
+const unlikely = (v: { data: any }) => Number(!!regionUnlikely(v.data.location));
 const now = Date.now();
 const isStale = (v: { data: any }) => {
   const days = freshnessDays(v.data.source);
@@ -48,16 +52,18 @@ const isStale = (v: { data: any }) => {
 const stale = withStale ? [] : queue.filter(isStale);
 const pending = queue
   .filter((v) => withStale || !isStale(v))
-  .sort((a, b) => date(b).localeCompare(date(a)) || Number(!!b.data.real_url) - Number(!!a.data.real_url));
+  .sort((a, b) => unlikely(a) - unlikely(b) || date(b).localeCompare(date(a)) || Number(!!b.data.real_url) - Number(!!a.data.real_url));
 const batch = pending.slice(0, limit);
 
 for (const v of batch) {
   const rel = path.relative(process.cwd(), v.file);
-  console.log(onlyPaths ? rel : `${rel}\n    ${v.data.id} · ${v.data.title} — ${v.data.company} · ${v.data.location ?? ''}`);
+  const why = regionUnlikely(v.data.location);
+  console.log(onlyPaths ? rel : `${rel}\n    ${v.data.id} · ${v.data.title} — ${v.data.company} · ${v.data.location ?? ''}${why ? ` · ⤓ регион: ${why}` : ''}`);
 }
 if (!onlyPaths) {
+  const unl = pending.filter(unlikely);
   const rest = pending.length - batch.length;
-  console.log(`\n# ИТОГ ОЧЕРЕДИ\n- выдано к скорингу: ${batch.length}\n- останется в очереди: ${pending.length - batch.length}\n- несвежих не выдано: ${stale.length}`);
+  console.log(`\n# ИТОГ ОЧЕРЕДИ\n- выдано к скорингу: ${batch.length}\n- останется в очереди: ${pending.length - batch.length}\n- несвежих не выдано: ${stale.length}\n- закрытых (possibly_closed) не выдано: ${closed.length}\n- регион явно вне AR/LATAM (в конце очереди): ${unl.length}, из них выдано: ${batch.filter(unlikely).length}`);
   console.log(`\nК скорингу сейчас: ${batch.length} из ${pending.length}` + (rest ? ` (остальные ${rest} — следующим запуском; лимит SCORE_MAX_PER_RUN=${env.SCORE_MAX_PER_RUN})` : ''));
   if (stale.length) {
     const by: Record<string, number> = {};

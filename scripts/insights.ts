@@ -146,7 +146,7 @@ for (const track of TRACKS) {
     '',
   );
 }
-const noRm = scored.filter((v) => !v.data.resume_match).length;
+const noRm = relevant.filter((v) => !v.data.resume_match).length;
 if (noRm) out.push(`⚠ Без resume_match: ${noRm} отскоренных вакансий — в статистику резюме не попали.`, '');
 if (unknown.size)
   out.push(`⚠ Навыки вне config/skills.yaml: ${[...unknown].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}×${n}`).join(', ')}`, '');

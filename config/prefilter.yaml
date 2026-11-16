@@ -3,6 +3,7 @@
 # Иначе оставить, если заголовок содержит include_title ИЛИ среди тегов есть include_tags.
 # Сравнение регистронезависимое: «словные» ключи — с начала слова (node → nodejs), прочие — подстрокой.
 # Суффикс `$` — ещё и по концу слова (intern$ не ловит Internal).
+# Порядок: exclude_title (абсолютно) → exclude_title_soft (отсеять, если в заголовке нет strong_title) → include.
 include_title:
   - vue
   - nuxt
@@ -49,6 +50,22 @@ include_title:
   - agentic
   - ai agent
   - automation engineer
+  - forward deployed
+  - forward-deployed
+  - design engineer
+  - growth engineer
+  - developer experience engineer
+  - product developer
+  - lead developer
+  - lead engineer
+  - early engineer
+  - back-end engineer
+  - back-end developer
+  - back end engineer
+  - back end developer
+  - backend software engineer
+  - frontend software engineer
+  - engineering roles
   # русскоязычные площадки (hh.ru и т.п.)
   - разработчик
   - программист
@@ -75,20 +92,15 @@ include_title:
   - analista programador
 include_tags: [vue, vuejs, nuxt, nuxtjs, react, reactjs, next.js, nextjs, angular, svelte, javascript, typescript, node, nodejs, nestjs, tauri, electron, frontend, front end, full stack, fullstack, llm, ai, ai-native, agents]
 exclude_title:
-  - sales
-  - marketing
   - recruit
   - account executive
   - customer success
-  - customer support
-  - support engineer
   - продаж
   - маркетолог
   - рекрутер
   - менеджер
   - аналитик
   - дизайнер
-  - java-разработчик
   - 1с
   - техподдерж
   - тестировщик
@@ -96,11 +108,6 @@ exclude_title:
   - copywriter
   - writer
   - accountant
-  - finance
-  - legal
-  - hr
-  - android
-  - ios
   - qa
   - test engineer
   - sre
@@ -125,30 +132,8 @@ exclude_title:
   - 1c
   - data analyst
   - data scientist
-  - java developer
-  - java engineer
-  - .net
-  # язык в заголовке = нужен коммерческий опыт на нём (его нет); ролевые AI-native вакансии проходят по своим ключам
-  - python developer
-  - python engineer
-  - python backend
-  - python-разработчик
-  - django
-  - golang
-  - go developer
-  - go engineer
-  - go backend
-  - go-разработчик
-  - rust developer
-  - rust engineer
-  - rust-разработчик
-  - c#
-  - php
-  - ruby
   - salesforce
   - sap
-  - wordpress
-  - shopify
   - manager
   - director
   - vp
@@ -176,7 +161,44 @@ exclude_title:
   - practicante
   - prácticas
   - becario
-  - desarrollador java$
-  - programador java$
   - desarrollador movil
   - desarrollador móvil
+  - plc
+# Исключения, которые уступают явному целевому стеку в заголовке: «Fullstack (.NET / React / Node.js)»,
+# «Full Stack PHP/Vue.js», «Engineer, Marketing Platform (React)» проходят и попадают к скорингу (fit там решит).
+# Язык в заголовке = нужен коммерческий опыт на нём (его нет) — но при целевом стеке рядом решает скоринг.
+exclude_title_soft:
+  - sales
+  - marketing
+  - customer support
+  - support engineer
+  - java-разработчик
+  - finance
+  - legal
+  - hr$
+  - android
+  - ios
+  - java developer
+  - java engineer
+  - .net
+  - python developer
+  - python engineer
+  - python backend
+  - python-разработчик
+  - django
+  - golang
+  - go developer
+  - go engineer
+  - go backend
+  - go-разработчик
+  - rust developer
+  - rust engineer
+  - rust-разработчик
+  - c#
+  - php
+  - ruby
+  - wordpress
+  - shopify
+  - desarrollador java$
+  - programador java$
+strong_title: [vue, nuxt, react, next.js, angular, svelte, typescript, node, nestjs, fullstack, full-stack, full stack, frontend, front-end, front end, javascript, фронтенд, фулстек, фуллстек]

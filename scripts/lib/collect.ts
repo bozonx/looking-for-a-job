@@ -266,7 +266,9 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
         // старая (по дате) или известная — пропускаем и считаем подряд: одна закреплённая/промо-вакансия
         // наверху ленты не должна останавливать сбор
         const old = !p.snapshot && j.postedAt != null && j.postedAt < minTime;
-        const known = idx.byId.has(id) || seen.has(id);
+        // отсеянная раньше, но проходящая предфильтр сейчас (его расширили) — не «известная», собираем заново
+        const refiltered = !idx.byId.has(id) && seen.isPrefiltered(id) && !j.skip && prefilter(j.title, j.tags).ok;
+        const known = !refiltered && (idx.byId.has(id) || seen.has(id));
         if (p.snapshot && known) {
           stats.known++;
           seen.add(id); // вакансия всё ещё открыта — не даём записи устареть
@@ -287,7 +289,7 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
           const f = j.skip ? { ok: false, reason: j.skip } : prefilter(j.title, j.tags);
           if (!f.ok) {
             stats.prefiltered++;
-            seen.add(id);
+            seen.add(id, true);
             rejected.push(`- ${j.title} — ${j.company} (${f.reason})`);
             continue;
           }
