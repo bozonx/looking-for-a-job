@@ -36,6 +36,21 @@
 | `scoring_version` | 3 |
 
 `scores.overall` не трогай — его считает `npm run score`.
+
+### Примеры `fit` — частые ошибки
+
+Перед записью `fit` прочитай **основное требование** вакансии («deep / strong / production-grade X», «N+ years of X»), а не только заголовок и теги.
+
+| Вакансия | Ошибка | Правильно |
+|---|---|---|
+| Senior SE, Observability (NetBox Labs): «Deep experience with idiomatic Go», gRPC, OpenTelemetry, сети; Python — «for tests and tooling»; фронтенда нет | `fullstack: 45`, `ai_engineer: 25` → overall 70 | узкий бэкенд на Go без фронтенда → все треки ≤ 30 (`fullstack: 20`, `ai_engineer: 15`) → сработал `fit_cap`, overall 35 |
+| AI Developer (аутсорс): RAG, MCP, Ollama, но «3–5+ years … production-level Python for building real services» | `ai_engineer: 70` («LLM/RAG совпадают, Python допустим») | Python — основной язык с требованием по годам → `ai_engineer` ≤ 30. RAG/MCP/LLM в стеке fit не поднимают |
+| Senior Agentic AI Engineer: агенты, LangGraph, MCP, но «Strong Python development skills … production-grade applications» | `ai_engineer: 80` | то же: AI-домен при обязательном сильном Python → ≤ 30 |
+| Kubernetes Control Plane (Go) | `ai_engineer: 35` | Go в заголовке → ≤ 30; системная инфраструктура без фронтенда → все треки ≤ 30 |
+| Любая бэкенд-роль, где в требованиях есть «use coding agents / AI assistants day to day» | рост `ai_engineer` | работа с coding agents — общий навык, роль AI-native не делает |
+
+`ai_engineer` высокий — когда роль строит AI-продукты и стек вторичен или совпадает с профилем (TS/Node, «any language»), например AI product engineer на TypeScript. Если обязателен глубокий опыт в Python/Go/Rust/Java, оценка ≤ 30.
+Fullstack с бэкендом на Go/Python и сильным React/TS-фронтендом (например, «4+ лет TS-фронтенда + 5+ лет бэкенда на Python или Go») — fullstack средний (≈ 50–65), а не ≤ 30: фронтенд совпадает, бэкенд-язык — пробел, отметь его в `red_flags`.
 Неоднозначное (например, «remote, US timezone» без требования резидентства) отражай в оценках и `red_flags`, не додумывай.
 
 ## `resume_match` — сравнение с резюме
