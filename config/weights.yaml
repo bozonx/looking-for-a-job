@@ -10,11 +10,11 @@ positive:
   fit: 4
   region: 1
   language: 2
-  startup: 1
+  startup: 1.5
 inverse:
   corporate: 2
-  outsource: 0.5
-  end_client_corporate: 0.5     # учитывается только если не null (т.е. для аутсорса)
+  outsource: 0                  # аутсорс/аутстаф — норм; оценку агент всё равно ставит
+  end_client_corporate: 0       # крупный конечный клиент — норм (кроме РФ-госа/банков → стоп-флаг ru_corporate)
 fit_tracks:
   vue: 1
   react: 1

@@ -73,8 +73,8 @@
 
 | Группа | vᵢ | Пример весов |
 |---|---|---|
-| `positive` | оценка как есть | remote 3, fit 4, legitimacy 2, language 2, region 1, startup 1 |
-| `inverse` | `100 − оценка` (чем выше, тем хуже) | corporate 2, outsource 0.5, end_client_corporate 0.5 |
+| `positive` | оценка как есть | remote 3, fit 4, legitimacy 2, language 2, region 1, startup 1.5 |
+| `inverse` | `100 − оценка` (чем выше, тем хуже) | corporate 2, outsource 0, end_client_corporate 0 (оценки ставятся, но не влияют) |
 | `fit` | `max` по трекам от `fit_tracks[трек] · fit[трек]` | vue 1, react 1, angular 0.8, fullstack 1, ai_engineer 1 |
 
 Детали, которые важны:
@@ -94,13 +94,13 @@
 | fit (max: vue 1·90) | 4 | 90 | 360 |
 | region | 1 | 70 | 70 |
 | language | 2 | 100 | 200 |
-| startup | 1 | 80 | 80 |
+| startup | 1.5 | 80 | 120 |
 | corporate (inv) | 2 | 100−10 = 90 | 180 |
-| outsource (inv) | 0.5 | 100−0 = 100 | 50 |
+| outsource (inv) | 0 | — | пропуск (вес 0) |
 | end_client_corporate | — | null | пропуск |
-| **Σ** | **15.5** | | **1395** |
+| **Σ** | **15.5** | | **1385** |
 
-overall = 1395 / 15.5 = **90**.
+overall = 1385 / 15.5 = 89.4 → **89**.
 
 Та же вакансия, но «только гибрид в Берлине»: агент ставит `office_outside_ar` → overall = 0 независимо от остального.
 
@@ -119,7 +119,7 @@ overall = 1395 / 15.5 = **90**.
 | Хочу | Что сделать |
 |---|---|
 | сильнее ценить удалёнку / слабее стартапы | веса в `weights.yaml → positive` |
-| аутсорс — сильнее минус | `inverse.outsource` |
+| аутсорс — снова сделать минусом | `inverse.outsource` > 0 |
 | перестать рассматривать трек | `fit_tracks.<трек>: 0` |
 | поменять приоритет региона | `regions.yaml` |
 | новый стоп-фактор | описать в `preferences.md` и `playbooks/scoring.md`, добавить в `weights.yaml → stop_flags` и в enum `STOP_FLAGS` в `scripts/lib/schema.ts`; уже отскоренные вакансии агенту придётся пересмотреть |
