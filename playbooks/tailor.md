@@ -20,6 +20,7 @@
 | `profile/resumes/i18n/<трек>.<lang>.md` | переводы трека (ru, es) | база для ru/es |
 | `profile/facts.md` | полный банк правдивых фактов: все пункты опыта, реальный стек, полный пул навыков | можно подтянуть пункт/навык, если его просит вакансия |
 | `profile/projects.md` | пул пет-проектов с темами, стеком и описаниями на en/ru/es | выбор 0–2 проектов |
+| `profile/photo.jpg` | фото | скрипт сам ставит только в ru-резюме; в en/es не добавлять |
 | `profile/soft-skills.md` | soft skills с доказательствами | вплести 1–2 в Summary/пункты, отдельной секцией не выводить |
 | вакансия | `resume_match` (required, nice_to_have, ats_keywords_missing, keyword_spellings, responsibilities, domain, soft_requirements, in_resume_negative), `red_flags`, текст | что подсветить и что убрать |
 

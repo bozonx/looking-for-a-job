@@ -10,6 +10,7 @@
  * playbooks/tailor.md). Устаревший перевод (source_hash ≠ хэш английского трека) — предупреждение.
  * Front matter резюме: track, title, projects[], lang (для --file), source_hash (для переводов).
  * Выход по умолчанию: data/generated/base/<Имя>_<track>_<lang>.pdf; для --file — рядом с файлом.
+ * Фото: profile/photo.jpg — только в ru (рынок РФ/СНГ); --photo / --no-photo переопределяют.
  * Chromium: $CHROMIUM_PATH, иначе chromium / google-chrome из PATH, иначе кэш Playwright.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
@@ -184,7 +185,12 @@ function injectProjects(body: string, projects: string): string {
   return body.trimEnd() + '\n\n' + projects;
 }
 
-function renderHtml(h: Header, lang: Lang, title: string, body: string): string {
+function photoDataUri(): string | null {
+  const f = join(PROFILE, 'photo.jpg');
+  return existsSync(f) ? `data:image/jpeg;base64,${readFileSync(f).toString('base64')}` : null;
+}
+
+function renderHtml(h: Header, lang: Lang, title: string, body: string, photo: string | null): string {
   const name = lang === 'ru' ? h.nameNative : h.nameLatin;
   const langs = h.languages
     .map((l) => {
@@ -205,7 +211,8 @@ function renderHtml(h: Header, lang: Lang, title: string, body: string): string 
   @page { size: A4; margin: 14mm 16mm; }
   * { box-sizing: border-box; }
   body { font-family: "Inter", "Helvetica Neue", Arial, "Liberation Sans", sans-serif; font-size: 10pt; line-height: 1.38; color: #1a1a1a; margin: 0; }
-  header { margin-bottom: 10pt; }
+  header { margin-bottom: 10pt; display: flex; gap: 12pt; align-items: center; }
+  header img { width: 26mm; height: 26mm; border-radius: 4pt; object-fit: cover; flex: none; }
   h1 { font-size: 20pt; margin: 0; letter-spacing: -0.2pt; }
   .role { font-size: 12pt; color: #333; margin: 2pt 0 4pt; font-weight: 600; }
   .contacts, .langs { font-size: 9pt; color: #444; }
@@ -220,10 +227,13 @@ function renderHtml(h: Header, lang: Lang, title: string, body: string): string 
 </style></head>
 <body>
 <header>
+  ${photo ? `<img src="${photo}" alt="">` : ''}
+  <div>
   <h1>${esc(name)}</h1>
   <div class="role">${esc(title)}</div>
   <div class="contacts">${contacts}</div>
   ${langs ? `<div class="langs">${esc(langs)}</div>` : ''}
+  </div>
 </header>
 ${content}
 </body></html>`;
@@ -279,7 +289,8 @@ function build(job: Job, header: Header, projects: Map<string, Project>, opts: {
   const title = data.title ?? die(`${job.src}: нет title во front matter`);
   const ids: string[] = opts.projects ?? data.projects ?? [];
   const md = injectProjects(stripComments(body).trim() + '\n', projectsMd(ids, projects, job.lang));
-  const html = renderHtml(header, job.lang, title, md);
+  const usePhoto = flag('photo') || (job.lang === 'ru' && !flag('no-photo'));
+  const html = renderHtml(header, job.lang, title, md, usePhoto ? photoDataUri() : null);
   mkdirSync(dirname(job.out), { recursive: true });
   const htmlFile = job.out.replace(/\.pdf$/, '.html');
   writeFileSync(htmlFile, html);

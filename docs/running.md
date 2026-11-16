@@ -31,7 +31,7 @@
 | `npm run dedupe` | диагностика индекса дублей |
 | `npm run fetch-page -- <url\|file.html> [--out f.md]` | страница → markdown (для HTML-площадок и поиска `real_url`) |
 | `npm run cleanup` | удаление старых вакансий: `--older-than 30d` (по умолчанию `CLEANUP_DEFAULT_DAYS`), `--status rejected,applied`, `--dry-run`; со звездой не трогает |
-| `npm run render-resume -- --track vue [--lang en\|ru\|es]` | PDF резюме трека в `data/generated/base/` (шапка из `about.md`, проекты из `projects.md`). `--all` — все треки × готовые переводы; `--file <md>` — адаптированное под вакансию; `--projects a,b` — свой набор проектов; `--html` — только HTML. Переводы и адаптацию делает агент — `playbooks/tailor.md` |
+| `npm run render-resume -- --track vue [--lang en\|ru\|es]` | PDF резюме трека в `data/generated/base/` (шапка из `about.md`, проекты из `projects.md`). `--all` — все треки × готовые переводы; `--file <md>` — адаптированное под вакансию; `--projects a,b` — свой набор проектов; `--html` — только HTML; фото `profile/photo.jpg` — только в ru (`--photo` / `--no-photo`). Переводы и адаптацию делает агент — `playbooks/tailor.md` |
 | `npm run dev` | UI на http://localhost:3000 |
 | `npm run ui:build` | production-сборка UI в `app/.output/` |
 | `npm run typecheck` | проверка типов скриптов и `.ts`-кода UI (`.vue` не проверяются) |
