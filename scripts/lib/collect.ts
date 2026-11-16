@@ -7,13 +7,13 @@ import { freshnessDays } from './freshness.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { env, today } from './env.ts';
-import { loadAll, vacancyPath, writeVacancy } from './vacancy.ts';
+import { loadAll, vacancyPath, writeVacancy, type VacancyFile } from './vacancy.ts';
 import { buildIndex, findDuplicate, key, normUrl, type Index } from './dedupe.ts';
 import { appendRunLog, appendRunStats } from './runlog.ts';
 import { pickApplyTarget } from './target.ts';
 import { SeenStore } from './seen.ts';
 import { loadPrefilter } from './prefilter.ts';
-import { sleep, takeHttpWarnings } from './http.ts';
+import { sleep, takeHttpWarnings, withHttpWarnings } from './http.ts';
 import { lastAttempt, lastRun, setLastAttempt, setLastRun } from './lastrun.ts';
 
 /** запас окна сбора: площадки публикуют с задержкой, даты бывают в другом поясе */
@@ -154,10 +154,28 @@ async function* pages(p: Provider, opts: CollectOptions, onStop: (r: string) => 
   if (p.paginated) onStop(`COLLECT_MAX_PAGES=${max}`);
 }
 
-export async function collect(p: Provider, opts: CollectOptions): Promise<CollectResult> {
-  const SOURCE = p.source;
+/**
+ * Общее состояние запуска: файлы вакансий и индекс дублей. Источники собираются параллельно,
+ * и индекс у них один — вакансия, сохранённая одним источником, сразу видна остальным как дубль.
+ * Гонок нет: от findDuplicate до записи файла и обновления индекса в коде нет await,
+ * а JS однопоточный — этот участок для каждой вакансии выполняется целиком.
+ */
+export interface CollectContext {
+  all: VacancyFile[];
+  idx: Index;
+}
+
+export function collectContext(): CollectContext {
   const all = loadAll();
-  const idx: Index = buildIndex(all);
+  return { all, idx: buildIndex(all) };
+}
+
+export function collect(p: Provider, opts: CollectOptions, ctx: CollectContext = collectContext()): Promise<CollectResult> {
+  return withHttpWarnings(() => collectSource(p, opts, ctx));
+}
+
+async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: CollectContext): Promise<CollectResult> {
+  const SOURCE = p.source;
   const seen = new SeenStore(SOURCE);
   const prefilter = loadPrefilter();
   const startedAt = Date.now();
@@ -181,7 +199,6 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
     ? 'полный список (snapshot), без окна по дате'
     : `с ${new Date(minTime).toISOString().slice(0, 10)} (${windowDays} дн.; ${prev ? `прошлый сбор ${new Date(prev).toISOString().slice(0, 10)}` : 'первый сбор'})`;
 
-  takeHttpWarnings(); // хвост от предыдущего источника не должен попасть в этот лог
   if (!opts.file && !opts.dryRun) setLastAttempt(SOURCE, startedAt);
   const stats = { listed: 0, pages: 0, viewed: 0, prefiltered: 0, duplicates: 0, known: 0, old: 0, saved: 0, errors: 0 };
   const warnings: string[] = [];

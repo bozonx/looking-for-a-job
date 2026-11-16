@@ -3,7 +3,14 @@
  * Без источников — все из scripts/providers/index.ts. --file — только с одним источником.
  * Новые вакансии сохраняются со `scores: null` — их скорит агент (playbooks/scoring.md).
  */
-import { collect, type CollectResult } from './lib/collect.ts';
+import { collect, collectContext, type CollectResult } from './lib/collect.ts';
+
+/**
+ * Сколько источников собирать одновременно. Разные площадки — разные хосты, так что параллельность
+ * не увеличивает нагрузку ни на одну из них; общий для источника хост (ленты на одном домене)
+ * всё равно ограничен паузой между запросами в lib/http.ts.
+ */
+const PARALLEL_SOURCES = 4;
 import { insertRunLog, runLogOffset } from './lib/runlog.ts';
 
 /**
@@ -63,11 +70,19 @@ async function main() {
 
   let total = 0;
   let failed = 0;
-  const results: CollectResult[] = [];
   const logOffset = runLogOffset('collect');
-  for (const n of list) {
-    const r = await collect(providers[n]!, { dryRun, limit, file });
-    results.push(r);
+  // один индекс дублей на весь запуск; результаты — в порядке списка источников, а не завершения
+  const ctx = collectContext();
+  const results: CollectResult[] = new Array(list.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < list.length) {
+      const i = next++;
+      results[i] = await collect(providers[list[i]!]!, { dryRun, limit, file }, ctx);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(PARALLEL_SOURCES, list.length) }, worker));
+  for (const r of results) {
     total += r.saved;
     if (r.failed) failed++;
   }
