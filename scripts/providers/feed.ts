@@ -4,7 +4,7 @@
  * У одной ленты может быть несколько URL (категории площадки) — элементы сливаются, свежие первыми.
  */
 import { XMLParser } from 'fast-xml-parser';
-import { fetchText, sleep } from '../lib/http.ts';
+import { eachTolerant, fetchText, warn } from '../lib/http.ts';
 import { jobPosting } from '../lib/jsonld.ts';
 import { htmlToMarkdown } from '../lib/html.ts';
 import { decodeEntities, makeJob, normEmployment, sourceConfig, stripTags, toMs } from '../lib/job.ts';
@@ -209,17 +209,20 @@ export function feedProvider(cfg: FeedConfig): Provider {
     job.build = async () => {
       const base = await short();
       try {
-        await sleep(500);
         const jp = jobPosting(await fetchText(base.data.source_url!));
-        if (!jp?.description) return base;
+        if (!jp?.description) {
+          warn(`${cfg.id}: на странице ${base.data.source_url} нет JobPosting с описанием — оставлено описание из ленты`);
+          return base;
+        }
         // шапка (заголовок, Source, доп. поля) — из ленты, описание — полное со страницы
         const head = base.body.split('\n\n').slice(0, 2).join('\n\n');
         return {
           data: { ...base.data, location: base.data.location ?? jp.location, employment: base.data.employment !== 'unknown' ? base.data.employment : jp.employment },
           body: `${head}\n\n${jp.location ? `- **Location:** ${jp.location}\n\n` : ''}${htmlToMarkdown(jp.description)}\n`,
         };
-      } catch {
-        return base; // страница не открылась — хватит и описания из ленты
+      } catch (e) {
+        warn(`${cfg.id}: полная страница не загрузилась (${(e as Error).message}) — оставлено описание из ленты`);
+        return base;
       }
     };
     return job;
@@ -235,11 +238,10 @@ export function feedProvider(cfg: FeedConfig): Provider {
     async fetchPage(page) {
       if (page > 0) return [];
       const all = new Map<string, RawJob>();
-      for (const [i, url] of cfg.urls.entries()) {
-        if (i > 0) await sleep(500);
+      await eachTolerant(`${cfg.id}: лента`, cfg.urls, async (url) => {
         for (const j of parse(await fetchText(url, { headers: { Accept: 'application/rss+xml, application/atom+xml, application/feed+json, application/xml, */*' } })))
           all.set(j.extId, j);
-      }
+      });
       return [...all.values()].sort((a, b) => (b.postedAt ?? 0) - (a.postedAt ?? 0));
     },
   };

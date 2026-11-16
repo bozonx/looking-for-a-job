@@ -13,8 +13,8 @@ import { appendRunLog, appendRunStats } from './runlog.ts';
 import { pickApplyTarget } from './target.ts';
 import { SeenStore } from './seen.ts';
 import { loadPrefilter } from './prefilter.ts';
-import { sleep } from './http.ts';
-import { lastRun, setLastRun } from './lastrun.ts';
+import { sleep, takeHttpWarnings } from './http.ts';
+import { lastAttempt, lastRun, setLastAttempt, setLastRun } from './lastrun.ts';
 
 /** запас окна сбора: площадки публикуют с задержкой, даты бывают в другом поясе */
 const WINDOW_MARGIN_DAYS = 2;
@@ -154,8 +154,9 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
   const startedAt = Date.now();
   const prev = opts.file ? null : lastRun(SOURCE);
 
-  if (prev && p.minIntervalHours && startedAt - prev < p.minIntervalHours * 3600e3) {
-    const next = new Date(prev + p.minIntervalHours * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
+  const prevAttempt = opts.file ? null : Math.max(prev ?? 0, lastAttempt(SOURCE) ?? 0) || null;
+  if (prevAttempt && p.minIntervalHours && startedAt - prevAttempt < p.minIntervalHours * 3600e3) {
+    const next = new Date(prevAttempt + p.minIntervalHours * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
     console.log(`## ${SOURCE} — пропущен: площадка просит не чаще раза в ${p.minIntervalHours} ч (следующий сбор после ${next} UTC)\n`);
     return { source: SOURCE, saved: 0, failed: false };
   }
@@ -171,6 +172,8 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
     ? 'полный список (snapshot), без окна по дате'
     : `с ${new Date(minTime).toISOString().slice(0, 10)} (${windowDays} дн.; ${prev ? `прошлый сбор ${new Date(prev).toISOString().slice(0, 10)}` : 'первый сбор'})`;
 
+  takeHttpWarnings(); // хвост от предыдущего источника не должен попасть в этот лог
+  if (!opts.file && !opts.dryRun) setLastAttempt(SOURCE, startedAt);
   const stats = { listed: 0, pages: 0, viewed: 0, prefiltered: 0, duplicates: 0, known: 0, old: 0, saved: 0, errors: 0 };
   const warnings: string[] = [];
   let stopReason = 'end of list';
@@ -298,7 +301,7 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
     errors.push(`- список (страница ${stats.pages}): ${(e as Error).message}`);
   }
 
-  warnings.push(...(p.takeWarnings?.() ?? []).map((w) => `- ${w}`));
+  warnings.push(...[...(p.takeWarnings?.() ?? []), ...takeHttpWarnings()].map((w) => `- ${w}`));
 
   // snapshot: вакансии источника, пропавшие из полного списка, вероятно закрыты (и наоборот)
   if (p.snapshot && p.covers && !failed && !opts.file) {

@@ -5,7 +5,12 @@
  * - Jobicy — https://jobicy.com/api/v2/remote-jobs (ссылка на Jobicy обязательна).
  * Ссылка на площадку — в source_url и в теле каждой вакансии. Настройки — config/sources.yaml.
  */
-import { fetchJson, sleep } from '../lib/http.ts';
+import { eachTolerant, fetchJson } from '../lib/http.ts';
+
+/** страница поиска Himalayas */
+const HIMALAYAS_PAGE = 20;
+/** запросы Himalayas, чья выдача уже кончилась, — дальше не запрашиваем */
+const himalayasDone = new Set<string>();
 import { makeJob, normEmployment, sourceConfig, toMs } from '../lib/job.ts';
 import type { Provider, RawJob } from '../lib/collect.ts';
 
@@ -54,12 +59,14 @@ export const himalayas: Provider = {
   parse: himalayasParse,
   async fetchPage(page) {
     const queries = sourceConfig<{ queries?: string[] }>('himalayas')?.queries ?? ['javascript'];
+    if (page === 0) himalayasDone.clear();
     const all = new Map<string, RawJob>();
-    for (const [i, q] of queries.entries()) {
-      if (i > 0) await sleep(500);
+    await eachTolerant('himalayas: запрос', queries.filter((q) => !himalayasDone.has(q)), async (q) => {
       const url = `https://himalayas.app/jobs/api/search?q=${encodeURIComponent(q)}&sort=recent&page=${page + 1}`;
-      for (const j of himalayasParse(await fetchJson(url))) all.set(j.extId, j);
-    }
+      const list = himalayasParse(await fetchJson(url));
+      if (list.length < HIMALAYAS_PAGE) himalayasDone.add(q);
+      for (const j of list) all.set(j.extId, j);
+    });
     return [...all.values()].sort(byDate);
   },
 };
@@ -100,10 +107,9 @@ export const remotive: Provider = {
     if (page > 0) return [];
     const cats = sourceConfig<{ categories?: string[] }>('remotive')?.categories ?? ['software-dev'];
     const out: RawJob[] = [];
-    for (const [i, c] of cats.entries()) {
-      if (i > 0) await sleep(1000);
+    await eachTolerant('remotive: категория', cats, async (c) => {
       out.push(...remotiveParse(await fetchJson(`https://remotive.com/api/remote-jobs?category=${encodeURIComponent(c)}`)));
-    }
+    });
     return out.sort(byDate);
   },
 };
@@ -142,10 +148,9 @@ export const jobicy: Provider = {
     if (page > 0) return [];
     const inds = sourceConfig<{ industries?: string[] }>('jobicy')?.industries ?? ['dev'];
     const out = new Map<string, RawJob>();
-    for (const [i, ind] of inds.entries()) {
-      if (i > 0) await sleep(1000);
+    await eachTolerant('jobicy: отрасль', inds, async (ind) => {
       for (const j of jobicyParse(await fetchJson(`https://jobicy.com/api/v2/remote-jobs?count=100&industry=${encodeURIComponent(ind)}`))) out.set(j.extId, j);
-    }
+    });
     return [...out.values()].sort(byDate);
   },
 };

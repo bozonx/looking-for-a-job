@@ -3,13 +3,15 @@
  * Через публичный API поиска Algolia (без ключа): последние треды пользователя whoishiring,
  * верхнеуровневые комментарии = вакансии. Первая строка поста — «Компания | Роль | Локация | …».
  */
-import { fetchJson, sleep } from '../lib/http.ts';
+import { fetchJson, warn } from '../lib/http.ts';
 import { decodeEntities, makeJob } from '../lib/job.ts';
 import type { Provider, RawJob } from '../lib/collect.ts';
 
 const API = 'https://hn.algolia.com/api/v1';
 /** сколько последних тредов смотреть (новый тред — 1-го числа; старый ещё актуален в начале месяца) */
 const THREADS = 2;
+/** предел страниц на тред: защита от зацикливания, если API не вернёт nbPages (1000 на страницу — с большим запасом) */
+const MAX_PAGES_PER_THREAD = 5;
 const ROLE = /engineer|developer|programmer|architect|\blead\b|cto|founding|full[- ]?stack|front[- ]?end|back[- ]?end|devops|sre|scientist|designer|manager|analyst|staff|intern/i;
 
 interface Hit {
@@ -67,11 +69,13 @@ export const hn: Provider = {
     if (!threads.length) throw new Error('не найден тред «Who is hiring»');
     const out: RawJob[] = [];
     for (const t of threads) {
-      for (let p = 0; ; p++) {
-        await sleep(300);
-        const res = (await fetchJson(`${API}/search_by_date?tags=comment,story_${t.objectID}&hitsPerPage=1000&page=${p}`)) as { hits: Hit[]; nbPages: number };
-        out.push(...parse(res));
-        if (p + 1 >= res.nbPages) break;
+      for (let p = 0; p < MAX_PAGES_PER_THREAD; p++) {
+        const res = (await fetchJson(`${API}/search_by_date?tags=comment,story_${t.objectID}&hitsPerPage=1000&page=${p}`)) as { hits: Hit[]; nbPages?: unknown };
+        const hits = parse(res);
+        out.push(...hits);
+        const nbPages = typeof res.nbPages === 'number' && Number.isFinite(res.nbPages) ? res.nbPages : 1;
+        if (!res.hits.length || p + 1 >= nbPages) break;
+        if (p + 1 === MAX_PAGES_PER_THREAD) warn(`hn: тред ${t.objectID} обрезан на ${MAX_PAGES_PER_THREAD} страницах`);
       }
     }
     return out.sort((a, b) => (b.postedAt ?? 0) - (a.postedAt ?? 0));

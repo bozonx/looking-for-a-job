@@ -3,7 +3,7 @@
  * Это первоисточник: закрытая вакансия исчезает из списка → possibly_closed (snapshot).
  * Список компаний — секция `ats` в config/sources.yaml. extId = <ats>-<slug>-<id вакансии>.
  */
-import { fetchJson, sleep } from '../lib/http.ts';
+import { fetchJson } from '../lib/http.ts';
 import { makeJob, normEmployment, sourceConfig, toMs } from '../lib/job.ts';
 import { safeExtId, type Provider, type RawJob } from '../lib/collect.ts';
 
@@ -132,7 +132,6 @@ export const ats: Provider = {
     if (!list.length) throw new Error('config/sources.yaml: секция ats пуста');
     const out: RawJob[] = [];
     for (const [i, [a, slug, title]] of list.entries()) {
-      if (i > 0) await sleep(300);
       try {
         out.push(...parseCompany(a, slug, await fetchJson(URLS[a](slug)), title));
         covered.add(scope(a, slug));

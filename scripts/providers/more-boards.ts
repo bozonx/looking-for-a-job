@@ -98,7 +98,6 @@ export const landingjobs: Provider = {
     if (page > 0) return [];
     const all: RawJob[] = [];
     for (let offset = 0; offset < 2000; offset += LJ_PAGE) {
-      if (offset) await sleep(500);
       const list = await fetchJson(`https://landing.jobs/api/v1/jobs?limit=${LJ_PAGE}&offset=${offset}`);
       if (!Array.isArray(list) || !list.length) break;
       all.push(...landingjobsParse(list));
@@ -153,7 +152,6 @@ function ycRaw(j: any): RawJob {
   });
   // описание — на странице вакансии; грузим лениво, только для прошедших предфильтр
   raw.build = async () => {
-    await sleep(500);
     const p = dataPage(await fetchText(url));
     const job = p.job ?? {};
     const c = p.company ?? {};

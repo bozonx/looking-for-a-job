@@ -3,7 +3,7 @@
  * Вакансии по категориям, свежие первыми. Не-удалённые вне стран из настроек отсеиваются (skip).
  * Настройки — секция `getonbrd` в config/sources.yaml.
  */
-import { fetchJson } from '../lib/http.ts';
+import { eachTolerant, fetchJson } from '../lib/http.ts';
 import { makeJob, sourceConfig, toMs } from '../lib/job.ts';
 import type { Provider, RawJob } from '../lib/collect.ts';
 
@@ -14,6 +14,8 @@ interface Cfg {
 }
 
 const PER_PAGE = 50;
+/** категории, чья лента уже кончилась (неполная страница) — дальше их страницы не запрашиваем */
+const exhausted = new Set<string>();
 const cfg = (): Required<Cfg> => {
   const c = sourceConfig<Cfg>('getonbrd') ?? {};
   return { categories: c.categories ?? ['programming'], remote: c.remote ?? ['fully_remote', 'remote_local'], office_countries: c.office_countries ?? ['Argentina'] };
@@ -63,11 +65,16 @@ export const getonbrd: Provider = {
   paginated: true,
   parse,
   async fetchPage(page) {
+    if (page === 0) exhausted.clear();
     const out: RawJob[] = [];
-    for (const cat of cfg().categories) {
+    const cats = cfg().categories.filter((c) => !exhausted.has(c));
+    // пауза между запросами к хосту — в lib/http.ts
+    await eachTolerant('getonbrd: категория', cats, async (cat) => {
       const url = `https://www.getonbrd.com/api/v0/categories/${encodeURIComponent(cat)}/jobs?per_page=${PER_PAGE}&page=${page + 1}&expand=${encodeURIComponent('["company","tags"]')}`;
-      out.push(...parse(await fetchJson(url)));
-    }
+      const list = parse(await fetchJson(url));
+      if (list.length < PER_PAGE) exhausted.add(cat);
+      out.push(...list);
+    });
     return out.sort((a, b) => (b.postedAt ?? 0) - (a.postedAt ?? 0));
   },
 };

@@ -31,3 +31,17 @@ export function setLastRun(source: string, at: number): void {
   fs.mkdirSync(path.dirname(FILE), { recursive: true });
   fs.writeFileSync(FILE, JSON.stringify(all, null, 1));
 }
+
+/**
+ * Время последнего обращения к площадке (полного или нет). Для minIntervalHours: обрыв сбора
+ * не должен разрешать сразу повторный запрос к площадке, которая просит ходить редко.
+ */
+export function lastAttempt(source: string): number | null {
+  const v = read()[`attempt:${source}`];
+  const n = v ? Date.parse(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+export function setLastAttempt(source: string, at: number): void {
+  setLastRun(`attempt:${source}`, at);
+}
