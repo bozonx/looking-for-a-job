@@ -12,7 +12,7 @@
  * Без real_url проверяется source_url (агрегатор) — только «generic»: закрытой считается лишь при явном 404/410/редиректе.
  * HN пропускается: ссылка ведёт на комментарий, он не удаляется вместе с вакансией.
  *
- * Пишет в front matter possibly_closed (true/false) и alive_checked_at (дата). Неизвестный результат ничего не меняет.
+ * Пишет в front matter possibly_closed (true/false) и alive_checked_at (дата). Неизвестный результат possibly_closed не меняет.
  * По умолчанию пропускает проверенные сегодня (--force — проверить заново).
  */
 import { fetchWithRetry } from './lib/http.ts';
@@ -123,6 +123,10 @@ async function main() {
       stat[r.verdict]++;
       if (r.verdict === 'unknown') {
         console.log(`? ${v.data.id}: ${r.how}`);
+        if (dryRun) return;
+        const fresh = parseVacancy(v.file); // possibly_closed не трогаем — только отмечаем, что сегодня смотрели
+        fresh.data.alive_checked_at = today;
+        writeVacancy(v.file, fresh.data, fresh.body);
         return;
       }
       const closed = r.verdict === 'closed';

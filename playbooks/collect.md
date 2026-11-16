@@ -27,7 +27,8 @@
       **Не больше 3 запросов/страниц на вакансию**, затем `null` — не трать токены на поиск.
       `apply_method` и `apply_target` пересчитает `npm run score`.
 5. `npm run score` — посчитает `overall`, `scores.region`, `apply_target`; `npm run validate` — исправь ошибки.
-   Затем `npm run check-alive` — проверит по real_url, не закрыты ли вакансии (new/selected/needs_attention;
+   Затем `npm run resolve-urls` — найдёт real_url на страницах агрегаторов (vuejobs, WWR; бережно: пауза ~3 с,
+   ≤ 40 страниц с площадки за запуск, 403/429 → площадка пропускается), и `npm run check-alive` — проверит по real_url, не закрыты ли вакансии (new/selected/needs_attention;
    закрытые получат `possibly_closed: true` и скроются в UI). Затем `npm run top` — топ-5 отскоренных в этом запуске (для отчёта).
    Не исправилось за 2 попытки — остановись и опиши проблему в отчёте.
 6. **Обязательно** допиши наблюдения в `data/insights.md` (создай файл, если нет) — раздел `## <дата>`, строки
@@ -60,6 +61,7 @@
    - <строки «# ИТОГ ОЧЕРЕДИ» из `npm run pending` как есть>
    - <строки «# ИТОГ СКОРИНГА» из `npm run score` как есть>
    - real_url найден: N из M проверенных
+   - <строки «# ИТОГ ПОИСКА REAL_URL» из `npm run resolve-urls` как есть>
    - <строки «# ИТОГ ПРОВЕРКИ» из `npm run check-alive` как есть>
    - `npm run validate`: invalid N, warnings N
 

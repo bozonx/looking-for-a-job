@@ -50,6 +50,7 @@ export const VacancySchema = z.object({
   source: z.string().min(1),
   source_url: z.string().url(),
   real_url: z.string().url().nullable().optional(),
+  real_url_tried_at: date.nullable().optional(), // когда npm run resolve-urls искал real_url на странице источника
   apply_method: z.string().regex(/^(easy-apply|ats-[a-z0-9-]+|email|comment|external|unknown)$/),
   duplicates: z.array(z.object({ source: z.string(), url: z.string().url(), seen_at: date.optional(), id: z.string().optional() })).default([]),
   apply_target: z.string().nullable().optional(),
