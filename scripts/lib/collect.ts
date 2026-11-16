@@ -307,7 +307,11 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
             const u = normUrl(data.source_url);
             const added = updateVacancy(dup.vacancy, opts.dryRun, (d) => {
               d.duplicates ??= [];
-              if (d.duplicates.some((x: any) => normUrl(x.url) === u) || normUrl(d.source_url) === u) return false;
+              // перевыложили (дубль опубликован позже) — двигаем posted_at: иначе запись остаётся «несвежей»
+              // и не попадёт в очередь скоринга, хотя вакансия жива
+              const reposted = !!data.posted_at && (!d.posted_at || data.posted_at > d.posted_at);
+              if (reposted) d.posted_at = data.posted_at;
+              if (d.duplicates.some((x: any) => normUrl(x.url) === u) || normUrl(d.source_url) === u) return reposted;
               d.duplicates.push({ source: SOURCE, url: data.source_url, seen_at: today(), ...(sameSource ? { id } : {}) });
               if (sameSource && data.location && !String(d.location ?? '').includes(data.location))
                 d.location = d.location ? `${d.location}; ${data.location}` : data.location;
