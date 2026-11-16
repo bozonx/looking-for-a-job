@@ -2,12 +2,12 @@
 # overall = Σ(w·score) / Σ(w) по всем ненулевым весам, округление до целого.
 # Для "inverse" используется (100 - score): чем выше оценка, тем хуже.
 # fit — берётся максимум по трекам из fit_tracks (вес трека 0 — трек игнорируется).
-version: 1
+version: 2
 # Уровень (senior+) и язык в заголовке отсекает предфильтр (prefilter.yaml); форма занятости на оценку не влияет — весов для них нет.
 positive:
   remote: 3
   legitimacy: 2
-  fit: 4
+  fit: 8                        # главный фактор: нерелевантная роль не должна вытягиваться удалёнкой/легитимностью
   region: 1
   language: 2
   startup: 1.5
@@ -21,5 +21,9 @@ fit_tracks:
   angular: 0.8                  # 3-й приоритет
   fullstack: 0.9                # 2-й приоритет
   ai_engineer: 1                # 1-й приоритет; ролевые AI-native вакансии; Python/Go/Rust в заголовке → низкий fit (playbooks/scoring.md)
+# Нерелевантная роль: если лучший взвешенный fit < below — overall не выше cap.
+fit_cap:
+  below: 40
+  cap: 35
 stop_flags: [office_outside_ar, location_restricted, nationality_excluded, ru_corporate, inadequate, scam]   # любой → overall = 0
 scam_legitimacy_below: 30                                        # автоматически ставит флаг scam

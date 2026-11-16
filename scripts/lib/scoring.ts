@@ -8,6 +8,8 @@ export interface Weights {
   positive: Record<string, number>;
   inverse: Record<string, number>;
   fit_tracks: Record<string, number>;
+  /** лучший взвешенный fit < below → overall ≤ cap */
+  fit_cap?: { below: number; cap: number };
   stop_flags: string[];
   scam_legitimacy_below: number;
 }
@@ -47,12 +49,11 @@ export function computeOverall(W: Weights, scores: Record<string, any>, stopFlag
     sum += w * v;
     wsum += w;
   };
-  for (const [k, w] of Object.entries(W.positive)) {
-    if (k === 'fit') {
-      const fits = Object.entries(scores.fit ?? {}).map(([t, v]) => (W.fit_tracks[t] ?? 0) * (v as number));
-      add(w, fits.length ? Math.max(...fits) : undefined);
-    } else add(w, scores[k]);
-  }
+  const fits = Object.entries(scores.fit ?? {}).map(([t, v]) => (W.fit_tracks[t] ?? 0) * (v as number));
+  const bestFit = fits.length ? Math.max(...fits) : undefined;
+  for (const [k, w] of Object.entries(W.positive)) add(w, k === 'fit' ? bestFit : scores[k]);
   for (const [k, w] of Object.entries(W.inverse)) if (typeof scores[k] === 'number') add(w, 100 - scores[k]);
-  return { overall: wsum ? Math.round(sum / wsum) : 0, flags };
+  let overall = wsum ? Math.round(sum / wsum) : 0;
+  if (W.fit_cap && bestFit !== undefined && bestFit < W.fit_cap.below) overall = Math.min(overall, W.fit_cap.cap);
+  return { overall, flags };
 }
