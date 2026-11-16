@@ -14,36 +14,123 @@ export interface FilterPreset {
     tab: string;
     status: string;
     minOverall: number;
-    track: string;
-    source: string;
-    region: string;
-    lang: string;
-    since: string;
+    tracks: string[];
+    sources: string[];
+    regions: string[];
+    langs: string[];
+    days: number | null;
     hideClosed: boolean;
     sort: string;
     dir: 'asc' | 'desc';
   };
 }
 
-const defaults = { tab: 'inbox', status: '', minOverall: 0, track: '', source: '', region: '', lang: '', since: '', hideClosed: true, q: '', sort: 'overall', dir: 'desc' as 'asc' | 'desc' };
+const defaults = {
+  tab: 'inbox',
+  status: '',
+  minOverall: 0,
+  tracks: [] as string[],
+  sources: [] as string[],
+  regions: [] as string[],
+  langs: [] as string[],
+  days: null as number | null,
+  hideClosed: true,
+  q: '',
+  sort: 'overall',
+  dir: 'desc' as 'asc' | 'desc',
+};
 const f = reactive({ ...defaults });
 const savedPresets = ref<FilterPreset[]>([]);
 const activePresetId = ref<string | null>(null);
+
+const STANDARD_DAYS = [1, 3, 7, 14, 30, 60, 90] as const;
+const isCustomDays = ref(false);
+
+const daysSelectValue = computed(() => {
+  if (f.days == null || f.days <= 0) return isCustomDays.value ? 'custom' : '';
+  if (STANDARD_DAYS.includes(f.days as any)) return String(f.days);
+  return 'custom';
+});
+
+function onDaysSelectChange(val: string) {
+  if (val === '') {
+    isCustomDays.value = false;
+    f.days = null;
+  } else if (val === 'custom') {
+    isCustomDays.value = true;
+    if (f.days == null || f.days <= 0 || STANDARD_DAYS.includes(f.days as any)) {
+      f.days = 5;
+    }
+  } else {
+    isCustomDays.value = false;
+    f.days = Number(val);
+  }
+}
+
+function normalizeFilters(raw: any) {
+  if (!raw || typeof raw !== 'object') return { ...defaults };
+  const tracks = Array.isArray(raw.tracks)
+    ? raw.tracks
+    : typeof raw.track === 'string' && raw.track
+    ? [raw.track]
+    : [];
+  const sources = Array.isArray(raw.sources)
+    ? raw.sources
+    : typeof raw.source === 'string' && raw.source
+    ? [raw.source]
+    : [];
+  const regions = Array.isArray(raw.regions)
+    ? raw.regions
+    : typeof raw.region === 'string' && raw.region
+    ? [raw.region]
+    : [];
+  const langs = Array.isArray(raw.langs)
+    ? raw.langs
+    : typeof raw.lang === 'string' && raw.lang
+    ? [raw.lang]
+    : [];
+
+  let days = typeof raw.days === 'number' ? raw.days : null;
+  if (days == null && typeof raw.since === 'string' && raw.since) {
+    const sinceDate = new Date(raw.since);
+    if (!isNaN(sinceDate.getTime())) {
+      const diffMs = Date.now() - sinceDate.getTime();
+      days = Math.max(1, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+    }
+  }
+
+  return {
+    tab: typeof raw.tab === 'string' ? raw.tab : defaults.tab,
+    status: typeof raw.status === 'string' ? raw.status : defaults.status,
+    minOverall: typeof raw.minOverall === 'number' ? raw.minOverall : defaults.minOverall,
+    tracks,
+    sources,
+    regions,
+    langs,
+    days,
+    hideClosed: typeof raw.hideClosed === 'boolean' ? raw.hideClosed : defaults.hideClosed,
+    sort: typeof raw.sort === 'string' ? raw.sort : defaults.sort,
+    dir: (raw.dir === 'asc' || raw.dir === 'desc' ? raw.dir : defaults.dir) as 'asc' | 'desc',
+    q: typeof raw.q === 'string' ? raw.q : defaults.q,
+  };
+}
 
 const activePreset = computed(() => savedPresets.value.find((p) => p.id === activePresetId.value) ?? null);
 
 const isPresetModified = computed(() => {
   if (!activePreset.value) return false;
-  const p = activePreset.value.filters;
+  const p = normalizeFilters(activePreset.value.filters);
+  const arrEqual = (a: string[] = [], b: string[] = []) =>
+    a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i]);
   return (
     f.tab !== p.tab ||
     f.status !== p.status ||
     f.minOverall !== p.minOverall ||
-    f.track !== p.track ||
-    f.source !== p.source ||
-    f.region !== p.region ||
-    f.lang !== p.lang ||
-    f.since !== p.since ||
+    !arrEqual(f.tracks, p.tracks) ||
+    !arrEqual(f.sources, p.sources) ||
+    !arrEqual(f.regions, p.regions) ||
+    !arrEqual(f.langs, p.langs) ||
+    f.days !== p.days ||
     f.hideClosed !== p.hideClosed ||
     f.sort !== p.sort ||
     f.dir !== p.dir
@@ -53,13 +140,25 @@ const isPresetModified = computed(() => {
 onMounted(() => {
   try {
     const rawPresets = localStorage.getItem('saved_presets');
-    if (rawPresets) savedPresets.value = JSON.parse(rawPresets);
+    if (rawPresets) {
+      const parsed = JSON.parse(rawPresets);
+      savedPresets.value = parsed.map((p: any) => ({
+        ...p,
+        filters: normalizeFilters(p.filters),
+      }));
+    }
     const active = localStorage.getItem('active_preset_id');
     if (active && savedPresets.value.some((p) => p.id === active)) {
       activePresetId.value = active;
     }
     const rawFilters = localStorage.getItem('filters');
-    if (rawFilters) Object.assign(f, JSON.parse(rawFilters));
+    if (rawFilters) {
+      const norm = normalizeFilters(JSON.parse(rawFilters));
+      Object.assign(f, norm);
+      if (norm.days && !STANDARD_DAYS.includes(norm.days as any)) {
+        isCustomDays.value = true;
+      }
+    }
   } catch {}
 });
 
@@ -92,6 +191,15 @@ const counts = computed(() => ({
   all: items.value.length,
 }));
 
+function getCutoffDate(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function matchRow(v: Row, filter: typeof defaults, q: string) {
   if (filter.tab === 'inbox' && !isFresh(v)) return false;
   if (filter.tab === 'flagged' && !v.flagged) return false;
@@ -100,12 +208,21 @@ function matchRow(v: Row, filter: typeof defaults, q: string) {
   if (filter.tab === 'selected' && v.status !== 'selected') return false;
   if (filter.tab === 'all' && filter.status && (v.status ?? 'none') !== filter.status) return false;
   if (filter.minOverall && (v.scores?.overall ?? 0) < filter.minOverall) return false;
-  if (filter.track && v.best_resume !== filter.track && !(v.role_tracks ?? []).includes(filter.track)) return false;
-  if (filter.source && v.source !== filter.source) return false;
-  if (filter.region && v.region !== filter.region) return false;
-  if (filter.lang && v.vacancy_language !== filter.lang) return false;
+  if (filter.tracks?.length) {
+    const hasTrack = filter.tracks.includes(v.best_resume) ||
+      (v.role_tracks ?? []).some((t: string) => filter.tracks.includes(t));
+    if (!hasTrack) return false;
+  }
+  if (filter.sources?.length && !filter.sources.includes(v.source)) return false;
+  if (filter.regions?.length && !filter.regions.includes(v.region)) return false;
+  if (filter.langs?.length && !filter.langs.includes(v.vacancy_language)) return false;
   if (filter.hideClosed && v.possibly_closed && filter.tab !== 'all' && filter.tab !== 'closed') return false;
-  if (filter.since && String(v.posted_at ?? v.collected_at) < filter.since) return false;
+  if (filter.days != null && filter.days > 0) {
+    const vDate = v.posted_at ?? v.collected_at;
+    if (!vDate) return false;
+    const cutoff = getCutoffDate(filter.days);
+    if (String(vDate).slice(0, 10) < cutoff) return false;
+  }
   if (q && !`${v.title} ${v.company} ${v.location ?? ''}`.toLowerCase().includes(q)) return false;
   return true;
 }
@@ -113,7 +230,7 @@ function matchRow(v: Row, filter: typeof defaults, q: string) {
 const presetCounts = computed(() => {
   const res: Record<string, number> = {};
   for (const p of savedPresets.value) {
-    res[p.id] = items.value.filter((v) => matchRow(v, { ...defaults, ...p.filters }, '')).length;
+    res[p.id] = items.value.filter((v) => matchRow(v, { ...defaults, ...normalizeFilters(p.filters) }, '')).length;
   }
   return res;
 });
@@ -297,19 +414,25 @@ function selectSystemTab(tabKey: string) {
 
 function selectPreset(preset: FilterPreset) {
   activePresetId.value = preset.id;
+  const p = normalizeFilters(preset.filters);
   Object.assign(f, {
-    tab: preset.filters.tab,
-    status: preset.filters.status,
-    minOverall: preset.filters.minOverall,
-    track: preset.filters.track,
-    source: preset.filters.source,
-    region: preset.filters.region,
-    lang: preset.filters.lang,
-    since: preset.filters.since,
-    hideClosed: preset.filters.hideClosed,
-    sort: preset.filters.sort,
-    dir: preset.filters.dir,
+    tab: p.tab,
+    status: p.status,
+    minOverall: p.minOverall,
+    tracks: [...p.tracks],
+    sources: [...p.sources],
+    regions: [...p.regions],
+    langs: [...p.langs],
+    days: p.days,
+    hideClosed: p.hideClosed,
+    sort: p.sort,
+    dir: p.dir,
   });
+  if (p.days && !STANDARD_DAYS.includes(p.days as any)) {
+    isCustomDays.value = true;
+  } else {
+    isCustomDays.value = false;
+  }
 }
 
 function updateActivePreset() {
@@ -318,11 +441,11 @@ function updateActivePreset() {
     tab: f.tab,
     status: f.status,
     minOverall: f.minOverall,
-    track: f.track,
-    source: f.source,
-    region: f.region,
-    lang: f.lang,
-    since: f.since,
+    tracks: [...f.tracks],
+    sources: [...f.sources],
+    regions: [...f.regions],
+    langs: [...f.langs],
+    days: f.days,
     hideClosed: f.hideClosed,
     sort: f.sort,
     dir: f.dir,
@@ -340,7 +463,15 @@ function resetFilters() {
   if (activePresetId.value) {
     activePresetId.value = null;
   }
-  Object.assign(f, { ...defaults, tab: f.tab });
+  isCustomDays.value = false;
+  Object.assign(f, {
+    ...defaults,
+    tracks: [],
+    sources: [],
+    regions: [],
+    langs: [],
+    tab: f.tab,
+  });
 }
 
 // ---- Modal: Save Filter ----
@@ -365,11 +496,11 @@ function savePreset() {
       tab: f.tab,
       status: f.status,
       minOverall: f.minOverall,
-      track: f.track,
-      source: f.source,
-      region: f.region,
-      lang: f.lang,
-      since: f.since,
+      tracks: [...f.tracks],
+      sources: [...f.sources],
+      regions: [...f.regions],
+      langs: [...f.langs],
+      days: f.days,
       hideClosed: f.hideClosed,
       sort: f.sort,
       dir: f.dir,
@@ -402,24 +533,36 @@ function executeDeletePreset() {
   toast.value = `Фильтр «${target.name}» удалён`;
 }
 
+function pluralDays(n: number): string {
+  const abs = Math.abs(n) % 100;
+  const rem = abs % 10;
+  if (abs > 10 && abs < 20) return 'дней';
+  if (rem > 1 && rem < 5) return 'дня';
+  if (rem === 1) return 'день';
+  return 'дней';
+}
+
 function getFilterTags(filters: FilterPreset['filters']): string[] {
+  const norm = normalizeFilters(filters);
   const tags: string[] = [];
-  if (filters.tab && filters.tab !== 'all') {
-    const t = tabs.find(([k]) => k === filters.tab);
+  if (norm.tab && norm.tab !== 'all') {
+    const t = tabs.find(([k]) => k === norm.tab);
     if (t) tags.push(`вкладка: ${t[1]}`);
   }
-  if (filters.tab === 'all' && filters.status) {
-    tags.push(`статус: ${STATUS_LABEL[filters.status] ?? filters.status}`);
+  if (norm.tab === 'all' && norm.status) {
+    tags.push(`статус: ${STATUS_LABEL[norm.status] ?? norm.status}`);
   }
-  if (filters.minOverall > 0) tags.push(`overall ≥ ${filters.minOverall}`);
-  if (filters.track) tags.push(`профиль: ${filters.track}`);
-  if (filters.source) tags.push(`источник: ${filters.source}`);
-  if (filters.region) tags.push(`регион: ${filters.region}`);
-  if (filters.lang) tags.push(`язык: ${filters.lang}`);
-  if (filters.since) tags.push(`с ${filters.since}`);
-  if (!filters.hideClosed) tags.push(`включая закрытые`);
-  if (filters.sort !== 'overall' || filters.dir !== 'desc') {
-    tags.push(`сортировка: ${filters.sort} ${filters.dir}`);
+  if (norm.minOverall > 0) tags.push(`overall ≥ ${norm.minOverall}`);
+  if (norm.tracks.length) tags.push(`профиль: ${norm.tracks.join(', ')}`);
+  if (norm.sources.length) tags.push(`источник: ${norm.sources.join(', ')}`);
+  if (norm.regions.length) tags.push(`регион: ${norm.regions.join(', ')}`);
+  if (norm.langs.length) tags.push(`язык: ${norm.langs.join(', ')}`);
+  if (norm.days != null && norm.days > 0) {
+    tags.push(`за ${norm.days} ${pluralDays(norm.days)}`);
+  }
+  if (!norm.hideClosed) tags.push(`включая закрытые`);
+  if (norm.sort !== 'overall' || norm.dir !== 'desc') {
+    tags.push(`сортировка: ${norm.sort} ${norm.dir}`);
   }
   return tags.length ? tags : ['без ограничений'];
 }
@@ -429,11 +572,11 @@ const currentFilterTags = computed(() =>
     tab: f.tab,
     status: f.status,
     minOverall: f.minOverall,
-    track: f.track,
-    source: f.source,
-    region: f.region,
-    lang: f.lang,
-    since: f.since,
+    tracks: [...f.tracks],
+    sources: [...f.sources],
+    regions: [...f.regions],
+    langs: [...f.langs],
+    days: f.days,
     hideClosed: f.hideClosed,
     sort: f.sort,
     dir: f.dir,
@@ -508,23 +651,47 @@ const currentFilterTags = computed(() =>
           <option v-for="(l, s) in STATUS_LABEL" :key="s" :value="s">{{ l }}</option>
         </select>
         <label>overall ≥ <input v-model.number="f.minOverall" type="number" min="0" max="100" step="5" class="num" /></label>
-        <select v-model="f.track">
-          <option value="">профиль: все</option>
-          <option v-for="t in TRACKS" :key="t" :value="t">{{ t }}</option>
+        <MultiSelect
+          v-model="f.tracks"
+          title="профиль"
+          :options="TRACKS"
+        />
+        <MultiSelect
+          v-model="f.sources"
+          title="источник"
+          :options="uniq('source')"
+        />
+        <MultiSelect
+          v-model="f.regions"
+          title="регион"
+          :options="REGIONS"
+        />
+        <MultiSelect
+          v-model="f.langs"
+          title="язык"
+          :options="uniq('vacancy_language')"
+        />
+        <select :value="daysSelectValue" @change="onDaysSelectChange(($event.target as HTMLSelectElement).value)">
+          <option value="">период: все</option>
+          <option value="1">за 1 день</option>
+          <option value="3">за 3 дня</option>
+          <option value="7">за 7 дней</option>
+          <option value="14">за 14 дней</option>
+          <option value="30">за 30 дней</option>
+          <option value="60">за 60 дней</option>
+          <option value="90">за 90 дней</option>
+          <option value="custom">свой период...</option>
         </select>
-        <select v-model="f.source">
-          <option value="">источник: все</option>
-          <option v-for="s in uniq('source')" :key="s" :value="s">{{ s }}</option>
-        </select>
-        <select v-model="f.region">
-          <option value="">регион: все</option>
-          <option v-for="r in REGIONS" :key="r" :value="r">{{ r }}</option>
-        </select>
-        <select v-model="f.lang">
-          <option value="">язык: все</option>
-          <option v-for="l in uniq('vacancy_language')" :key="l" :value="l">{{ l }}</option>
-        </select>
-        <label>с <input v-model="f.since" type="date" /></label>
+        <label v-if="isCustomDays" title="Количество дней назад">
+          <input
+            v-model.number="f.days"
+            type="number"
+            min="1"
+            max="365"
+            class="num"
+            placeholder="дней"
+          /> дн.
+        </label>
         <label title="Скрыть вакансии с пометкой «возможно, закрыта» (на вкладке «все» видны всегда)"><input v-model="f.hideClosed" type="checkbox" /> скрыть закрытые</label>
         <select :value="f.sort" @change="sortBy(($event.target as HTMLSelectElement).value)">
           <option value="overall">overall</option>
