@@ -28,7 +28,8 @@ npm run validate          # на пустой data/ напишет «Checked 0»
 cd profile
 cp about.example.md about.md
 cp answers.example.md answers.md
-cp cover-letter.example.md cover-letter.md
+cp cover-letter.example.md cover-letter.md   # необязательно
+cp accounts.example.md accounts.md
 cp resumes/vue.example.md resumes/vue.md
 cp projects.example.md projects.md
 cp facts.example.md facts.md
@@ -43,7 +44,8 @@ cp soft-skills.example.md soft-skills.md
 | `projects.md` | пет-проекты с темами и описаниями на en/ru/es | для резюме (0–2 по теме) |
 | `soft-skills.md` | soft skills с доказательствами | для резюме |
 | `answers.md` | ответы на типовые вопросы форм (опыт по годам, notice period, разрешение на работу…). Агент будет дописывать новые вопросы, ответы правите вы | для этапа 3 (отклик) |
-| `cover-letter.md` | тон, длина, что упоминать/не упоминать в сопроводительных | для этапа 3 |
+| `cover-letter.md` | личное для писем: формат работы, фразы «своим голосом», опорные истории. Общие правила — `config/cover-letter.md` | необязательно, этап 3 |
+| `accounts.md` | на каких площадках есть аккаунт (без паролей) | для этапа 3 |
 | `media/` | заготовленные видео-/аудио-визитки | для этапа 3 |
 
 Резюме по направлениям, которых у вас нет, можно не создавать — но тогда уберите трек из рассмотрения (вес 0 в `config/weights.yaml → fit_tracks`).

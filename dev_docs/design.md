@@ -60,7 +60,11 @@
 
 Детальный план (полуавтомат: агент заполняет, отправляю я) — `dev_docs/apply-plan.md`; он приоритетнее описанного ниже.
 
-Не реализован: нет `playbooks/apply.md` (резюме уже есть: `playbooks/tailor.md`, `scripts/render-resume.ts`); переменные `APPLY_*`, `LINKEDIN_APPLY_MAX_PER_DAY`, `TYPE_DELAY_MS` зарезервированы (`docs/env.md`). При реализации — добавить маршрут в `AGENTS.md`.
+**Реализовано по `apply-plan.md` (полуавтомат):** `playbooks/apply.md`, `scripts/browser.ts` (`npm run browser`, `browser:start` —
+Chromium по CDP), `apply-set` (набор с лимитами), `apply-mark` (статус + лог), `apply-targets` (площадки и аккаунты);
+данные — `profile/answers.md`, `profile/accounts.md`, `config/cover-letter.md` + `profile/cover-letter.md`.
+**Отличия от текста ниже:** агент не нажимает Submit (шаг 4 «отправить» — пользователь); стандартные медиа (`profile/media/`) отложены;
+паузы внутри формы — `FILL_DELAY_*`, посимвольный ввод — только для автокомплитов и LinkedIn.
 
 **Команды:**
 

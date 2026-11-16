@@ -22,13 +22,19 @@
     "cleanup": "node --env-file-if-exists=.env scripts/cleanup.ts",
     "check-alive": "node --env-file-if-exists=.env scripts/check-alive.ts",
     "resolve-urls": "node --env-file-if-exists=.env scripts/resolve-urls.ts",
-    "render-resume": "node --env-file-if-exists=.env scripts/render-resume.ts"
+    "render-resume": "node --env-file-if-exists=.env scripts/render-resume.ts",
+    "browser": "node --env-file-if-exists=.env scripts/browser.ts",
+    "browser:start": "node --env-file-if-exists=.env scripts/browser.ts start",
+    "apply-set": "node --env-file-if-exists=.env scripts/apply-set.ts",
+    "apply-mark": "node --env-file-if-exists=.env scripts/apply-mark.ts",
+    "apply-targets": "node --env-file-if-exists=.env scripts/apply-targets.ts"
   },
   "dependencies": {
     "chokidar": "^6.0.0",
     "fast-xml-parser": "^5.12.1",
     "marked": "^18.2.0",
     "nuxt": "^4.6.4",
+    "playwright-core": "^1.65.1",
     "turndown": "^7.2.5",
     "vue": "^3.5.45",
     "yaml": "^2.9.1",
