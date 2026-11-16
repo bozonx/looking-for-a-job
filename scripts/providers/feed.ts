@@ -214,10 +214,13 @@ export function feedProvider(cfg: FeedConfig): Provider {
           warn(`${cfg.id}: на странице ${base.data.source_url} нет JobPosting с описанием — оставлено описание из ленты`);
           return base;
         }
-        // шапка (заголовок, Source, доп. поля) — из ленты, описание — полное со страницы
-        const head = base.body.split('\n\n').slice(0, 2).join('\n\n');
+        // шапка (заголовок, Source, доп. поля) — из ленты, описание — полное со страницы;
+        // компании нет в ленте (Djinni) — берём из JobPosting
+        const fixCompany = job.company === 'Unknown' && !!jp.company;
+        let head = base.body.split('\n\n').slice(0, 2).join('\n\n');
+        if (fixCompany) head = head.replace(/^(# .*) — Unknown$/m, `$1 — ${jp.company}`);
         return {
-          data: { ...base.data, location: base.data.location ?? jp.location, employment: base.data.employment !== 'unknown' ? base.data.employment : jp.employment },
+          data: { ...base.data, ...(fixCompany ? { company: jp.company! } : {}), location: base.data.location ?? jp.location, employment: base.data.employment !== 'unknown' ? base.data.employment : jp.employment },
           body: `${head}\n\n${jp.location ? `- **Location:** ${jp.location}\n\n` : ''}${htmlToMarkdown(jp.description)}\n`,
         };
       } catch (e) {

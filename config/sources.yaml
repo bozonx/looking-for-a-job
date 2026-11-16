@@ -50,6 +50,21 @@ feeds:
     urls:
       - https://nodesk.co/remote-jobs/index.xml
 
+  # Djinni (Украина, много удалёнки от западных компаний): RSS поиска, по 100 последних на категорию.
+  # primary_keyword — категория сайта (JavaScript, Fullstack, React.js, Vue.js, Node.js, Angular…);
+  # неизвестное значение молча отдаёт всю ленту. Компании в ленте нет — берётся из JobPosting страницы.
+  - id: djinni
+    name: Djinni
+    title_format: "title"
+    full_page: true
+    urls:
+      - https://djinni.co/jobs/rss/?primary_keyword=JavaScript&employment=remote
+      - https://djinni.co/jobs/rss/?primary_keyword=Fullstack&employment=remote
+      - https://djinni.co/jobs/rss/?primary_keyword=React.js&employment=remote
+      - https://djinni.co/jobs/rss/?primary_keyword=Vue.js&employment=remote
+      - https://djinni.co/jobs/rss/?primary_keyword=Node.js&employment=remote
+      - https://djinni.co/jobs/rss/?primary_keyword=Angular&employment=remote
+
 # Публичные API систем найма: полный список открытых вакансий компании.
 # Список слагов или словарь «слаг: название» (Lever и Ashby название компании не отдают).
 # Вакансия пропала из списка → possibly_closed: true. Слаг — из адреса страницы вакансий:
@@ -126,6 +141,22 @@ yc:
   pages:
     - /jobs/role/software-engineer/remote
 
+# HeadHunter СНГ (hh.kz / hh.uz / rabota.by / hh.kg / hh.az — одна база, разбор страницы поиска).
+# areas — id регионов hh: 40 Казахстан, 97 Узбекистан, 16 Беларусь, 48 Кыргызстан, 9 Азербайджан, 28 Грузия,
+# 1001 другие регионы (113 Россия не включена; пусто — все регионы). remote_only — только «удалённо».
+hh:
+  queries: [vue, nuxt, react, typescript, fullstack, frontend]
+  areas: ["40", "97", "16", "48", "9", "28", "1001"]
+  remote_only: true
+
+# getmatch: API отдаёт все активные вакансии (поиска нет); remote_only — офис/гибрид отсеиваются до предфильтра.
+getmatch:
+  remote_only: true
+
+# GeekJob: все активные вакансии (~200); remote_only — офисные отсеиваются до предфильтра.
+geekjob:
+  remote_only: true
+
 # Свежесть для скоринга, дней с публикации: старше — в очередь скоринга (npm run pending) не попадает
 # (откликаться поздно, токены не тратим); файлы остаются, взять их — `npm run pending -- --stale`.
 # На сбор не влияет: окно сбора считается от прошлого запуска (docs/env.md, COLLECT_MAX_AGE_DAYS).
@@ -146,6 +177,10 @@ freshness_days:
   bumeran: 7
   zonajobs: 7
   computrabajo: 7
+  djinni: 7
+  hh: 7
+  getmatch: 7
+  geekjob: 7
   # редкие публикации
   hn: 30             # тред раз в месяц, компании пишут в первые дни
   ats: null

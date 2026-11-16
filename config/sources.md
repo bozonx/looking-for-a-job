@@ -21,9 +21,15 @@
 | bumeran | Bumeran — https://www.bumeran.com.ar | api (JSON, POST, `x-site-id: BMAR`) | Аргентина: офис/гибрид/удалёнка, IT-рубрика | ✅ |
 | zonajobs | ZonaJobs — https://www.zonajobs.com.ar | api (JSON, та же платформа, `x-site-id: ZJAR`) | Аргентина, свой пул вакансий (не копия Bumeran) | ✅ |
 | computrabajo | Computrabajo — https://ar.computrabajo.com | html + JobPosting на странице вакансии | Аргентина, рубрика «Informática y Telecom» | ✅ |
+| djinni | Djinni — https://djinni.co | rss + страница вакансии | Украина/международные, удалёнка; компания — из JobPosting | ✅ |
+| hh | HeadHunter СНГ — hh.kz, hh.uz, rabota.by, hh.kg, hh.az | html (JSON в `HH-Lux-InitialState`) + страница вакансии | Казахстан, Узбекистан, Беларусь, Кыргызстан, Азербайджан, Грузия; только «удалённо» | ✅ |
+| getmatch | getmatch — https://getmatch.ru | api (JSON) | русскоязычные IT-компании, с зарплатами; только удалённые | ✅ |
+| geekjob | GeekJob — https://geekjob.ru | api (JSON) + страница вакансии | русскоязычные IT-компании; только удалённые | ✅ |
 | indeed, jooble, talent, empleosit | — | — | Аргентина: 403/капча или нет машиночитаемых данных | ✗ |
-| euremotejobs, dailyremote, remoterocketship, wellfound, startup.jobs, 4dayweek, getmanfred | — | — | Cloudflare/403 или лента без вакансий | ✗ |
-| hh | hh.ru | api | анонимный доступ закрыт (403), нужна регистрация приложения с модерацией | ✗ не подключаем |
+| euremotejobs, dailyremote, remoterocketship, wellfound, startup.jobs, 4dayweek, getmanfred, devby | — | — | Cloudflare/403 или лента без вакансий | ✗ |
+| hh (api) | api.hh.ru | api | анонимный доступ закрыт (403) — поэтому `hh` разбирает HTML страницы поиска | ✗ |
+| turing, toptal (платформа), lemon.io, arc.dev | — | — | вакансии только после регистрации/входа (Toptal как работодатель — в `ats`) | ✗ |
+| relocate.me | — | html | только вакансии с переездом — противоречит `preferences.md` | ✗ не подключаем |
 | linkedin | LinkedIn | html (браузер Orca) | — | после стабилизации |
 
 Собрать все: `npm run collect`; один: `npm run collect -- <id>`; проверить без записи: `--dry-run`.
@@ -45,6 +51,11 @@
 - **bumeran, zonajobs** — фильтры `filters` в `config/sources.yaml`; описание — простой текст из выдачи. Компания часто
   скрыта («Confidencial» / «Importante compañía…») → `company_country: null`. Много объявлений кадровых агентств.
 - **computrabajo** — дата в списке только «Hace N horas»; точная — из JobPosting на странице вакансии (грузится после предфильтра).
+- **hh** — hh.kz/hh.uz/rabota.by/hh.kg/hh.az — одна база: один источник, страна задаётся `areas`. Пагинация
+  по 50, `COLLECT_MAX_PAGES` действует на каждый запрос. Описание — JobPosting страницы вакансии (после предфильтра).
+- **djinni** — неизвестный `primary_keyword` молча отдаёт всю ленту (продажи, финансы…) — проверяй значение на сайте.
+- **getmatch, geekjob** — поиска нет, берётся весь поток; не удалённые отсеиваются до предфильтра (`remote_only`).
+  GeekJob: дата в списке без года («16 ноября»), точная — в JobPosting.
 - **landingjobs** — офисные вакансии отсеиваются до предфильтра (кроме `office_countries`).
 - **Склейка внутри источника:** одна роль в нескольких локациях (vuejobs, ats, himalayas) — одна запись, локации через `;`.
 - **Окно сбора и свежесть** — `docs/env.md`: окно у каждого источника от прошлого сбора; в скоринг идут только
