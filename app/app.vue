@@ -175,6 +175,8 @@ async function patch(id: string, body: Record<string, unknown>) {
     const res = await $fetch<{ data: Row }>(`/api/vacancies/${encodeURIComponent(id)}`, { method: 'PATCH', body });
     const it = items.value.find((v) => v.id === id);
     if (it) Object.assign(it, res.data);
+    // опрос, стартовавший до PATCH, вернул бы старый статус; новый refresh отменяет его (dedupe: 'cancel')
+    void refresh();
     if (current.value === id && !rows.value.some((v) => v.id === id)) {
       const next = r[i + 1] ?? r[i - 1];
       current.value = next && next.id !== id ? next.id : (rows.value[0]?.id ?? null);

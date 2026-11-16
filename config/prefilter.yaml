@@ -110,6 +110,11 @@ exclude_title:
   - стажер
   - стажировка
   - junior
+  - jr$
+  - jr.
+  - entry level
+  - entry-level
+  - graduate
   - джуниор
   - c++
   - embedded

@@ -18,6 +18,15 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Обработать items, держа в работе не больше limit одновременно (порядок старта — порядок списка). */
+export async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) await fn(items[next++]!);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
 /** хосты, ответившие 429 после всех повторов, — до конца запуска не трогаем */
 const blockedHosts = new Set<string>();
 /** хост → момент, раньше которого следующий запрос к нему не отправляем */

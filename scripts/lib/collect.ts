@@ -7,7 +7,7 @@ import { freshnessDays } from './freshness.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { env, today } from './env.ts';
-import { loadAll, vacancyPath, writeVacancy, type VacancyFile } from './vacancy.ts';
+import { loadAll, parseVacancy, vacancyPath, writeVacancy, type VacancyFile } from './vacancy.ts';
 import { buildIndex, findDuplicate, key, normUrl, type Index } from './dedupe.ts';
 import { appendRunLog, appendRunStats } from './runlog.ts';
 import { pickApplyTarget } from './target.ts';
@@ -165,6 +165,28 @@ export interface CollectContext {
   idx: Index;
 }
 
+/**
+ * Изменить вакансию, не затирая чужие правки: снимок `all` загружен в начале запуска, а за минуты сбора
+ * файл мог поменять UI (status/starred/notes) или агент (скоринг). Поэтому файл перечитывается прямо
+ * перед записью, mutate применяется к свежей версии, и она же становится записью в индексе.
+ * mutate возвращает false — менять нечего, файл не пишется.
+ */
+function updateVacancy(v: VacancyFile, dryRun: boolean, mutate: (d: VacancyData & Record<string, any>) => boolean): boolean {
+  let fresh: VacancyFile = v;
+  if (!dryRun) {
+    try {
+      fresh = parseVacancy(v.file);
+    } catch {
+      /* файла нет/битый — работаем с копией в памяти */
+    }
+  }
+  if (!mutate(fresh.data as any)) return false;
+  if (!dryRun) writeVacancy(v.file, fresh.data, fresh.body);
+  v.data = fresh.data;
+  v.body = fresh.body;
+  return true;
+}
+
 export function collectContext(): CollectContext {
   const all = loadAll();
   return { all, idx: buildIndex(all) };
@@ -277,18 +299,19 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
 
           if (dup) {
             stats.duplicates++;
-            const d = dup.vacancy.data;
-            d.duplicates ??= [];
             const u = normUrl(data.source_url);
-            if (!d.duplicates.some((x: any) => normUrl(x.url) === u) && normUrl(d.source_url) !== u) {
+            const added = updateVacancy(dup.vacancy, opts.dryRun, (d) => {
+              d.duplicates ??= [];
+              if (d.duplicates.some((x: any) => normUrl(x.url) === u) || normUrl(d.source_url) === u) return false;
               d.duplicates.push({ source: SOURCE, url: data.source_url, seen_at: today(), ...(sameSource ? { id } : {}) });
               if (sameSource && data.location && !String(d.location ?? '').includes(data.location))
                 d.location = d.location ? `${d.location}; ${data.location}` : data.location;
               if (data.real_url && !d.real_url) d.real_url = data.real_url;
               d.apply_target = pickApplyTarget(d);
-              if (!opts.dryRun) writeVacancy(dup.vacancy.file, d, dup.vacancy.body);
-              idx.byUrl.set(u, dup.vacancy);
-            }
+              return true;
+            });
+            if (added) idx.byUrl.set(u, dup.vacancy);
+            const d = dup.vacancy.data;
             if (sameSource) {
               merged.push(`- ${id} → ${d.id}: «${data.title} — ${data.company}»${data.location ? ` (+ ${data.location})` : ''}`);
               idx.byId.set(id, dup.vacancy);
@@ -337,12 +360,14 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
       const ext = String(d.id).slice(SOURCE.length + 1);
       if (!p.covers(ext)) continue;
       // открыта, если в списке есть она сама или склеенная с ней вакансия того же источника
-      const gone = !listedIds.has(d.id) && !(d.duplicates ?? []).some((x: any) => x.id && listedIds.has(x.id));
-      if (gone === !!d.possibly_closed) continue;
-      d.possibly_closed = gone;
-      if (gone) closed++;
-      else reopened++;
-      if (!opts.dryRun) writeVacancy(v.file, d, v.body);
+      updateVacancy(v, opts.dryRun, (fd) => {
+        const gone = !listedIds.has(fd.id) && !(fd.duplicates ?? []).some((x: any) => x.id && listedIds.has(x.id));
+        if (gone === !!fd.possibly_closed) return false;
+        fd.possibly_closed = gone;
+        if (gone) closed++;
+        else reopened++;
+        return true;
+      });
     }
   }
 

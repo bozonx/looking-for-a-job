@@ -12,6 +12,7 @@ import { collect, collectContext, type CollectResult } from './lib/collect.ts';
  */
 const PARALLEL_SOURCES = 4;
 import { insertRunLog, runLogOffset } from './lib/runlog.ts';
+import { acquireLock } from './lib/lock.ts';
 
 /**
  * Итог запуска — точные цифры и дословные ошибки/предупреждения по всем источникам.
@@ -68,6 +69,8 @@ async function main() {
   const list = names.length ? names : Object.keys(providers);
   if (file && list.length !== 1) throw new Error('--file работает только с одним источником');
 
+  // dry-run и --file ничего не пишут в state — им блокировка не нужна
+  if (!dryRun && !file) acquireLock('collect');
   let total = 0;
   let failed = 0;
   const logOffset = runLogOffset('collect');

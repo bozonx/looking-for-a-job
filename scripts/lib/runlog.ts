@@ -11,16 +11,24 @@ export function appendRunLog(kind: string, markdown: string): string {
   return file;
 }
 
-/** Текущий размер лога (точка вставки для insertRunLog). */
-export function runLogOffset(kind: string): number {
+/** Точка вставки для insertRunLog: файл лога и его текущий размер. */
+export interface RunLogMark {
+  file: string;
+  offset: number;
+}
+
+export function runLogOffset(kind: string): RunLogMark {
   const file = path.join(RUNS_DIR, `${today()}-${kind}.md`);
-  return fs.existsSync(file) ? fs.statSync(file).size : 0;
+  return { file, offset: fs.existsSync(file) ? fs.statSync(file).size : 0 };
 }
 
 /** Вставить раздел в лог по смещению (перед разделами, дописанными после runLogOffset). */
-export function insertRunLog(kind: string, markdown: string, offset: number): string {
+export function insertRunLog(kind: string, markdown: string, mark: RunLogMark): string {
   fs.mkdirSync(RUNS_DIR, { recursive: true });
   const file = path.join(RUNS_DIR, `${today()}-${kind}.md`);
+  // запуск перешёл через полночь: смещение относится к вчерашнему файлу — просто дописываем в конец сегодняшнего
+  if (file !== mark.file) return appendRunLog(kind, markdown);
+  const { offset } = mark;
   const buf = fs.existsSync(file) ? fs.readFileSync(file) : Buffer.alloc(0);
   const head = `# ${today()} — ${kind}\n\n`;
   // новый файл: offset 0 указывает на начало — заголовок дня оставляем первым

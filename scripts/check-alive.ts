@@ -15,7 +15,10 @@
  * Пишет в front matter possibly_closed (true/false) и alive_checked_at (дата). Неизвестный результат possibly_closed не меняет.
  * По умолчанию пропускает проверенные сегодня (--force — проверить заново).
  */
-import { fetchWithRetry } from './lib/http.ts';
+import { fetchWithRetry, pool } from './lib/http.ts';
+
+/** не больше стольких проверок одновременно — иначе сотни хостов = сотни открытых соединений */
+const PARALLEL_CHECKS = 16;
 import { loadAll, parseVacancy, resolveTargets, writeVacancy } from './lib/vacancy.ts';
 import { appendRunLog } from './lib/runlog.ts';
 
@@ -109,38 +112,36 @@ async function main() {
   const closedNow: string[] = [];
   const reopened: string[] = [];
   // throttle в lib/http разводит запросы к одному хосту; разные хосты идут параллельно
-  await Promise.all(
-    queue.map(async (v) => {
-      let r: { verdict: Verdict; how: string };
-      try {
-        r = await checkUrl(targetUrl(v.data)!);
-        if (!v.data.real_url) r.how = `source: ${r.how}`;
-      } catch (e) {
-        stat.error++;
-        console.log(`! ${v.data.id}: ${(e as Error).message}`);
-        return;
-      }
-      stat[r.verdict]++;
-      if (r.verdict === 'unknown') {
-        console.log(`? ${v.data.id}: ${r.how}`);
-        if (dryRun) return;
-        const fresh = parseVacancy(v.file); // possibly_closed не трогаем — только отмечаем, что сегодня смотрели
-        fresh.data.alive_checked_at = today;
-        writeVacancy(v.file, fresh.data, fresh.body);
-        return;
-      }
-      const closed = r.verdict === 'closed';
-      if (closed && !v.data.possibly_closed) closedNow.push(`${v.data.id} (${r.how}) ${targetUrl(v.data)}`);
-      if (!closed && v.data.possibly_closed) reopened.push(v.data.id);
-      if (closed) console.log(`✕ ${v.data.id}: закрыта (${r.how})`);
+  await pool(queue, PARALLEL_CHECKS, async (v) => {
+    let r: { verdict: Verdict; how: string };
+    try {
+      r = await checkUrl(targetUrl(v.data)!);
+      if (!v.data.real_url) r.how = `source: ${r.how}`;
+    } catch (e) {
+      stat.error++;
+      console.log(`! ${v.data.id}: ${(e as Error).message}`);
+      return;
+    }
+    stat[r.verdict]++;
+    if (r.verdict === 'unknown') {
+      console.log(`? ${v.data.id}: ${r.how}`);
       if (dryRun) return;
-      // перечитываем перед записью: файл мог поменять UI, пока шли запросы
-      const fresh = parseVacancy(v.file);
-      fresh.data.possibly_closed = closed;
+      const fresh = parseVacancy(v.file); // possibly_closed не трогаем — только отмечаем, что сегодня смотрели
       fresh.data.alive_checked_at = today;
       writeVacancy(v.file, fresh.data, fresh.body);
-    }),
-  );
+      return;
+    }
+    const closed = r.verdict === 'closed';
+    if (closed && !v.data.possibly_closed) closedNow.push(`${v.data.id} (${r.how}) ${targetUrl(v.data)}`);
+    if (!closed && v.data.possibly_closed) reopened.push(v.data.id);
+    if (closed) console.log(`✕ ${v.data.id}: закрыта (${r.how})`);
+    if (dryRun) return;
+    // перечитываем перед записью: файл мог поменять UI, пока шли запросы
+    const fresh = parseVacancy(v.file);
+    fresh.data.possibly_closed = closed;
+    fresh.data.alive_checked_at = today;
+    writeVacancy(v.file, fresh.data, fresh.body);
+  });
 
   const summary =
     `- проверено: ${queue.length}; открыты: ${stat.open}, закрыты: ${stat.closed}, неизвестно: ${stat.unknown}, ошибок: ${stat.error}\n` +
