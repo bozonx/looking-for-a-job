@@ -101,7 +101,8 @@ resume_match:
   в резюме («no agencies», «not looking for AngularJS-only devs», «job hoppers»). `evidence` — цитата на языке вакансии.
   Локацию, гражданство, возраст сюда не пиши — это `stop_flags`.
 - `responsibilities` — 3–8 обязанностей из блока «what you'll do / responsibilities / задачи» (если его нет —
-  из описания роли). Каждая — короткая фраза «глагол + объект» **на английском, нижним регистром**, без названий
+  из описания роли). **Только ключи из `config/responsibilities.yaml`**; технологии в формулировку не включай (они уже
+  в `required`/`nice_to_have`). Подходящего ключа нет — добавь в словарь новый общий ключ (или синоним существующего). Каждая — короткая фраза «глагол + объект» **на английском, нижним регистром**, без названий
   компаний и цифр: `build reusable ui components`, `integrate rest apis`, `mentor junior developers`.
   Формулируй единообразно, чтобы одинаковые задачи из разных вакансий склеивались при подсчёте (не
   «create components» в одной и «build components» в другой — выбирай `build`). Требования к навыкам сюда не пиши.
@@ -118,5 +119,6 @@ resume_match:
 ## Дозаполнение v3 у уже отскоренных
 
 `npm run pending -- --upgrade [--limit N | --all]` — релевантные вакансии со `scoring_version` < 3 (по убыванию overall).
+Сюда же попадают вакансии, у которых `responsibilities` не из `config/responsibilities.yaml`, — перепиши их ключами словаря.
 Для каждой: прочитай текст, допиши в `resume_match` только поля v3, поставь `scoring_version: 3`. Остальные оценки
 не меняй, `npm run score` не нужен. Потом `npm run validate`.

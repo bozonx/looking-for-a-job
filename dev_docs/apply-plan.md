@@ -233,18 +233,19 @@ To: … · Subject: … · Вложение: Ivan_Kozyrin_vue_en.pdf
 Статус на 2026-11-16: пункты 1–5 и 8 сделаны; `browser.ts` проверен на Ashby, Greenhouse (react-select, автокомплит
 локации, телефон, upload) и Workable. Дальше — пункт 3 (регистрация, где нужно) и 6 (пилот).
 
-1. `config/cover-letter.md` (общие правила) + `profile/cover-letter.md`; `profile/answers.md` по 4.2 — агент предзаполняет
+1. ✅ `config/cover-letter.md` (общие правила) + `profile/cover-letter.md`; `profile/answers.md` по 4.2 — агент предзаполняет
    годы по технологиям и опорные истории из `facts.md`, я проверяю и дописываю доступность.
-2. `scripts/browser.ts` + `browser:start`; проверить на 2–3 реальных формах Greenhouse/Ashby: fill в React-полях,
+2. ✅ `scripts/browser.ts` + `browser:start`; проверить на 2–3 реальных формах Greenhouse/Ashby: fill в React-полях,
    кастомные селекты, автокомплит локации, upload файла.
-3. `profile/accounts.md` (площадка, аккаунт есть/нет, заметки — без паролей) + `npm run apply-targets` (сколько вакансий
+3. ◐ `profile/accounts.md` (площадка, аккаунт есть/нет, заметки — без паролей) + `npm run apply-targets` (сколько вакансий
    на отклик по каждому `apply_target`, где нужен аккаунт); регистрируюсь где нужно. Greenhouse/Ashby/Lever/Workable —
    без аккаунта; Workday — аккаунт на каждую компанию, по ходу.
-4. `playbooks/apply.md` по §6; маршруты в `AGENTS.md`; переменные `FILL_DELAY_*` в `docs/env.md`.
-5. Скрипты рутины: `apply-set` (набор с лимитами), `apply-mark` (статус + лог).
+   ✅ `accounts.md` и `apply-targets` готовы; ⏳ регистрация: djinni, hh, geekjob, getonbrd, habr, yc, zonajobs — «?».
+4. ✅ `playbooks/apply.md` по §6; маршруты в `AGENTS.md`; переменные `FILL_DELAY_*` в `docs/env.md`.
+5. ✅ Скрипты рутины: `apply-set` (набор с лимитами), `apply-mark` (статус + лог).
 6. **Пилот** на 3–5 вакансиях Greenhouse/Ashby; правки playbook и `answers.md`.
 7. Площадки с аккаунтом (Get on Board, Djinni, Habr…), затем Workday, LinkedIn последним.
-8. Обновить `design.md` §5.2.
+8. ✅ Обновить `design.md` §5.2.
 
 ## 9. Отложено
 

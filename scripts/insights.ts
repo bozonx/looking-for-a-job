@@ -15,7 +15,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { DATA_DIR, RUNS_DIR, today } from './lib/env.ts';
+import { CONFIG_DIR, DATA_DIR, RUNS_DIR, today } from './lib/env.ts';
 import { appendRunLog } from './lib/runlog.ts';
 import { TRACKS } from './lib/schema.ts';
 import { loadSkills, normSkill } from './lib/skills.ts';
@@ -28,6 +28,7 @@ const since = opt('--since') ?? new Date(Date.now() - days * 86400e3).toISOStrin
 const save = !args.includes('--no-save');
 
 const dict = loadSkills();
+const respDict = loadSkills(path.join(CONFIG_DIR, 'responsibilities.yaml'));
 const vac = loadAll().filter((v) => String(v.data.collected_at) >= since);
 const scored = vac.filter((v) => v.data.scores);
 const relevant = scored.filter((v) => !(v.data.stop_flags ?? []).length);
@@ -88,10 +89,11 @@ out.push(
 // ---------- Резюме ----------
 out.push('### Резюме', '');
 const unknown = new Map<string, number>();
+const unknownResp = new Map<string, number>();
 for (const track of TRACKS) {
   const vs = relevant.filter((v) => v.data.resume_match?.resume === track);
   if (!vs.length) continue;
-  const req: Counter = new Map(), miss: Counter = new Map(), missNice: Counter = new Map(), ats: Counter = new Map();
+  const req: Counter = new Map(), nice: Counter = new Map(), fresh: Counter = new Map(), miss: Counter = new Map(), missNice: Counter = new Map(), ats: Counter = new Map();
   const resp: Counter = new Map(), dom: Counter = new Map(), prod: Counter = new Map(), soft: Counter = new Map();
   const spell = new Map<string, Map<string, number>>();
   const years: number[] = [];
@@ -103,11 +105,18 @@ for (const track of TRACKS) {
       if (!r.known) unknown.set(r.name, (unknown.get(r.name) ?? 0) + 1);
       return r.name;
     };
+    const nr = (s: string) => {
+      const r = normSkill(String(s), respDict);
+      if (!r.known) unknownResp.set(r.name, (unknownResp.get(r.name) ?? 0) + 1);
+      return r.name;
+    };
+    for (const s of [...(rm.required ?? []), ...(rm.nice_to_have ?? [])]) if (!normSkill(s, dict).known) bump(fresh, normSkill(s, dict).name, w, d.id);
+    for (const s of rm.nice_to_have ?? []) bump(nice, n(s), w, d.id);
     for (const s of rm.required ?? []) bump(req, n(s), w, d.id);
     for (const s of rm.missing_required ?? []) bump(miss, n(s), w, d.id);
     for (const s of rm.missing_nice ?? []) bump(missNice, n(s), w, d.id);
     for (const s of rm.ats_keywords_missing ?? []) bump(ats, String(s).toLowerCase(), w, d.id);
-    for (const r of rm.responsibilities ?? []) bump(resp, String(r).toLowerCase().trim(), w, d.id);
+    for (const r of rm.responsibilities ?? []) bump(resp, nr(r), w, d.id);
     for (const r of rm.soft_requirements ?? []) bump(soft, String(r).toLowerCase().trim(), w, d.id);
     if (rm.domain) bump(dom, String(rm.domain).toLowerCase(), w, d.id);
     if (rm.product_type) bump(prod, String(rm.product_type).toLowerCase(), w, d.id);
@@ -135,13 +144,21 @@ for (const track of TRACKS) {
     '**ATS: формулировки, которых нет в тексте резюме:**',
     '',
     table(ats, vs.length, 10),
+    '**Новые навыки (нет в config/skills.yaml — кандидаты в словарь и, если опыт есть, в резюме):**',
+    '',
+    table(fresh, vs.length, 15),
     '**Есть в резюме, но вакансия считает минусом:**',
     '',
     negative.length ? negative.join('\n') + '\n' : '_нет_\n',
     ...v3Block(vs.filter((v) => (v.data.scoring_version ?? 0) >= 3).length, vs.length, resp, spell, dom, prod, soft, years),
     '<details><summary>Самые частые требования (спрос)</summary>',
     '',
+    '_Обязательные:_',
+    '',
     table(req, vs.length, 25),
+    '_Желательные (nice to have):_',
+    '',
+    table(nice, vs.length, 25),
     '</details>',
     '',
   );
@@ -150,6 +167,18 @@ const noRm = relevant.filter((v) => !v.data.resume_match).length;
 if (noRm) out.push(`⚠ Без resume_match: ${noRm} отскоренных вакансий — в статистику резюме не попали.`, '');
 if (unknown.size)
   out.push(`⚠ Навыки вне config/skills.yaml: ${[...unknown].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}×${n}`).join(', ')}`, '');
+
+if (unknownResp.size)
+  out.push(
+    `⚠ Обязанности вне config/responsibilities.yaml: ${unknownResp.size} формулировок (${[...unknownResp.values()].reduce((a, b) => a + b, 0)} упоминаний) — ` +
+      'нормализуй через npm run pending -- --upgrade или добавь синонимы.',
+    '',
+  );
+
+// ---------- Особые требования отклика ----------
+const special: Counter = new Map();
+for (const v of relevant) for (const x of v.data.requirements_special ?? []) bump(special, `${x.type}${x.standard ? '' : ' (нестандартное)'}`, weight(v.data), v.data.id);
+out.push('### Особые требования отклика', '', table(special, relevant.length, 15).replace('| навык |', '| тип |'));
 
 // ---------- Конвейер ----------
 out.push('### Источники и фильтры', '');

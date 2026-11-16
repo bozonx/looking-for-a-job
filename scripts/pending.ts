@@ -5,12 +5,14 @@
  * Порядок: сначала свежие (posted_at, иначе collected_at), при равенстве — с известным real_url.
  * Остаток остаётся в очереди и берётся следующим запуском: курсор не нужен, очередь — это сами файлы.
  * `--upgrade` — вместо очереди скоринга: отскоренные релевантные вакансии (без stop_flags) со
- *   scoring_version < 3, по убыванию overall — им нужно дозаполнить поля v3 в resume_match (playbooks/scoring.md).
+ *   scoring_version < 3 или с обязанностями вне config/responsibilities.yaml, по убыванию overall —
+ *   дозаполнить поля v3 / нормализовать responsibilities в resume_match (playbooks/scoring.md).
  * Свежесть: вакансии старше `freshness_days` своего источника (config/sources.yaml) в очередь не попадают —
  * откликаться на них поздно, токены на скоринг не тратим. Файлы остаются (видны в UI); `--stale` — взять и их.
  */
 import path from 'node:path';
-import { env } from './lib/env.ts';
+import { CONFIG_DIR, env } from './lib/env.ts';
+import { loadSkills, normSkill } from './lib/skills.ts';
 import { loadAll } from './lib/vacancy.ts';
 import { freshnessDays } from './lib/freshness.ts';
 import { regionUnlikely } from './lib/location.ts';
@@ -26,8 +28,10 @@ const onlyPaths = args.includes('--paths');
 const withStale = args.includes('--stale') || args.includes('--all');
 
 if (args.includes('--upgrade')) {
+  const resp = loadSkills(path.join(CONFIG_DIR, 'responsibilities.yaml'));
+  const rawResp = (v: { data: any }) => (v.data.resume_match?.responsibilities ?? []).some((r: string) => !normSkill(r, resp).known);
   const up = loadAll()
-    .filter((v) => v.data.scores && (v.data.scoring_version ?? 0) < 3 && !(v.data.stop_flags ?? []).length )
+    .filter((v) => v.data.scores && !(v.data.stop_flags ?? []).length && ((v.data.scoring_version ?? 0) < 3 || rawResp(v)))
     .sort((a, b) => (b.data.scores.overall ?? 0) - (a.data.scores.overall ?? 0));
   const batch = up.slice(0, limit);
   for (const v of batch) {

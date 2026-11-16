@@ -1,0 +1,64 @@
+# Словарь обязанностей для resume_match.responsibilities (playbooks/scoring.md) и отчёта `npm run insights`.
+# Ключ — каноническая формулировка «глагол + объект» (англ., строчными), значение — синонимы.
+# Технологии в формулировку НЕ входят (они уже в required/nice_to_have): не «build ui in react», а «build ui features».
+# Подходящей нет — добавь новый ключ (общий, без названий продуктов и компаний), а не пиши произвольную фразу.
+
+# --- фронтенд
+build ui features: [develop frontend features, develop frontend interfaces, develop frontend applications, build user interfaces, develop responsive web interfaces]
+build reusable ui components: [build ui components, develop responsive web components]
+translate designs into ui: [implement interfaces per figma, implement pixel-perfect ui]
+build design system: [extend design system, maintain component library]
+improve web performance: [improve technical seo and web performance, optimize frontend performance]
+ensure accessibility: [implement accessible interfaces]
+fix cross-browser ui bugs: []
+build real-time ui: [integrate websockets for live updates, build real-time interfaces]
+build dashboards and internal tools: [develop tools and dashboard interfaces, build internal tools]
+build marketing and product pages: [build high-traffic product pages]
+# --- бэкенд и данные
+build backend apis: [develop backend apis, build backend rest apis, design and develop rest apis, design rest apis, build graphql apis]
+build backend services: [develop backend services, develop full-stack services, build backend microservices]
+design data models: [design database schemas, design scalable postgres data models, design sql schemas]
+optimize database queries: [optimize postgresql queries, profile db queries]
+build background jobs and queues: [build background workers, build asynchronous processing workflows]
+integrate third-party apis: [integrate external apis, integrate salesforce apis, integrate accounting apis]
+integrate payments: [integrate payment gateways and webhooks, build billing]
+build authentication: [implement auth, build oauth flows]
+build search features: [build customer-facing search experiences, optimize search pipelines]
+build data pipelines: [build etl pipelines]
+scale distributed systems: [maintain distributed infrastructure, design scalable backend services]
+improve performance and reliability: [improve reliability, improve system performance]
+# --- fullstack / продукт
+build features end to end: [own features from discovery to deployment, ship features end to end, ship production features]
+build web applications: [develop and maintain web applications]
+maintain production applications: [maintain and support production web platform, maintain legacy code]
+build product analytics features: []
+run product experiments: [design and ship experiments, own growth experiments]
+translate requirements into implementation: [translate product requirements into technical solutions]
+build mvp and prototypes: [build prototype applications]
+# --- AI
+integrate llm apis: [integrate llm, build llm features, integrate langchain and llm apis]
+build ai agents: [design agentic ai workflows, design and orchestrate ai agents, build agentic workflows]
+build rag pipelines: [build rag systems]
+build llm tool integrations: [develop mcp integrations, build mcp servers]
+implement llm evaluation: [conduct evaluations of llm quality, set up review gates and evaluations]
+improve ai reliability: []
+serve llm models: [serve open-source llms, deploy llm models]
+build ai-assisted development workflows: [build workflows with coding agents, incorporate ai-assisted development tools, build ai-assisted workflows with claude code]
+# --- автоматизация
+automate business processes: [automate operational tasks, build workflow automations]
+build chatbots: [build telegram bots]
+# --- инфраструктура и качество
+build ci/cd pipelines: [scale devops pipelines, build engineering delivery processes]
+deploy services to cloud: [deploy services to google cloud platform, operate cloud infrastructure]
+monitor production systems: [set up observability, set up monitoring]
+write automated tests: [write unit and integration tests, develop and maintain automated test suites]
+review code: [participate in code reviews]
+# --- архитектура и лидерство
+design system architecture: [define technical strategy and architecture, participate in architecture definitions, own architecture]
+lead engineering team: [lead hands-on development]
+mentor engineers: [mentor junior developers, hire and mentor engineers, coach engineering teams]
+collaborate with product and design: [collaborate with product managers, collaborate directly with product and design teams]
+participate in agile process: [participate in agile ceremonies, participate in sprint planning and estimation]
+improve developer experience: [improve developer tooling]
+contribute to open source: []
+support customers and stakeholders: [provide technical support]
