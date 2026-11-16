@@ -5,6 +5,10 @@
 # title_format: как разбирать заголовок элемента —
 #   "company: title" (We Work Remotely), "title at company", "title" (компания из author/поля company_field).
 # location_field / company_field / tags_field — имя дополнительного XML-поля элемента (если есть).
+# title_regex — регулярка по заголовку с именованными группами title / company / location;
+# description_regex — по тексту описания (без HTML, абзацы — отдельные строки), группы company / location.
+# full_page: true — описание в ленте обрезано: для прошедших предфильтр полный текст берётся со страницы
+#   вакансии (schema.org JobPosting в ld+json).
 feeds:
   - id: weworkremotely
     name: We Work Remotely
@@ -16,6 +20,35 @@ feeds:
       - https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss
       - https://weworkremotely.com/categories/remote-front-end-programming-jobs.rss
       - https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss
+
+  # Хабр Карьера: RSS поиска, только «можно удалённо».
+  # Заголовок: «Требуется «Роль» (Город, зарплата)», компания — в <author>.
+  - id: habr
+    name: Хабр Карьера
+    full_page: true    # в ленте 1–2 строки; полный текст — из JobPosting на странице
+    title_regex: "^Требуется «(?<title>.+)»(?:\\s*\\((?<location>[^()]*)\\))?$"
+    urls:
+      - https://career.habr.com/vacancies/rss?type=all&remote=true&q=vue
+      - https://career.habr.com/vacancies/rss?type=all&remote=true&q=nuxt
+      - https://career.habr.com/vacancies/rss?type=all&remote=true&q=react
+      - https://career.habr.com/vacancies/rss?type=all&remote=true&q=typescript
+      - https://career.habr.com/vacancies/rss?type=all&remote=true&q=fullstack
+      - https://career.habr.com/vacancies/rss?type=all&remote=true&q=frontend
+
+  # VueJobs: все активные вакансии одной лентой (~900, свежие сверху). Компания и локация — в начале описания.
+  - id: vuejobs
+    name: VueJobs
+    full_page: true    # в ленте описание обрезано
+    description_regex: "Employer:\\s*(?<company>[^\\n]+)\\nLocation:\\s*(?<location>[^\\n]+)"
+    urls:
+      - https://vuejobs.com/feed/posts
+
+  # NoDesk: последние ~10 вакансий удалёнки, «Title at Company».
+  - id: nodesk
+    name: NoDesk
+    title_format: "title at company"
+    urls:
+      - https://nodesk.co/remote-jobs/index.xml
 
 # Публичные API систем найма: полный список открытых вакансий компании.
 # Список слагов или словарь «слаг: название» (Lever и Ashby название компании не отдают).
@@ -66,3 +99,39 @@ remotive:
 # Jobicy: параметр industry API.
 jobicy:
   industries: [dev]
+
+# Working Nomads: какие категории брать (остальные отсеиваются до предфильтра).
+workingnomads:
+  categories: [Development]
+
+# Landing.jobs: все активные вакансии (snapshot). Удалённые — всегда; офисные — только в этих странах (ISO).
+landingjobs:
+  office_countries: []
+
+# Y Combinator: страницы списка ycombinator.com (без домена). Snapshot: пропала со страницы → possibly_closed.
+yc:
+  pages:
+    - /jobs/role/software-engineer/remote
+
+# Свежесть для скоринга, дней с публикации: старше — в очередь скоринга (npm run pending) не попадает
+# (откликаться поздно, токены не тратим); файлы остаются, взять их — `npm run pending -- --stale`.
+# На сбор не влияет: окно сбора считается от прошлого запуска (docs/env.md, COLLECT_MAX_AGE_DAYS).
+# null — без ограничения: snapshot-источники, где вакансия актуальна, пока открыта.
+freshness_days:
+  default: 7
+  # большие площадки, много откликов — важна скорость
+  remoteok: 3
+  himalayas: 3
+  jobicy: 3
+  remotive: 4        # данные с задержкой ~24 ч
+  weworkremotely: 5
+  workingnomads: 5
+  vuejobs: 7
+  nodesk: 7
+  getonbrd: 7
+  habr: 7
+  # редкие публикации
+  hn: 30             # тред раз в месяц, компании пишут в первые дни
+  ats: null
+  yc: null
+  landingjobs: null

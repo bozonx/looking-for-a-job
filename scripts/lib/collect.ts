@@ -13,6 +13,10 @@ import { pickApplyTarget } from './target.ts';
 import { SeenStore } from './seen.ts';
 import { loadPrefilter } from './prefilter.ts';
 import { sleep } from './http.ts';
+import { lastRun, setLastRun } from './lastrun.ts';
+
+/** запас окна сбора: площадки публикуют с задержкой, даты бывают в другом поясе */
+const WINDOW_MARGIN_DAYS = 2;
 
 /** Вакансия из списка площадки — минимум для лимитов и предфильтра; полная запись строится лениво. */
 export interface RawJob {
@@ -51,6 +55,8 @@ export interface Provider {
   covers?(extId: string): boolean;
   /** некритичные проблемы последней загрузки (например, одна компания из списка не ответила) */
   takeWarnings?(): string[];
+  /** не чаще раза в N часов (условия площадки); раньше — источник пропускается */
+  minIntervalHours?: number;
 }
 
 export type VacancyData = ReturnType<typeof blankVacancy>;
@@ -65,7 +71,7 @@ export function blankVacancy(source: string, extId: string) {
     source_url: '',
     real_url: null as string | null,
     apply_method: 'unknown',
-    duplicates: [] as { source: string; url: string; seen_at?: string }[],
+    duplicates: [] as { source: string; url: string; seen_at?: string; id?: string }[],
     apply_target: null as string | null,
     collected_at: today(),
     posted_at: null as string | null,
@@ -144,34 +150,53 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
   const idx: Index = buildIndex(all);
   const seen = new SeenStore(SOURCE);
   const prefilter = loadPrefilter();
-  const minTime = Date.now() - env.COLLECT_MAX_AGE_DAYS * 86400e3;
+  const startedAt = Date.now();
+  const prev = opts.file ? null : lastRun(SOURCE);
+
+  if (prev && p.minIntervalHours && startedAt - prev < p.minIntervalHours * 3600e3) {
+    const next = new Date(prev + p.minIntervalHours * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
+    console.log(`## ${SOURCE} — пропущен: площадка просит не чаще раза в ${p.minIntervalHours} ч (следующий сбор после ${next} UTC)\n`);
+    return { source: SOURCE, saved: 0, failed: false };
+  }
+
+  // окно сбора: с прошлого полного сбора (+ запас), но не дальше COLLECT_MAX_AGE_DAYS; первый сбор — COLLECT_MAX_AGE_DAYS
+  const capTime = startedAt - env.COLLECT_MAX_AGE_DAYS * 86400e3;
+  const minTime = prev ? Math.max(capTime, prev - WINDOW_MARGIN_DAYS * 86400e3) : capTime;
+  const windowDays = Math.ceil((startedAt - minTime) / 86400e3);
+  const windowNote = p.snapshot
+    ? 'полный список (snapshot), без окна по дате'
+    : `с ${new Date(minTime).toISOString().slice(0, 10)} (${windowDays} дн.; ${prev ? `прошлый сбор ${new Date(prev).toISOString().slice(0, 10)}` : 'первый сбор'})`;
 
   const stats = { listed: 0, pages: 0, viewed: 0, prefiltered: 0, duplicates: 0, known: 0, old: 0, saved: 0, errors: 0 };
   const warnings: string[] = [];
   let stopReason = 'end of list';
+  /** лента дочитана до конца или до известных — можно сдвигать окно */
+  let complete = true;
   let seenStreak = 0;
   let failed = false;
   const saved: string[] = [];
   const rejected: string[] = [];
   const dupLines: string[] = [];
-  const maybeDup: string[] = [];
+  const merged: string[] = [];
   const errors: string[] = [];
   const listedIds = new Set<string>();
   let closed = 0;
   let reopened = 0;
 
   outer: try {
-    for await (const list of pages(p, opts, (r) => (stopReason = r))) {
+    for await (const list of pages(p, opts, (r) => ((stopReason = r), (complete = false)))) {
       stats.pages++;
       stats.listed += list.length;
       for (const j of list) listedIds.add(`${SOURCE}-${j.extId}`);
       for (const j of list) {
         if (saved.length >= opts.limit) {
           stopReason = `--limit ${opts.limit}`;
+          complete = false;
           break outer;
         }
         if (saved.length >= env.COLLECT_MAX_NEW) {
           stopReason = `COLLECT_MAX_NEW=${env.COLLECT_MAX_NEW}`;
+          complete = false;
           warnings.push(`- сработал страховочный лимит COLLECT_MAX_NEW=${env.COLLECT_MAX_NEW}: лента необычно большая — проверь фильтры источника; хвост ленты не собран`);
           break outer;
         }
@@ -191,7 +216,7 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
           if (known) stats.known++;
           else stats.old++;
           if (++seenStreak >= env.COLLECT_STOP_ON_SEEN) {
-            stopReason = `${seenStreak} known/older than ${env.COLLECT_MAX_AGE_DAYS}d in a row`;
+            stopReason = `${seenStreak} известных/вне окна подряд`;
             break outer;
           }
           continue;
@@ -211,13 +236,11 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
           const data: VacancyData = { ...blankVacancy(SOURCE, j.extId), title: j.title, company: j.company || 'Unknown', tags: j.tags, ...built.data, id };
           if (!data.source_url) throw new Error('no source_url');
           const urls = [data.source_url, data.real_url].filter(Boolean) as string[];
-          let dup = findDuplicate(idx, { id, urls, company: data.company, title: data.title });
+          const dup = findDuplicate(idx, { id, urls, company: data.company, title: data.title });
 
-          // company+title в том же источнике при другом id — скорее разные вакансии (другая страна/команда): сохраняем, но помечаем
-          if (dup && dup.by === 'company+title' && dup.vacancy.data.source === SOURCE) {
-            maybeDup.push(`- ${id} ↔ ${dup.vacancy.data.id}: «${data.title} — ${data.company}» (тот же источник, сохранено отдельно)`);
-            dup = null;
-          }
+          // company+title в том же источнике при другом id — та же роль в другой стране/офисе: одна запись,
+          // локации сливаются в location, ссылка (с id) — в duplicates; скорить одно и то же дважды незачем
+          const sameSource = !!dup && dup.by === 'company+title' && dup.vacancy.data.source === SOURCE;
 
           if (dup) {
             stats.duplicates++;
@@ -225,11 +248,19 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
             d.duplicates ??= [];
             const u = normUrl(data.source_url);
             if (!d.duplicates.some((x: any) => normUrl(x.url) === u) && normUrl(d.source_url) !== u) {
-              d.duplicates.push({ source: SOURCE, url: data.source_url, seen_at: today() });
+              d.duplicates.push({ source: SOURCE, url: data.source_url, seen_at: today(), ...(sameSource ? { id } : {}) });
+              if (sameSource && data.location && !String(d.location ?? '').includes(data.location))
+                d.location = d.location ? `${d.location}; ${data.location}` : data.location;
               if (data.real_url && !d.real_url) d.real_url = data.real_url;
               d.apply_target = pickApplyTarget(d);
               if (!opts.dryRun) writeVacancy(dup.vacancy.file, d, dup.vacancy.body);
               idx.byUrl.set(u, dup.vacancy);
+            }
+            if (sameSource) {
+              merged.push(`- ${id} → ${d.id}: «${data.title} — ${data.company}»${data.location ? ` (+ ${data.location})` : ''}`);
+              idx.byId.set(id, dup.vacancy);
+              seen.add(id);
+              continue;
             }
             const check = dup.by === 'company+title' ? ' — совпадение только по названию, проверь' : '';
             dupLines.push(`- ${data.title} — ${data.company} → дубль ${d.id} (по ${dup.by})${check}`);
@@ -257,6 +288,7 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
     }
   } catch (e) {
     failed = true;
+    complete = false;
     stats.errors++;
     stopReason = `ошибка загрузки списка: ${(e as Error).message}`;
     errors.push(`- список (страница ${stats.pages}): ${(e as Error).message}`);
@@ -271,7 +303,8 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
       if (d.source !== SOURCE) continue;
       const ext = String(d.id).slice(SOURCE.length + 1);
       if (!p.covers(ext)) continue;
-      const gone = !listedIds.has(d.id);
+      // открыта, если в списке есть она сама или склеенная с ней вакансия того же источника
+      const gone = !listedIds.has(d.id) && !(d.duplicates ?? []).some((x: any) => x.id && listedIds.has(x.id));
       if (gone === !!d.possibly_closed) continue;
       d.possibly_closed = gone;
       if (gone) closed++;
@@ -283,9 +316,10 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
   const rel = (f: string) => path.relative(process.cwd(), f);
   const log =
     `## ${SOURCE} — ${new Date().toISOString().slice(11, 16)} UTC${opts.dryRun ? ' (dry-run)' : ''}\n\n` +
+    `- окно: ${windowNote}\n` +
     `- страниц: ${stats.pages}, в ленте: ${stats.listed}, просмотрено: ${stats.viewed}\n` +
     `- отсеяно предфильтром: ${stats.prefiltered}\n` +
-    `- уже известных (вкл. отсеянные и удалённые ранее): ${stats.known}, старше ${env.COLLECT_MAX_AGE_DAYS} дн.: ${stats.old}, дублей с других площадок: ${stats.duplicates}\n` +
+    `- уже известных (вкл. отсеянные и удалённые ранее): ${stats.known}, вне окна по дате: ${stats.old}, дублей с других площадок: ${stats.duplicates}\n` +
     `- сохранено новых: ${stats.saved}\n` +
     (p.snapshot ? `- помечено possibly_closed (нет в списке): ${closed}, снова открыто: ${reopened}\n` : '') +
     `- ошибок: ${stats.errors}\n` +
@@ -294,11 +328,12 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
     (errors.length ? `### Ошибки\n${errors.join('\n')}\n\n` : '') +
     (saved.length ? `### Сохранено (ждут скоринга)\n${saved.map((f) => `- ${rel(f)}`).join('\n')}\n\n` : '') +
     (dupLines.length ? `### Дубли\n${dupLines.join('\n')}\n\n` : '') +
-    (maybeDup.length ? `### Возможные дубли (проверь)\n${maybeDup.join('\n')}\n\n` : '') +
+    (merged.length ? `### Склеено (та же роль в другой локации того же источника)\n${merged.join('\n')}\n\n` : '') +
     (rejected.length ? `<details><summary>Отсеяно предфильтром (${rejected.length})</summary>\n\n${rejected.join('\n')}\n\n</details>\n` : '');
 
   if (!opts.dryRun) {
     seen.save();
+    if (complete && !opts.file) setLastRun(SOURCE, startedAt);
     if (!opts.file) appendRunStats({ kind: 'collect', source: SOURCE, ...stats, closed, reopened, failed, stop: stopReason });
     console.log(`Run log: ${rel(appendRunLog('collect', log))}`);
   }

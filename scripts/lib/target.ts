@@ -23,6 +23,13 @@ const BOARDS: Record<string, string> = {
   'remotive.com': 'remotive',
   'jobicy.com': 'jobicy',
   'news.ycombinator.com': 'hn',
+  'ycombinator.com': 'yc',
+  'workatastartup.com': 'yc',
+  'workingnomads.com': 'workingnomads',
+  'landing.jobs': 'landingjobs',
+  'career.habr.com': 'habr',
+  'vuejobs.com': 'vuejobs',
+  'nodesk.co': 'nodesk',
 };
 
 function host(url: string): string {

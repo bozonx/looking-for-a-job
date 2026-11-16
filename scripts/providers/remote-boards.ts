@@ -93,6 +93,8 @@ function remotiveParse(input: unknown): RawJob[] {
 export const remotive: Provider = {
   source: 'remotive',
   paginated: false,
+  // условия Remotive: не чаще 4 запросов в день; данные и так обновляются раз в сутки
+  minIntervalHours: 6,
   parse: remotiveParse,
   async fetchPage(page) {
     if (page > 0) return [];

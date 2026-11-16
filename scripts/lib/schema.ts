@@ -44,7 +44,7 @@ export const VacancySchema = z.object({
   source_url: z.string().url(),
   real_url: z.string().url().nullable().optional(),
   apply_method: z.string().regex(/^(easy-apply|ats-[a-z0-9-]+|email|comment|external|unknown)$/),
-  duplicates: z.array(z.object({ source: z.string(), url: z.string().url(), seen_at: date.optional() })).default([]),
+  duplicates: z.array(z.object({ source: z.string(), url: z.string().url(), seen_at: date.optional(), id: z.string().optional() })).default([]),
   apply_target: z.string().nullable().optional(),
   collected_at: date,
   posted_at: date.nullable().optional(),

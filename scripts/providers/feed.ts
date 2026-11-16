@@ -5,7 +5,9 @@
  */
 import { XMLParser } from 'fast-xml-parser';
 import { fetchText, sleep } from '../lib/http.ts';
-import { decodeEntities, makeJob, normEmployment, sourceConfig, toMs } from '../lib/job.ts';
+import { jobPosting } from '../lib/jsonld.ts';
+import { htmlToMarkdown } from '../lib/html.ts';
+import { decodeEntities, makeJob, normEmployment, sourceConfig, stripTags, toMs } from '../lib/job.ts';
 import type { Provider, RawJob } from '../lib/collect.ts';
 
 export interface FeedConfig {
@@ -17,6 +19,15 @@ export interface FeedConfig {
   company_field?: string;
   tags_field?: string;
   employment_field?: string;
+  /** регулярка по заголовку с именованными группами title / company / location (вместо title_format) */
+  title_regex?: string;
+  /** регулярка по тексту описания (без HTML, абзац = строка) с группами company / location — когда площадка пишет их в описание */
+  description_regex?: string;
+  /**
+   * в ленте обрезанное описание: для прошедших предфильтр грузить страницу вакансии и брать полный текст
+   * из schema.org JobPosting (ld+json); не нашлось — остаётся описание из ленты
+   */
+  full_page?: boolean;
 }
 
 /** Элемент ленты в общем виде, независимо от формата. */
@@ -140,6 +151,26 @@ function itemExtId(it: FeedItem): string {
   return s.split('/').pop()!.slice(-80) || String(Math.abs(hash(s)));
 }
 
+/** Текст описания построчно: абзацы и <br> — переводы строк, внутри строки — как stripTags. */
+function textLines(html: string): string {
+  return html
+    .split(/<\/p>|<br\s*\/?>|<\/li>|<\/h\d>|\n/i)
+    .map((l) => stripTags(l))
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** Ссылка без utm-меток (иначе одна вакансия из разных лент даёт разные URL). */
+function cleanLink(url: string): string {
+  try {
+    const u = new URL(url);
+    for (const k of [...u.searchParams.keys()]) if (k.startsWith('utm_')) u.searchParams.delete(k);
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 function hash(s: string): number {
   let h = 0;
   for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0;
@@ -148,24 +179,50 @@ function hash(s: string): number {
 
 export function feedProvider(cfg: FeedConfig): Provider {
   const name = cfg.name ?? cfg.id;
+  const titleRe = cfg.title_regex ? new RegExp(cfg.title_regex, 'u') : null;
+  const descRe = cfg.description_regex ? new RegExp(cfg.description_regex, 'u') : null;
   const toRaw = (it: FeedItem): RawJob | null => {
     if (!it.title || !/^https?:/.test(it.link)) return null;
-    const { title, company } = splitTitle(it.title, cfg.title_format);
+    const tg = titleRe ? decodeEntities(it.title).match(titleRe)?.groups : undefined;
+    const dg = descRe ? textLines(it.html).match(descRe)?.groups : undefined;
+    const split = splitTitle(it.title, cfg.title_format);
+    const title = tg?.title?.trim() || split.title;
+    const company = tg?.company?.trim() || dg?.company?.trim() || split.company;
+    const location = tg?.location?.trim() || dg?.location?.trim() || null;
     const f = (k?: string) => (k ? decodeEntities(it.fields[k]) || null : null);
     const tags = cfg.tags_field ? (f(cfg.tags_field) ?? '').split(/,\s*|\s+and\s+/).filter(Boolean) : it.categories;
-    return makeJob({
+    const job = makeJob({
       extId: itemExtId(it),
       postedAt: it.date,
       title,
       company: f(cfg.company_field) ?? company ?? it.author ?? 'Unknown',
       tags,
       sourceName: name,
-      sourceUrl: it.link,
-      location: f(cfg.location_field),
+      sourceUrl: cleanLink(it.link),
+      location: f(cfg.location_field) ?? location,
       employment: normEmployment(f(cfg.employment_field)),
       extra: cfg.tags_field ? { Skills: f(cfg.tags_field) } : undefined,
       html: it.html,
     });
+    if (!cfg.full_page) return job;
+    const short = job.build;
+    job.build = async () => {
+      const base = await short();
+      try {
+        await sleep(500);
+        const jp = jobPosting(await fetchText(base.data.source_url!));
+        if (!jp?.description) return base;
+        // шапка (заголовок, Source, доп. поля) — из ленты, описание — полное со страницы
+        const head = base.body.split('\n\n').slice(0, 2).join('\n\n');
+        return {
+          data: { ...base.data, location: base.data.location ?? jp.location, employment: base.data.employment !== 'unknown' ? base.data.employment : jp.employment },
+          body: `${head}\n\n${jp.location ? `- **Location:** ${jp.location}\n\n` : ''}${htmlToMarkdown(jp.description)}\n`,
+        };
+      } catch {
+        return base; // страница не открылась — хватит и описания из ленты
+      }
+    };
+    return job;
   };
   const parse = (input: unknown): RawJob[] =>
     parseFeed(input)

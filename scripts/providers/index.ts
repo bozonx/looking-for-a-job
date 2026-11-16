@@ -9,6 +9,7 @@ import { ats } from './ats.ts';
 import { getonbrd } from './getonbrd.ts';
 import { hn } from './hn.ts';
 import { himalayas, jobicy, remotive } from './remote-boards.ts';
+import { landingjobs, workingnomads, yc } from './more-boards.ts';
 import { feedProviders } from './feed.ts';
 
-export const providers: Record<string, Provider> = { ats, getonbrd, hn, remoteok, himalayas, jobicy, remotive, ...feedProviders() };
+export const providers: Record<string, Provider> = { ats, getonbrd, hn, remoteok, himalayas, jobicy, remotive, workingnomads, landingjobs, yc, ...feedProviders() };

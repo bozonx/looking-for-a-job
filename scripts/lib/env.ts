@@ -16,7 +16,7 @@ function num(name: string, def: number): number {
 
 export const env = {
   COLLECT_MAX_PAGES: num('COLLECT_MAX_PAGES', 5),
-  COLLECT_MAX_AGE_DAYS: num('COLLECT_MAX_AGE_DAYS', 7),
+  COLLECT_MAX_AGE_DAYS: num('COLLECT_MAX_AGE_DAYS', 30),
   COLLECT_STOP_ON_SEEN: num('COLLECT_STOP_ON_SEEN', 5),
   COLLECT_MAX_NEW: num('COLLECT_MAX_NEW', 300),
   SCORE_MAX_PER_RUN: num('SCORE_MAX_PER_RUN', 50),
