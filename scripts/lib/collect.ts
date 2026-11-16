@@ -100,13 +100,17 @@ export interface CollectResult {
 
 async function* pages(p: Provider, opts: CollectOptions, onStop: (r: string) => void): AsyncGenerator<RawJob[]> {
   if (opts.file) {
-    yield p.parse(JSON.parse(fs.readFileSync(opts.file, 'utf8')));
+    const list = p.parse(JSON.parse(fs.readFileSync(opts.file, 'utf8')));
+    if (!list.length) throw new Error(`в файле ${opts.file} нет вакансий`);
+    yield list;
     return;
   }
   const max = p.paginated ? env.COLLECT_MAX_PAGES : 1;
   for (let i = 0; i < max; i++) {
     if (i > 0) await sleep(p.pageDelayMs ?? 1000);
     const list = await p.fetchPage(i);
+    // пустая первая страница — скорее капча/логин/сменилась вёрстка, чем пустая лента
+    if (!list.length && i === 0) throw new Error('первая страница списка пуста (капча, логин, сменилась вёрстка или слишком узкий фильтр?)');
     if (!list.length) return;
     yield list;
   }
@@ -121,7 +125,8 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
   const prefilter = loadPrefilter();
   const minTime = Date.now() - env.COLLECT_MAX_AGE_DAYS * 86400e3;
 
-  const stats = { listed: 0, pages: 0, viewed: 0, prefiltered: 0, duplicates: 0, known: 0, saved: 0, errors: 0 };
+  const stats = { listed: 0, pages: 0, viewed: 0, prefiltered: 0, duplicates: 0, known: 0, old: 0, saved: 0, errors: 0 };
+  const warnings: string[] = [];
   let stopReason = 'end of list';
   let seenStreak = 0;
   let failed = false;
@@ -136,21 +141,27 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
       stats.pages++;
       stats.listed += list.length;
       for (const j of list) {
-        if (j.postedAt != null && j.postedAt < minTime) {
-          stopReason = `older than ${env.COLLECT_MAX_AGE_DAYS}d`;
-          break outer;
-        }
         if (saved.length >= opts.limit) {
           stopReason = `--limit ${opts.limit}`;
+          break outer;
+        }
+        if (saved.length >= env.COLLECT_MAX_NEW) {
+          stopReason = `COLLECT_MAX_NEW=${env.COLLECT_MAX_NEW}`;
+          warnings.push(`- сработал страховочный лимит COLLECT_MAX_NEW=${env.COLLECT_MAX_NEW}: лента необычно большая — проверь фильтры источника; хвост ленты не собран`);
           break outer;
         }
         stats.viewed++;
         const id = `${SOURCE}-${j.extId}`;
 
-        if (idx.byId.has(id) || seen.has(id)) {
-          stats.known++;
+        // старая (по дате) или известная — пропускаем и считаем подряд: одна закреплённая/промо-вакансия
+        // наверху ленты не должна останавливать сбор
+        const old = j.postedAt != null && j.postedAt < minTime;
+        const known = idx.byId.has(id) || seen.has(id);
+        if (old || known) {
+          if (known) stats.known++;
+          else stats.old++;
           if (++seenStreak >= env.COLLECT_STOP_ON_SEEN) {
-            stopReason = `${seenStreak} known in a row`;
+            stopReason = `${seenStreak} known/older than ${env.COLLECT_MAX_AGE_DAYS}d in a row`;
             break outer;
           }
           continue;
@@ -205,6 +216,7 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
           idx.byId.set(id, vf);
           for (const u of urls) idx.byUrl.set(normUrl(u), vf);
           idx.byKey.set(key(data.company, data.title), vf);
+          seen.add(id); // чтобы после удаления файла (cleanup) вакансия не вернулась как новая
           stats.saved++;
           saved.push(file);
         } catch (e) {
@@ -225,10 +237,11 @@ export async function collect(p: Provider, opts: CollectOptions): Promise<Collec
     `## ${SOURCE} — ${new Date().toISOString().slice(11, 16)} UTC${opts.dryRun ? ' (dry-run)' : ''}\n\n` +
     `- страниц: ${stats.pages}, в ленте: ${stats.listed}, просмотрено: ${stats.viewed}\n` +
     `- отсеяно предфильтром: ${stats.prefiltered}\n` +
-    `- уже известных (вкл. отсеянные ранее): ${stats.known}, дублей с других площадок: ${stats.duplicates}\n` +
+    `- уже известных (вкл. отсеянные и удалённые ранее): ${stats.known}, старше ${env.COLLECT_MAX_AGE_DAYS} дн.: ${stats.old}, дублей с других площадок: ${stats.duplicates}\n` +
     `- сохранено новых: ${stats.saved}\n` +
     `- ошибок: ${stats.errors}\n` +
     `- причина остановки: ${stopReason}\n\n` +
+    (warnings.length ? `### ⚠ Предупреждения\n${warnings.join('\n')}\n\n` : '') +
     (errors.length ? `### Ошибки\n${errors.join('\n')}\n\n` : '') +
     (saved.length ? `### Сохранено (ждут скоринга)\n${saved.map((f) => `- ${rel(f)}`).join('\n')}\n\n` : '') +
     (dupLines.length ? `### Дубли\n${dupLines.join('\n')}\n\n` : '') +

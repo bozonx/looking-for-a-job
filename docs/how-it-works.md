@@ -30,7 +30,7 @@
 `npm run collect` → общий конвейер `scripts/lib/collect.ts`; провайдер `scripts/providers/<источник>.ts` только отдаёт страницы списка и маппинг полей. Шаги:
 
 1. **Индекс известных** — из всех файлов в `data/vacancies/`: по `id`, по всем URL (`source_url`, `real_url`, URL из `duplicates`), по `company+title`. Плюс `data/state/seen-<источник>.json`.
-2. **Лента** — от новых к старым, постранично. Остановка при первом из условий: вакансия старше `COLLECT_MAX_AGE_DAYS`; `COLLECT_STOP_ON_SEEN` известных подряд; `--limit`; `COLLECT_MAX_PAGES` страниц; конец ленты. Запросы повторяются при 429/5xx. См. [env.md](env.md).
+2. **Лента** — от новых к старым, постранично. Вакансии старше `COLLECT_MAX_AGE_DAYS` пропускаются. Остановка при первом из условий: `COLLECT_STOP_ON_SEEN` известных/старых подряд; `--limit` или `COLLECT_MAX_NEW`; `COLLECT_MAX_PAGES` страниц; конец ленты. Запросы повторяются при 429/5xx. См. [env.md](env.md).
 3. **Предфильтр** (`config/prefilter.yaml`), без LLM:
    - заголовок содержит слово из `exclude_title` → отсеять (exclude важнее include);
    - иначе заголовок содержит слово из `include_title` **или** среди тегов есть `include_tags` → пропустить;

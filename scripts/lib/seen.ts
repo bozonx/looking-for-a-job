@@ -1,13 +1,14 @@
 /**
- * Id вакансий, отсеянных предфильтром, по источнику: data/state/seen-<source>.json.
- * Нужны, чтобы при повторном сборе они считались «известными» (COLLECT_STOP_ON_SEEN)
- * и не попадали в лог заново. Записи старше 60 дней удаляются при сохранении.
+ * Id всех обработанных вакансий источника (сохранённых, отсеянных предфильтром, дублей):
+ * data/state/seen-<source>.json. Нужны, чтобы при повторном сборе они считались «известными»
+ * (COLLECT_STOP_ON_SEEN) — в том числе после удаления файла (cleanup, ручное удаление дубля).
+ * Записи старше KEEP_DAYS удаляются при сохранении; KEEP_DAYS > CLEANUP_DEFAULT_DAYS с запасом.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { DATA_DIR, today } from './env.ts';
+import { DATA_DIR, env, today } from './env.ts';
 
-const KEEP_DAYS = 60;
+const KEEP_DAYS = Math.max(90, env.CLEANUP_DEFAULT_DAYS + 60);
 
 export class SeenStore {
   private file: string;
