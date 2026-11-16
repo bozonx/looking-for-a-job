@@ -88,8 +88,7 @@ export const VacancySchema = z.object({
   attention_reason: z.enum(['unknown_question', 'special_media', 'captcha', 'login', 'ambiguous', 'other']).nullable().optional(),
   attention_details: z.string().nullable().optional(),
   starred: z.boolean().default(false),
-  flagged: z.boolean().default(false), // пользователь пометил «проблемная» (скоринг/данные неверны) — агент перепроверяет
-  flag_reviewed_at: date.nullable().optional(), // когда агент перепроверил помеченную; сбрасывается при повторной пометке
+  flagged: z.boolean().default(false), // ⚑ «проблемная»: пользователь считает скоринг/данные неверными; агент разбирает и снимает (playbooks/flagged.md)
   notes: z.string().default(''),
   possibly_closed: z.boolean().default(false), // нет в снимке ATS (collect) или real_url отвечает «нет вакансии» (check-alive)
   alive_checked_at: date.nullable().optional(), // когда npm run check-alive последний раз проверял real_url

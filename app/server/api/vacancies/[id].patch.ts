@@ -14,9 +14,7 @@ const Patch = z
 export default defineEventHandler(async (event) => {
   const parsed = Patch.safeParse(await readBody(event));
   if (!parsed.success) throw createError({ statusCode: 400, statusMessage: 'Invalid patch', message: parsed.error.message });
-  const patch: Record<string, unknown> = { ...parsed.data };
-  if (patch.flagged === true) patch.flag_reviewed_at = null; // повторная пометка — агент перепроверит заново
-  const v = patchVacancy(getRouterParam(event, 'id')!, patch);
+  const v = patchVacancy(getRouterParam(event, 'id')!, parsed.data);
   if (!v) throw createError({ statusCode: 404, statusMessage: 'Vacancy not found' });
   return { data: v.data };
 });

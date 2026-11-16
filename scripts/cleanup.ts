@@ -1,5 +1,5 @@
 /**
- * Удаление старых вакансий без решения (логика — scripts/lib/cleanup.ts).
+ * Чистка: закрытые (кроме ★) и старые без решения (логика — scripts/lib/cleanup.ts).
  * `npm run cleanup -- [--older-than 30d] [--dry-run]`
  * По умолчанию возраст — CLEANUP_DEFAULT_DAYS. Также запускается после `npm run collect`, если CLEANUP_ON_COLLECT=true.
  */

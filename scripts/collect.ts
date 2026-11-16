@@ -96,8 +96,8 @@ async function main() {
   if (!dryRun && !file) {
     writeLastCollect(COLLECT_RUN);
     if (env.CLEANUP_ON_COLLECT) {
-      const removed = cleanup(env.CLEANUP_DEFAULT_DAYS, false, () => {});
-      itog += `\n### Очистка (CLEANUP_ON_COLLECT)\n- удалено вакансий без решения старше ${env.CLEANUP_DEFAULT_DAYS} дн.: ${removed.length}\n`;
+      const r = cleanup(env.CLEANUP_DEFAULT_DAYS, false, () => {});
+      itog += `\n### Очистка (CLEANUP_ON_COLLECT)\n- удалено закрытых: ${r.closed}, старых без решения (> ${env.CLEANUP_DEFAULT_DAYS} дн.): ${r.old}\n`;
     }
   }
   if (!dryRun && !file) insertRunLog('collect', itog.replace('# ИТОГ СБОРА', `## ИТОГ СБОРА — ${new Date().toISOString().slice(11, 16)} UTC`), logOffset);
