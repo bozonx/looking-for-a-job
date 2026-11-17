@@ -11,6 +11,8 @@ interface PrefilterConfig {
   /** исключения, которые уступают явному стеку в заголовке (strong_title): «Full Stack PHP/Vue.js» проходит */
   exclude_title_soft?: string[];
   strong_title?: string[];
+  /** исключение с оговоркой: ключ отсеивает, если в заголовке нет ни одного из «спасающих» ключей */
+  exclude_title_unless?: Record<string, string[]>;
 }
 
 /**
@@ -34,11 +36,19 @@ export function loadPrefilter(): Prefilter {
   const exclude = (pf.exclude_title ?? []).map((w) => [w, toRe(w)] as const);
   const excludeSoft = (pf.exclude_title_soft ?? []).map((w) => [w, toRe(w)] as const);
   const strong = (pf.strong_title ?? []).map((w) => [w, toRe(w)] as const);
+  const unless = Object.entries(pf.exclude_title_unless ?? {}).map(
+    ([w, rescue]) => [w, toRe(w), (rescue ?? []).map((r) => [r, toRe(r)] as const)] as const,
+  );
   const include = (pf.include_title ?? []).map((w) => [w, toRe(w)] as const);
   const includeTags = new Set((pf.include_tags ?? []).map((t) => t.toLowerCase()));
   return (title, tags) => {
     const ex = exclude.find(([, re]) => re.test(title));
     if (ex) return { ok: false, reason: `title~"${ex[0]}"` };
+    for (const [w, re, rescue] of unless) {
+      if (!re.test(title)) continue;
+      const r = rescue.find(([, rr]) => rr.test(title));
+      if (!r) return { ok: false, reason: `title~"${w}"` };
+    }
     const soft = excludeSoft.find(([, re]) => re.test(title));
     if (soft) {
       const st = strong.find(([, re]) => re.test(title));

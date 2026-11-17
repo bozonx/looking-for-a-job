@@ -17,11 +17,11 @@ export const ScoresSchema = z.object({
   startup: score,
   corporate: score,
   outsource: score,
-  end_client_corporate: nscore,
+  end_client_corporate: nscore.optional(), // устарело (weights v3): не заполняется, в старых файлах остаётся
   legitimacy: score,
   region: nscore.optional(), // считает score.ts из regions.yaml по company_country / ru_speaking_team
   language: score,
-  // automation добавлен позже: в старых вакансиях ключа нет — допускаем отсутствие
+  // automation добавлен позже: отсутствие допустимо только у вакансий со stop_flags (проверка в ScoredVacancySchema)
   fit: z.object(Object.fromEntries(TRACKS.map((t) => [t, t === 'automation' ? nscore.optional() : score])) as Record<(typeof TRACKS)[number], typeof score>),
   overall: nscore.optional(),
 });
@@ -112,6 +112,10 @@ export const ScoredVacancySchema = VacancySchema.extend({
   best_resume: z.enum(TRACKS),
   score_reasoning: z.string().min(1),
   scoring_version: z.number().int(),
+}).superRefine((d, ctx) => {
+  // без стоп-флага все шесть треков обязательны: пропуск automation занижал fit автоматизационных ролей
+  if (!d.stop_flags.length && typeof d.scores.fit.automation !== 'number')
+    ctx.addIssue({ code: 'custom', path: ['scores', 'fit', 'automation'], message: 'обязателен у вакансий без stop_flags' });
 });
 
 export type Vacancy = z.infer<typeof VacancySchema>;

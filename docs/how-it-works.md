@@ -56,7 +56,7 @@
 
 ### Двухуровневая схема
 
-1. **Агент** ставит частные оценки 0–100 (`remote`, `startup`, `corporate`, `outsource`, `end_client_corporate`, `legitimacy`, `language`, `fit.*`), определяет `company_country` / `ru_speaking_team`, стоп-флаги и пишет обоснование. Методика — `playbooks/scoring.md`, поля — [vacancy-format.md](vacancy-format.md#оценки--scores).
+1. **Агент** ставит частные оценки 0–100 (`remote`, `startup`, `corporate`, `outsource`, `legitimacy`, `language`, `fit.*`), определяет `company_country` / `ru_speaking_team`, стоп-флаги и пишет обоснование. Методика — `playbooks/scoring.md`, поля — [vacancy-format.md](vacancy-format.md#оценки--scores).
 2. **`npm run score`** (`scripts/lib/scoring.ts` + `rescore.ts`) считает итог по `config/weights.yaml`.
 
 Агент не видит и не пишет `overall`. Это убирает соблазн «подогнать» итог и делает веса единственным рычагом.
@@ -64,43 +64,43 @@
 ### Формула
 
 ```
-если есть стоп-флаг из weights.stop_flags  → overall = 0
+если есть стоп-флаг (STOP_FLAGS в scripts/lib/schema.ts) → overall = 0
 иначе:
   overall = round( Σ wᵢ · vᵢ / Σ wᵢ )
+  если лучший сырой fit (без веса трека) < fit_cap.below (40) → overall = min(overall, fit_cap.cap = 35)
 ```
 
 где слагаемые:
 
 | Группа | vᵢ | Пример весов |
 |---|---|---|
-| `positive` | оценка как есть | remote 3, fit 4, legitimacy 2, language 2, region 1, startup 1.5 |
-| `inverse` | `100 − оценка` (чем выше, тем хуже) | corporate 2, outsource 0, end_client_corporate 0 (оценки ставятся, но не влияют) |
-| `fit` | `max` по трекам от `fit_tracks[трек] · fit[трек]` | vue 1, ai_engineer 1, fullstack 0.9, react 0.9, angular 0.8 |
+| `positive` | оценка как есть | remote 3, fit 8, legitimacy 2, language 2, region 1, startup 1.5 |
+| `inverse` | `100 − оценка` (чем выше, тем хуже) | corporate 2, outsource 0 (оценка ставится, но не влияет) |
+| `fit` | `max` по трекам от `fit_tracks[трек] · fit[трек]` | vue 1, ai_engineer 1, fullstack 0.9, react 0.9, angular 0.8, automation 0.8 |
 
 Детали, которые важны:
-- Это **взвешенное среднее**, а не сумма: итог всегда 0–100, и абсолютный масштаб весов не важен — важны пропорции. `fit: 4` при сумме весов 15.5 значит, что fit даёт ~26 % балла.
-- Вес `0` и оценка `null` выкидывают слагаемое **и из числителя, и из знаменателя**. Поэтому `end_client_corporate: null` (не аутсорс) не штрафует и не поощряет — просто не участвует.
-- `fit` берёт **лучший** трек: вакансия хорошо подходит под одно резюме — этого достаточно. Вес трека < 1 (angular 0.8) понижает потолок: идеальный Angular даёт fit 80, а не 100. Вес 0 — трек игнорируется.
+- Это **взвешенное среднее**, а не сумма: итог всегда 0–100, и абсолютный масштаб весов не важен — важны пропорции. `fit: 8` при сумме весов 19.5 значит, что fit даёт ~41 % балла.
+- Вес `0` и оценка `null` выкидывают слагаемое **и из числителя, и из знаменателя**. Поэтому `region: null` не штрафует и не поощряет — просто не участвует.
+- `fit` берёт **лучший** трек: вакансия хорошо подходит под одно резюме — этого достаточно. Вес трека < 1 (angular 0.8) понижает потолок: идеальный Angular даёт fit 80, а не 100. Вес 0 — трек игнорируется. Ограничение `fit_cap` сравнивает **сырой** fit: Angular с fit 45 — не «нерелевантная роль», хотя взвешенно это 36.
 - `legitimacy < scam_legitimacy_below` (30) автоматически добавляет `scam` в `stop_flags`.
 
 ### Пример расчёта
 
-Оценки: remote 95, startup 80, corporate 10, outsource 0, end_client_corporate null, legitimacy 85, region 70 (europe), language 100, fit {vue 90, react 20, angular 0, fullstack 55, ai_engineer 70}.
+Оценки: remote 95, startup 80, corporate 10, outsource 0, legitimacy 85, region 70 (europe), language 100, fit {vue 90, react 20, angular 0, fullstack 55, ai_engineer 70, automation 10}.
 
 | Слагаемое | w | v | w·v |
 |---|---|---|---|
 | remote | 3 | 95 | 285 |
 | legitimacy | 2 | 85 | 170 |
-| fit (max: vue 1·90) | 4 | 90 | 360 |
+| fit (max: vue 1·90) | 8 | 90 | 720 |
 | region | 1 | 70 | 70 |
 | language | 2 | 100 | 200 |
 | startup | 1.5 | 80 | 120 |
 | corporate (inv) | 2 | 100−10 = 90 | 180 |
 | outsource (inv) | 0 | — | пропуск (вес 0) |
-| end_client_corporate | — | null | пропуск |
-| **Σ** | **15.5** | | **1385** |
+| **Σ** | **19.5** | | **1745** |
 
-overall = 1385 / 15.5 = 89.4 → **89**.
+overall = 1745 / 19.5 = 89.5 → **89**.
 
 Та же вакансия, но «только гибрид в Берлине»: агент ставит `office_outside_ar` → overall = 0 независимо от остального.
 

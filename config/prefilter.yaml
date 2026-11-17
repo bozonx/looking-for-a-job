@@ -3,7 +3,11 @@
 # Иначе оставить, если заголовок содержит include_title ИЛИ среди тегов есть include_tags.
 # Сравнение регистронезависимое: «словные» ключи — с начала слова (node → nodejs), прочие — подстрокой.
 # Суффикс `$` — ещё и по концу слова (intern$ не ловит Internal).
-# Порядок: exclude_title (абсолютно) → exclude_title_soft (отсеять, если в заголовке нет strong_title) → include.
+# Порядок: exclude_title (абсолютно) → exclude_title_unless (отсеять, если нет ни одного «спасающего» ключа)
+#   → exclude_title_soft (отсеять, если в заголовке нет strong_title) → include.
+# Короткие ключи (qa, sap, vp…) — с `$`, иначе ловят начало чужих слов (Qatar, Sapient, VPN).
+# Бэкенд без языка в заголовке («Backend Engineer») не отсеивается: в топе такие часто на TS/Node.
+#   «Чистый» бэкенд на чужом стеке режет exclude_title_soft (java/python/go/.net/php…), остальное решает скоринг.
 include_title:
   - vue
   - nuxt
@@ -81,6 +85,30 @@ include_title:
   - backend software engineer
   - frontend software engineer
   - engineering roles
+  - deployed engineer
+  - field engineer
+  - gtm engineer
+  - partner engineer
+  - product builder
+  - prototype developer
+  - creative technologist
+  - harness engineer
+  - context engineer
+  - development team lead
+  - technical team lead
+  - engineering lead
+  - cto$
+  - chief technology officer
+  - senior software developer
+  - mobile developer
+  - mobile engineer
+  # кроссплатформенная мобильная разработка на веб-стеке
+  - react native
+  - expo$                       # без $ ловит Export/Exposure
+  - ionic
+  - capacitor
+  - nativescript
+  - quasar
   # русскоязычные площадки (hh.ru и т.п.)
   - разработчик
   - программист
@@ -91,6 +119,20 @@ include_title:
   - фулстек
   - фуллстек
   - инженер-программист
+  - ии-инженер
+  - ai-инженер
+  - тимлид
+  - техлид
+  - технический директор
+  - руководитель разработ
+  - руководитель команды разработ
+  - руководитель группы разработ
+  - ведущий разработчик
+  # португальский / французский
+  - desenvolvedor
+  - développeur
+  - developpeur
+  - développeuse
   # испаноязычные вакансии (женские формы ловятся по началу слова: desarrollador → desarrolladora)
   - desarrollador
   - programador
@@ -105,7 +147,9 @@ include_title:
   - ingeniero de ia
   - ingeniera de ia
   - analista programador
-include_tags: [vue, vuejs, nuxt, nuxtjs, react, reactjs, next.js, nextjs, angular, svelte, javascript, typescript, node, nodejs, nestjs, tauri, electron, frontend, front end, full stack, fullstack, llm, ai, ai-native, agents]
+  - líder técnico
+  - lider tecnico
+include_tags: [vue, vuejs, vue.js, vue 3, nuxt, nuxtjs, nuxt.js, react, reactjs, react.js, react native, next, next.js, nextjs, angular, svelte, sveltekit, javascript, typescript, node, nodejs, node.js, nestjs, tauri, electron, frontend, front-end, front end, frontend-engineer, full stack, full-stack, fullstack, full-stack-engineer, llm, ai, ai-native, agents, ai agents, ai engineering, n8n, automation]
 exclude_title:
   - recruit
   - account executive
@@ -113,7 +157,9 @@ exclude_title:
   - продаж
   - маркетолог
   - рекрутер
-  - менеджер
+  - менеджер по
+  - менеджер проект
+  - менеджер продукт
   - аналитик
   - дизайнер
   - 1с
@@ -123,24 +169,24 @@ exclude_title:
   - copywriter
   - writer
   - accountant
-  - qa
+  - qa$
   - test engineer
-  - sre
+  # QA-автоматизация — не трек automation (playbooks/scoring.md); иначе проходит по «automation engineer»
+  - test automation
+  - automation qa
+  - aqa$
+  - sdet$
+  - sre$
   - intern$
   - internship
   - стажёр
   - стажер
   - стажировка
-  - junior
-  - jr$
-  - jr.
   - entry level
   - entry-level
   - graduate
-  - джуниор
   - c++
-  - embedded
-  - unity
+  - unity$
   - game developer
   - solidity
   - blockchain
@@ -148,12 +194,14 @@ exclude_title:
   - data analyst
   - data scientist
   - salesforce
-  - sap
-  - manager
-  - director
-  - vp
-  - head of
+  - sap$
+  - vp$
   - trainee
+  - early career
+  - new grad
+  - mechanical
+  - vlsi
+  - hardware engineer
   # испанский
   - ventas
   - vendedor
@@ -176,9 +224,20 @@ exclude_title:
   - practicante
   - prácticas
   - becario
-  - desarrollador movil
-  - desarrollador móvil
-  - plc
+  - plc$
+# Отсеять, если в заголовке нет ни одного ключа из списка справа.
+# junior — только чисто джунские; «Junior/Middle», «junior to mid» остаются.
+# manager/director/head of — только чисто управленческие; «Head of Frontend», «Lead Engineer / Manager»,
+#   «AI Product Engineer, AI Product Manager» остаются (в заголовке есть инженерная роль или целевой стек).
+exclude_title_unless:
+  junior: &mid [middle, mid, mid-level, midlevel, senior, мидл, миддл, сеньор, ssr, semi senior, semisenior]
+  jr$: *mid
+  jr.: *mid
+  джуниор: *mid
+  manager: [engineer$, developer$, tech lead, разработчик]
+  director: [frontend, front-end, fullstack, full-stack, full stack]
+  head of: [frontend, front-end, fullstack, full-stack, full stack, engineering, development, web, ui$, разработк, vue, react, angular, javascript, typescript]
+  руководитель: [разработк, фронтенд, frontend, группы разработ, тимлид, team lead]
 # Исключения, которые уступают явному целевому стеку в заголовке: «Fullstack (.NET / React / Node.js)»,
 # «Full Stack PHP/Vue.js», «Engineer, Marketing Platform (React)» проходят и попадают к скорингу (fit там решит).
 # Язык в заголовке = нужен коммерческий опыт на нём (его нет) — но при целевом стеке рядом решает скоринг.
@@ -187,19 +246,12 @@ exclude_title_soft:
   - marketing
   - customer support
   - support engineer
-  - java-разработчик
   - finance
   - legal
   - hr$
   - android
   - ios
-  - java developer
-  - java engineer
   - .net
-  - python developer
-  - python engineer
-  - python backend
-  - python-разработчик
   - django
   - golang
   - go developer
@@ -214,6 +266,30 @@ exclude_title_soft:
   - ruby
   - wordpress
   - shopify
-  - desarrollador java$
-  - programador java$
-strong_title: [vue, nuxt, react, next.js, angular, svelte, typescript, node, nestjs, fullstack, full-stack, full stack, frontend, front-end, front end, javascript, фронтенд, фулстек, фуллстек]
+  - embedded
+  - firmware
+  - desarrollador movil
+  - desarrollador móvil
+  - kotlin
+  - swift
+  - flutter
+  - scala$
+  - elixir
+  - drupal
+  - magento
+  - bitrix
+  - битрикс
+  - data engineer
+  - ml engineer
+  - machine learning engineer
+  - devops
+  - platform engineer
+  - java$
+  - python$
+  - go разработчик
+  - с#                          # кириллическая «С»: «Разработчик Бэкэнд С#»
+  - rails$
+  - delphi
+  - creatio
+  - uniface
+strong_title: [vue, nuxt, react, next.js, angular, svelte, typescript, node, nestjs, fullstack, full-stack, full stack, frontend, front-end, front end, javascript, фронтенд, фулстек, фуллстек, react native, ionic, capacitor, nativescript, quasar, expo$, llm, ai engineer, agentic]

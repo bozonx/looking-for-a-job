@@ -10,6 +10,7 @@ const ids = new Map<string, string>();
 let bad = 0;
 let pending = 0;
 const skills = loadSkills();
+for (const c of skills.conflicts) console.warn(`config/skills.yaml: написание в двух навыках ${c}`);
 const unknownSkills = new Map<string, number>();
 let warned = 0;
 

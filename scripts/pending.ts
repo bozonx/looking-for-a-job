@@ -15,7 +15,7 @@ import { CONFIG_DIR, env } from './lib/env.ts';
 import { loadSkills, normSkill } from './lib/skills.ts';
 import { loadAll } from './lib/vacancy.ts';
 import { freshnessDays } from './lib/freshness.ts';
-import { regionUnlikely } from './lib/location.ts';
+import { regionUnlikely, restrictionHint } from './lib/location.ts';
 
 const args = process.argv.slice(2);
 const li = args.indexOf('--limit');
@@ -46,7 +46,8 @@ const date = (v: { data: any }) => String(v.data.posted_at ?? v.data.collected_a
 const unscored = loadAll().filter((v) => v.data.scores == null);
 const closed = unscored.filter((v) => v.data.possibly_closed);
 const queue = unscored.filter((v) => !v.data.possibly_closed);
-const unlikely = (v: { data: any }) => Number(!!regionUnlikely(v.data.location));
+const hint = (v: { data: any; body: string }) => restrictionHint(v.body);
+const unlikely = (v: { data: any; body: string }) => Number(!!regionUnlikely(v.data.location) || !!hint(v));
 const now = Date.now();
 const isStale = (v: { data: any }) => {
   const days = freshnessDays(v.data.source);
@@ -62,12 +63,17 @@ const batch = pending.slice(0, limit);
 for (const v of batch) {
   const rel = path.relative(process.cwd(), v.file);
   const why = regionUnlikely(v.data.location);
-  console.log(onlyPaths ? rel : `${rel}\n    ${v.data.id} · ${v.data.title} — ${v.data.company} · ${v.data.location ?? ''}${why ? ` · ⤓ регион: ${why}` : ''}`);
+  const h = hint(v);
+  console.log(
+    onlyPaths
+      ? rel
+      : `${rel}\n    ${v.data.id} · ${v.data.title} — ${v.data.company} · ${v.data.location ?? ''}${why ? ` · ⤓ регион: ${why}` : ''}${h ? ` · ⚠ вероятный location_restricted: «${h}» — проверь, при подтверждении короткий скоринг` : ''}`,
+  );
 }
 if (!onlyPaths) {
   const unl = pending.filter(unlikely);
   const rest = pending.length - batch.length;
-  console.log(`\n# ИТОГ ОЧЕРЕДИ\n- выдано к скорингу: ${batch.length}\n- останется в очереди: ${pending.length - batch.length}\n- несвежих не выдано: ${stale.length}\n- закрытых (possibly_closed) не выдано: ${closed.length}\n- регион явно вне AR/LATAM (в конце очереди): ${unl.length}, из них выдано: ${batch.filter(unlikely).length}`);
+  console.log(`\n# ИТОГ ОЧЕРЕДИ\n- выдано к скорингу: ${batch.length}\n- останется в очереди: ${pending.length - batch.length}\n- несвежих не выдано: ${stale.length}\n- закрытых (possibly_closed) не выдано: ${closed.length}\n- регион вне AR/LATAM или фраза-ограничение в тексте (в конце очереди): ${unl.length}, из них выдано: ${batch.filter(unlikely).length}`);
   console.log(`\nК скорингу сейчас: ${batch.length} из ${pending.length}` + (rest ? ` (остальные ${rest} — следующим запуском; лимит SCORE_MAX_PER_RUN=${env.SCORE_MAX_PER_RUN})` : ''));
   if (stale.length) {
     const by: Record<string, number> = {};

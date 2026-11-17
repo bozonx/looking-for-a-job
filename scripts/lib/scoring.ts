@@ -2,20 +2,23 @@ import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
 import { CONFIG_DIR } from './env.ts';
+import { STOP_FLAGS } from './schema.ts';
 
 export interface Weights {
   version: number;
   positive: Record<string, number>;
   inverse: Record<string, number>;
   fit_tracks: Record<string, number>;
-  /** лучший взвешенный fit < below → overall ≤ cap */
+  /** лучший СЫРОЙ fit (без веса трека) < below → overall ≤ cap: роль нерелевантна ни одному треку */
   fit_cap?: { below: number; cap: number };
-  stop_flags: string[];
   scam_legitimacy_below: number;
 }
 
 export function loadWeights(): Weights {
-  return YAML.parse(fs.readFileSync(path.join(CONFIG_DIR, 'weights.yaml'), 'utf8')) as Weights;
+  const W = YAML.parse(fs.readFileSync(path.join(CONFIG_DIR, 'weights.yaml'), 'utf8')) as Weights & { stop_flags?: unknown };
+  // стоп-флаги — единый список STOP_FLAGS в schema.ts; старый ключ в weights.yaml игнорируем
+  delete W.stop_flags;
+  return W;
 }
 
 export interface RegionGroup {
@@ -40,7 +43,7 @@ export function regionGroup(R: Regions, country: string | null | undefined, ruTe
 export function computeOverall(W: Weights, scores: Record<string, any>, stopFlags: string[]): { overall: number; flags: string[] } {
   const flags = [...new Set(stopFlags ?? [])];
   if (typeof scores.legitimacy === 'number' && scores.legitimacy < W.scam_legitimacy_below && !flags.includes('scam')) flags.push('scam');
-  if (flags.some((f) => W.stop_flags.includes(f))) return { overall: 0, flags };
+  if (flags.some((f) => (STOP_FLAGS as readonly string[]).includes(f))) return { overall: 0, flags };
 
   let sum = 0;
   let wsum = 0;
@@ -49,11 +52,12 @@ export function computeOverall(W: Weights, scores: Record<string, any>, stopFlag
     sum += w * v;
     wsum += w;
   };
-  const fits = Object.entries(scores.fit ?? {}).map(([t, v]) => (W.fit_tracks[t] ?? 0) * (v as number));
-  const bestFit = fits.length ? Math.max(...fits) : undefined;
+  const fitEntries = Object.entries(scores.fit ?? {}).filter(([t, v]) => typeof v === 'number' && (W.fit_tracks[t] ?? 0) > 0) as [string, number][];
+  const bestFit = fitEntries.length ? Math.max(...fitEntries.map(([t, v]) => (W.fit_tracks[t] ?? 0) * v)) : undefined;
+  const bestRawFit = fitEntries.length ? Math.max(...fitEntries.map(([, v]) => v)) : undefined;
   for (const [k, w] of Object.entries(W.positive)) add(w, k === 'fit' ? bestFit : scores[k]);
   for (const [k, w] of Object.entries(W.inverse)) if (typeof scores[k] === 'number') add(w, 100 - scores[k]);
   let overall = wsum ? Math.round(sum / wsum) : 0;
-  if (W.fit_cap && bestFit !== undefined && bestFit < W.fit_cap.below) overall = Math.min(overall, W.fit_cap.cap);
+  if (W.fit_cap && bestRawFit !== undefined && bestRawFit < W.fit_cap.below) overall = Math.min(overall, W.fit_cap.cap);
   return { overall, flags };
 }

@@ -88,3 +88,28 @@ export function regionUnlikely(location: string | null | undefined): string | nu
   if (OFFICE_RE.test(loc) && !REMOTE_RE.test(loc)) return 'офис/гибрид';
   return null;
 }
+
+/**
+ * Фразы в тексте вакансии, которые обычно означают стоп-флаг location_restricted (обязательное право на работу / резидентство).
+ * Только подсказка агенту и сортировка очереди: на размеченных данных точность ≈ 94%, поэтому флаг не ставится автоматически
+ * («preferred», «nice to have» и найм через EOR решает агент).
+ */
+const RESTRICTION_RE: RegExp[] = [
+  /(?:legally\s+)?authori[sz]ed\s+to\s+work\s+in\s+(?:the\s+)?(?:u\.?s\.?a?|united\s+states|uk|united\s+kingdom|eu|european\s+union|canada)\b/i,
+  /(?:must|required\s+to)\s+(?:be\s+)?(?:reside|live|located|based)\s+in\s+(?:the\s+)?(?:u\.?s\.?a?|united\s+states|uk|canada|eu)\b/i,
+  /\bu\.?s\.?\s+citizen(?:ship)?\b/i,
+  /\bgreen\s+card\b/i,
+  /\bsecurity\s+clearance\b/i,
+  /\bwithout\s+(?:visa\s+)?sponsorship\b/i,
+  /\bright\s+to\s+work\s+in\b/i,
+];
+
+/** Первая фраза-ограничение из текста (обрезанная цитата) или null. */
+export function restrictionHint(body: string | null | undefined): string | null {
+  const text = String(body ?? '');
+  for (const re of RESTRICTION_RE) {
+    const m = re.exec(text);
+    if (m) return m[0].replace(/\s+/g, ' ').slice(0, 80);
+  }
+  return null;
+}

@@ -56,7 +56,6 @@ const scoreRows = computed(() => {
     ['language', s.language, false],
     ['corporate', s.corporate, true],
     ['outsource', s.outsource, true],
-    ['end client corp.', s.end_client_corporate, true],
   ] as [string, number | null, boolean][];
 });
 

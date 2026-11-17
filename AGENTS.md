@@ -43,7 +43,7 @@
 - Не выдумывай. Не уверен — оставь `null` и опиши сомнение в `score_reasoning` / `attention_details`.
 - `scores.overall` считает только `npm run score`, не агент.
 - После любых правок вакансий — `npm run validate`.
-- Код скриптов — только TypeScript; после изменений — `npm run typecheck`.
+- Код скриптов — только TypeScript; после изменений — `npm run typecheck` и `npm test`.
 - `data/` и `profile/` — личное, в git не коммитить.
 - Заявки агент не отправляет: Submit нажимает пользователь (`dev_docs/apply-plan.md`).
 - `status` — решение: `null` (нет решения), `selected` (на отклик), `applied`/`needs_attention`/`apply_failed` (агент). Неотскоренная = `scores: null`.
