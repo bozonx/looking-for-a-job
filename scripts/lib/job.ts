@@ -84,7 +84,7 @@ export function makeJob(f: JobFields): RawJob {
     title,
     company,
     tags,
-    skip: f.skip ?? undefined,
+    skip: f.skip ?? (geoscreen(f.geo ?? {}).hire_from_ar === 'no' ? geoscreen(f.geo ?? {}).hire_from_ar_evidence ?? undefined : undefined),
     build() {
       const apply = f.applyUrl && /^(https?:|mailto:)/.test(f.applyUrl) ? f.applyUrl : null;
       const extra = Object.entries(f.extra ?? {})

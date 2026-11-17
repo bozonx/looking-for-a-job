@@ -111,6 +111,7 @@ export function blankVacancy(source: string, extId: string) {
     apply_log: null,
     applied_via: null,
     scoring_version: null,
+    prefilter_reason: null as string | null,
   };
 }
 
@@ -306,6 +307,11 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
             stats.prefiltered++;
             seen.add(id, true);
             rejected.push(`- ${j.title} — ${j.company} (${f.reason})`);
+            if (!opts.dryRun) {
+              const built = await j.build();
+              const data: VacancyData = { ...blankVacancy(SOURCE, j.extId), title: j.title, company: j.company || 'Unknown', tags: j.tags, ...built.data, id, prefilter_reason: f.reason };
+              writeVacancy(vacancyPath(data.collected_at, SOURCE, data.company, data.title, j.extId), data, built.body);
+            }
             continue;
           }
 

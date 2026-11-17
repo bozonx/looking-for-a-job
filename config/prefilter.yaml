@@ -234,7 +234,6 @@ exclude_title_unless:
   jr$: *mid
   jr.: *mid
   джуниор: *mid
-  manager: [engineer$, developer$, tech lead, разработчик]
   director: [frontend, front-end, fullstack, full-stack, full stack]
   head of: [frontend, front-end, fullstack, full-stack, full stack, engineering, development, web, ui$, разработк, vue, react, angular, javascript, typescript]
   руководитель: [разработк, фронтенд, frontend, группы разработ, тимлид, team lead]
@@ -242,6 +241,7 @@ exclude_title_unless:
 # «Full Stack PHP/Vue.js», «Engineer, Marketing Platform (React)» проходят и попадают к скорингу (fit там решит).
 # Язык в заголовке = нужен коммерческий опыт на нём (его нет) — но при целевом стеке рядом решает скоринг.
 exclude_title_soft:
+  - manager
   - sales
   - marketing
   - customer support

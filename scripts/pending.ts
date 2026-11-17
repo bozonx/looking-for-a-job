@@ -61,7 +61,7 @@ if (args.includes('--market')) {
 const date = (v: { data: any }) => String(v.data.posted_at ?? v.data.collected_at ?? '');
 const unscored = loadAll().filter((v) => v.data.scores == null);
 const closed = unscored.filter((v) => v.data.possibly_closed);
-const queue = unscored.filter((v) => !v.data.possibly_closed && v.data.hire_from_ar !== 'no' && !(v.data.stop_flags ?? []).length)
+const queue = unscored.filter((v) => !v.data.prefilter_reason && !v.data.possibly_closed && v.data.hire_from_ar !== 'no' && !(v.data.stop_flags ?? []).length)
   .filter(v => !args.includes('--geo') || v.data.hire_from_ar == null || v.data.hire_from_ar === 'unknown');
 const hint = (v: { data: any; body: string }) => restrictionHint(v.body);
 const unlikely = (v: { data: any; body: string }) => Number(!!regionUnlikely(v.data.location) || !!hint(v));

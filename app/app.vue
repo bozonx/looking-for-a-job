@@ -7,8 +7,14 @@ import { nextSorts } from '~/utils/filters';
  */
 const { items, errors, lastRun, refresh, patch, patchMany, rescore, usePolling } = useVacancies();
 usePolling();
+const rejectedTab = ref(false);
+const rejected = computed(() => items.value.filter(v => v.prefilter_reason));
+const system = computed(() => {
+ const all = items.value.filter(v => !v.prefilter_reason);
+ return `Очередь: ${all.filter(v => !v.scores && !v.possibly_closed && v.hire_from_ar !== 'no' && !v.stop_flags?.length).length} · Отсеяно: ${rejected.value.length} · Стоп-флаги: ${all.filter(v => v.stop_flags?.length).length}/${all.length} · Без канала: ${all.filter(v => !v.apply_channels?.length).length}`;
+});
 const { views, activeId, filters, isModified, reset, commit, view } = useViews();
-const { q, searchAll, viewCounts, rows, outsideHits, current, currentRow, move } = useVacancyList({ items, lastRun, views, filters, activeId });
+const { q, searchAll, viewCounts, rows, outsideHits, current, currentRow, move } = useVacancyList({ items: computed(() => items.value.filter(v => !v.prefilter_reason)), lastRun, views, filters, activeId });
 const { state: alive, start: startAlive } = useCheckAlive(() => refresh());
 const { toast, show } = useToast();
 
@@ -56,6 +62,9 @@ useHotkeys(() => {
         <button class="ghost" title="Пересчитать overall по weights.yaml" @click="rescore">⟳ rescore</button>
       </ViewTabs>
 
+      <div class="hint small">{{ system }}</div>
+      <button @click="rejectedTab = !rejectedTab">{{ rejectedTab ? 'Вакансии' : 'Отсеяно предфильтром' }}</button>
+      <div v-if="rejectedTab"><p v-for="v in rejected" :key="v.id"><a :href="v.source_url" target="_blank">{{ v.title }}</a> — {{ v.prefilter_reason }}</p></div>
       <FilterBar v-model:filters="view.filters" v-model:q="q" :items="items" :modified="isModified" @reset="reset" @commit="onCommit" />
 
       <div v-if="searchAll" class="hint small">
@@ -71,7 +80,7 @@ useHotkeys(() => {
         <div v-for="e in errors" :key="e.file">⚠ {{ e.file }}: {{ e.error }}</div>
       </div>
 
-      <VacancyTable :rows="rows" :current="current" :sorts="filters.sorts" :last-run="lastRun" @select="current = $event" @sort="onSort" @mark="onMark" />
+      <VacancyTable v-if="!rejectedTab" :rows="rows" :current="current" :sorts="filters.sorts" :last-run="lastRun" @select="current = $event" @sort="onSort" @mark="onMark" />
       <footer class="muted small">j/k — навигация · a — выбрать · m — откликнулся сам · u — снять выбор/ручной отклик · s — звезда · f — проблемная · / — поиск · Shift+клик по заголовку — доп. сортировка</footer>
     </aside>
 

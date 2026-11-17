@@ -49,6 +49,7 @@ export const VacancySchema = z.object({
   company_country: z.string().regex(/^[A-Z]{2}$/, 'ISO 3166-1 alpha-2').nullable().optional(), // страна регистрации нанимающей стороны
   ru_speaking_team: z.boolean().nullable().optional(), // явно русскоязычная компания/команда
   source: z.string().min(1),
+  prefilter_reason: z.string().nullable().optional(),
   source_url: z.string().url(),
   real_url: z.string().url().nullable().optional(),
   real_url_tried_at: date.nullable().optional(), // когда npm run resolve-urls искал real_url на странице источника
