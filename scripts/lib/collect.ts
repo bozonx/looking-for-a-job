@@ -361,6 +361,13 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
     errors.push(`- список (страница ${stats.pages}): ${(e as Error).message}`);
   }
 
+  // переполнение окна: лента дочитана до конца, но в ней нет ни одной известной или старой вакансии —
+  // значит, между сборами вышло больше, чем отдаёт площадка, и часть вакансий, вероятно, пропущена
+  if (!p.snapshot && prev && !failed && complete && stopReason === 'end of list' && stats.listed > 0 && stats.known === 0 && stats.old === 0) {
+    const hours = Math.round((startedAt - prev) / 3600e3);
+    warnings.push(`- возможен пропуск: все ${stats.listed} вакансий ленты новые (прошлый сбор ${hours} ч назад) — собирай чаще или сузь фильтр источника`);
+  }
+
   warnings.push(...[...(p.takeWarnings?.() ?? []), ...takeHttpWarnings()].map((w) => `- ${w}`));
 
   // snapshot: вакансии источника, пропавшие из полного списка, вероятно закрыты (и наоборот)
