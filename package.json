@@ -34,7 +34,8 @@
     "apply-targets": "node --env-file-if-exists=.env scripts/apply-targets.ts",
     "channels": "node --env-file-if-exists=.env scripts/channels.ts",
     "migrate-scoring": "node --env-file-if-exists=.env scripts/migrate-scoring.ts",
-    "geoscreen": "node --env-file-if-exists=.env scripts/geoscreen.ts"
+    "geoscreen": "node --env-file-if-exists=.env scripts/geoscreen.ts",
+    "test:coverage": "node --test --experimental-test-coverage scripts/lib/*.test.ts app/tests/*.test.ts"
   },
   "dependencies": {
     "chokidar": "^6.0.0",
