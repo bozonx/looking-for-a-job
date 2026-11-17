@@ -6,7 +6,7 @@
 const props = defineProps<{ id: string; rev?: number }>();
 const emit = defineEmits<{ patch: [id: string, patch: Record<string, unknown>] }>();
 
-const { data: full, refresh } = useFetch<{ data: Record<string, any>; body: string; file: string }>(() => `/api/vacancies/${encodeURIComponent(props.id)}`);
+const { data: full, refresh } = useFetch<{ data: Record<string, any>; body: string; file: string; resume_missing: string[] | null }>(() => `/api/vacancies/${encodeURIComponent(props.id)}`);
 watch(() => props.rev, (r, old) => r !== old && refresh());
 const v = computed(() => full.value?.data);
 
@@ -96,7 +96,7 @@ const ruTeam = computed(() => (v.value?.ru_speaking_team == null ? 'неизве
     </section>
     <section v-else class="muted">Ещё не отскорена агентом.</section>
 
-    <ResumeMatch v-if="v.resume_match" :m="v.resume_match" />
+    <ResumeMatch v-if="v.resume_match" :m="v.resume_match" :missing="full?.resume_missing ?? null" />
 
     <section v-if="v.requirements_special?.length">
       <h3>Особые требования</h3>

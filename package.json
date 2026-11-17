@@ -18,6 +18,8 @@
     "dev": "nuxt dev app",
     "ui:build": "nuxt build app",
     "insights": "node --env-file-if-exists=.env scripts/insights.ts",
+    "prefilter-review": "node --env-file-if-exists=.env scripts/prefilter-review.ts",
+    "calibrate": "node --env-file-if-exists=.env scripts/calibrate.ts",
     "fetch-page": "node --env-file-if-exists=.env scripts/fetch-page.ts",
     "top": "node --env-file-if-exists=.env scripts/top.ts",
     "cleanup": "node --env-file-if-exists=.env scripts/cleanup.ts",

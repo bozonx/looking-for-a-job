@@ -14,7 +14,11 @@ for (const c of skills.conflicts) console.warn(`config/skills.yaml: написа
 const unknownSkills = new Map<string, number>();
 let warned = 0;
 
-/** Проверки resume_match: обязателен при scoring_version ≥ 2 (кроме вакансий со stop_flags), навыки канонические, missing ⊆ required/nice. */
+/**
+ * Проверки resume_match: обязателен при scoring_version ≥ 2 (кроме вакансий со stop_flags), навыки канонические.
+ * missing_* / ats_keywords_missing больше не заполняются (пробелы считает npm run insights по текущему резюме);
+ * в старых вакансиях они остаются и игнорируются.
+ */
 function checkResumeMatch(data: Record<string, any>, errs: string[], warns: string[]): void {
   const rm = data.resume_match;
   if (data.scores == null) return;
@@ -26,7 +30,7 @@ function checkResumeMatch(data: Record<string, any>, errs: string[], warns: stri
     return;
   }
   if (data.best_resume && rm.resume !== data.best_resume) warns.push(`resume_match.resume (${rm.resume}) ≠ best_resume (${data.best_resume})`);
-  const lists = ['required', 'nice_to_have', 'missing_required', 'missing_nice'] as const;
+  const lists = ['required', 'nice_to_have'] as const;
   for (const l of lists)
     for (const s of rm[l] ?? []) {
       const n = normSkill(String(s), skills);
@@ -35,11 +39,9 @@ function checkResumeMatch(data: Record<string, any>, errs: string[], warns: stri
     }
   const req = new Set((rm.required ?? []).map((s: string) => s.toLowerCase()));
   const nice = new Set((rm.nice_to_have ?? []).map((s: string) => s.toLowerCase()));
-  for (const s of rm.missing_required ?? []) if (!req.has(String(s).toLowerCase())) errs.push(`resume_match.missing_required: «${s}» нет в required`);
-  for (const s of rm.missing_nice ?? []) if (!nice.has(String(s).toLowerCase())) errs.push(`resume_match.missing_nice: «${s}» нет в nice_to_have`);
   // v3: обязанности, написания, домен
   if ((data.scoring_version ?? 0) >= 3) {
-    if (!(rm.responsibilities ?? []).length) warns.push('resume_match.responsibilities: пусто (scoring_version 3)');
+    if (!(rm.responsibilities ?? []).length && !(data.stop_flags ?? []).length) warns.push('resume_match.responsibilities: пусто (scoring_version 3)');
     if (rm.domain === undefined) warns.push('resume_match.domain: не заполнено (null, если неясно)');
   } else if ((data.scoring_version ?? 0) === 2 && !(data.stop_flags ?? []).length) warns.push('scoring_version 2: нет responsibilities/keyword_spellings/domain — дозаполни через npm run pending -- --upgrade');
   for (const r of rm.responsibilities ?? []) if (String(r).length > 80) warns.push(`resume_match.responsibilities: слишком длинно «${String(r).slice(0, 40)}…» — сократи до «глагол + объект»`);

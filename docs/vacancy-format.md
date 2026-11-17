@@ -213,8 +213,10 @@ apply_channels:
 2–4 предложения по-русски: на чём основаны ключевые оценки и флаги, что было неоднозначно. Главный инструмент проверки агента — читайте его, когда балл кажется странным.
 
 ### `resume_match` · А · обязательно при `scoring_version` ≥ 2
-Сравнение вакансии с резюме `best_resume`: `resume`, `required`, `nice_to_have`, `missing_required`, `missing_nice`,
-`in_resume_negative` (`{ skill, evidence }` — только с цитатой), `ats_keywords_missing`. Навыки — канонические имена из
+Требования вакансии для трека `best_resume`: `resume`, `required`, `nice_to_have`,
+`in_resume_negative` (`{ skill, evidence }` — только с цитатой). Пробелы резюме не хранятся — их считают `npm run insights`
+и UI по текущему `profile/resumes/<трек>.md`; устаревшие `missing_required`, `missing_nice`, `ats_keywords_missing`
+в старых вакансиях игнорируются. У вакансий со стоп-флагом по локации и fit ≥ 50 — короткий вариант (только рыночные поля). Навыки — канонические имена из
 `config/skills.yaml` (синоним — ошибка `validate`, неизвестный навык — предупреждение). Правила — `playbooks/scoring.md`.
 Агрегирует `npm run insights`: какие навыки массово требуют, а в резюме их нет.
 

@@ -28,10 +28,11 @@ export const ResumeMatchSchema = z.object({
   resume: z.enum(TRACKS),
   required: z.array(z.string()).default([]),
   nice_to_have: z.array(z.string()).default([]),
-  missing_required: z.array(z.string()).default([]),
-  missing_nice: z.array(z.string()).default([]),
+  // устарело: пробелы считает npm run insights по текущему резюме; в старых вакансиях остаются, не заполнять
+  missing_required: z.array(z.string()).optional(),
+  missing_nice: z.array(z.string()).optional(),
   in_resume_negative: z.array(z.object({ skill: z.string(), evidence: z.string().min(1) })).default([]),
-  ats_keywords_missing: z.array(z.string()).default([]),
+  ats_keywords_missing: z.array(z.string()).optional(), // устарело, не заполнять
   // scoring_version ≥ 3 — сырьё для блока опыта и формулировок резюме (см. playbooks/scoring.md)
   responsibilities: z.array(z.string()).default([]), // обязанности: короткие фразы «глагол + объект», en, нижний регистр
   keyword_spellings: z.record(z.string(), z.array(z.string())).default({}), // канонический навык → написания из текста, если отличаются

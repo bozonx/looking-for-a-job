@@ -7,6 +7,8 @@
  * `--upgrade` — вместо очереди скоринга: отскоренные релевантные вакансии (без stop_flags) со
  *   scoring_version < 3 или с обязанностями вне config/responsibilities.yaml, по убыванию overall —
  *   дозаполнить поля v3 / нормализовать responsibilities в resume_match (playbooks/scoring.md).
+ * `--market` — отскоренные со стоп-флагом по локации и fit ≥ 50 без resume_match: дозаполнить рыночные поля
+ *   (короткий resume_match, playbooks/scoring.md) — для статистики спроса в npm run insights.
  * Свежесть: вакансии старше `freshness_days` своего источника (config/sources.yaml) в очередь не попадают —
  * откликаться на них поздно, токены на скоринг не тратим. Файлы остаются (видны в UI); `--stale` — взять и их.
  */
@@ -15,6 +17,7 @@ import { CONFIG_DIR, env } from './lib/env.ts';
 import { loadSkills, normSkill } from './lib/skills.ts';
 import { loadAll } from './lib/vacancy.ts';
 import { freshnessDays } from './lib/freshness.ts';
+import { needsMarketFields } from './lib/market.ts';
 import { regionUnlikely, restrictionHint } from './lib/location.ts';
 
 const args = process.argv.slice(2);
@@ -39,6 +42,19 @@ if (args.includes('--upgrade')) {
     console.log(onlyPaths ? rel : `${rel}\n    ${v.data.id} · overall ${v.data.scores.overall ?? '—'} · ${v.data.title} — ${v.data.company}`);
   }
   if (!onlyPaths) console.log(`\n# ДОЗАПОЛНЕНИЕ v3\n- выдано: ${batch.length}\n- осталось после: ${up.length - batch.length}`);
+  process.exit(0);
+}
+
+if (args.includes('--market')) {
+  const up = loadAll()
+    .filter((v) => needsMarketFields(v.data))
+    .sort((a, b) => String(b.data.collected_at ?? '').localeCompare(String(a.data.collected_at ?? '')));
+  const batch = up.slice(0, limit);
+  for (const v of batch) {
+    const rel = path.relative(process.cwd(), v.file);
+    console.log(onlyPaths ? rel : `${rel}\n    ${v.data.id} · ${v.data.stop_flags.join(',')} · ${v.data.title} — ${v.data.company}`);
+  }
+  if (!onlyPaths) console.log(`\n# ДОЗАПОЛНЕНИЕ РЫНОЧНЫХ ПОЛЕЙ\n- выдано: ${batch.length}\n- осталось после: ${up.length - batch.length}`);
   process.exit(0);
 }
 

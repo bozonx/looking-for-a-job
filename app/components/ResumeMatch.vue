@@ -1,8 +1,11 @@
 <script setup lang="ts">
-/** Сравнение вакансии с резюме best_resume (resume_match из скоринга). */
-const props = defineProps<{ m: Record<string, any> }>();
+/**
+ * Сравнение вакансии с резюме best_resume. Требования — из resume_match (скоринг), пробелы `missing` —
+ * сервер считает по текущему тексту резюме; нет резюме — по устаревшим missing_* из скоринга.
+ */
+const props = defineProps<{ m: Record<string, any>; missing: string[] | null }>();
 
-const missing = computed(() => new Set<string>([...(props.m.missing_required ?? []), ...(props.m.missing_nice ?? [])]));
+const missing = computed(() => new Set<string>(props.missing ?? [...(props.m.missing_required ?? []), ...(props.m.missing_nice ?? [])]));
 const facts = computed(() =>
   [
     props.m.years_required != null ? `опыт от ${props.m.years_required} лет` : '',
@@ -23,10 +26,6 @@ const facts = computed(() =>
     <div v-if="m.nice_to_have?.length" class="skills">
       <span class="muted small">желательно:</span>
       <span v-for="s in m.nice_to_have" :key="s" class="skill" :class="missing.has(s) ? 'mid' : 'good'" :title="missing.has(s) ? 'нет в резюме' : 'есть в резюме'">{{ s }}</span>
-    </div>
-    <div v-if="m.ats_keywords_missing?.length" class="skills">
-      <span class="muted small">ATS-ключи, которых нет в резюме:</span>
-      <span v-for="s in m.ats_keywords_missing" :key="s" class="skill mid">{{ s }}</span>
     </div>
     <div v-if="m.in_resume_negative?.length">
       <span class="muted small">в резюме, но вакансия против:</span>

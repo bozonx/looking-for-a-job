@@ -42,7 +42,14 @@
 Если поставил любой `stop_flags`, вакансия к отклику не пойдёт — не трать токены на детали:
 заполни `company_country`, `ru_speaking_team`, `employment`, `vacancy_language`, `role_tracks`, `summary` (1 предложение),
 `scores` (все ключи, можно грубо), `stop_flags`, `best_resume`, `score_reasoning` (1–2 предложения: почему флаг),
-`scoring_version`. `key_points: []`, `red_flags: []`, `requirements_special: []`, **`resume_match` не заполняй** (`null`).
+`scoring_version`. `key_points: []`, `red_flags: []`, `requirements_special: []`.
+
+`resume_match`:
+- флаг **по локации** (`office_outside_ar`, `location_restricted`, `nationality_excluded`) и fit лучшего трека ≥ 50 —
+  заполни **рыночные поля**: `resume`, `required`, `nice_to_have`, `responsibilities`, `keyword_spellings`, `domain`,
+  `product_type`, `years_required` (остальное не нужно). Вакансия нам недоступна, но это тот же рынок трека —
+  её требования идут в статистику спроса для резюме (`npm run insights`);
+- иначе (`ru_corporate`, `inadequate`, `scam` или fit < 50) — `resume_match: null`.
 
 ### Склеенные локации
 
@@ -67,20 +74,18 @@
 Fullstack с бэкендом на Go/Python/C#/Java/Kotlin/PHP/Ruby и сильным React/Vue/Angular + TS-фронтендом (например, «4+ лет TS-фронтенда + 5+ лет бэкенда на Python или .NET») — fullstack средний (≈ 50–65), а не ≤ 30: фронтенд совпадает, бэкенд-язык — пробел, отметь его в `red_flags`.
 Неоднозначное (например, «remote, US timezone» без требования резидентства) отражай в оценках и `red_flags`, не додумывай.
 
-## `resume_match` — сравнение с резюме
+## `resume_match` — требования вакансии
 
-Сырьё для `npm run insights`: какие навыки массово требуют, а в резюме их нет. Прочитай `profile/resumes/<best_resume>.md`
-(одно резюме на вакансию) и заполни:
+Сырьё для `npm run insights`: что требует рынок трека. Это **факты о вакансии**, не сравнение с резюме:
+пробелы резюме (`чего нет`) скрипт считает сам по текущему `profile/resumes/<трек>.md`, поэтому после правки резюме
+статистика сразу актуальна. Резюме читай только для `in_resume_negative`. Заполни:
 
 ```yaml
 resume_match:
   resume: angular                 # = best_resume
   required: [angular, rxjs, ngrx, typescript, aws]   # must-have из вакансии
   nice_to_have: [graphql]         # «plus», «nice to have», «bonus»
-  missing_required: [ngrx, aws]   # из required, чего нет в резюме
-  missing_nice: []                # из nice_to_have, чего нет в резюме
   in_resume_negative: []          # [{ skill, evidence }] — см. ниже
-  ats_keywords_missing: [state management]
   # --- v3: сырьё для блока опыта и формулировок резюме ---
   responsibilities: [build design system, migrate angularjs to angular, own frontend architecture]
   keyword_spellings: { ngrx: [NgRx], aws: [Amazon Web Services] }
@@ -94,9 +99,7 @@ resume_match:
   Нет в словаре — добавь туда ключ (или синоним существующего), а не выдумывай написание.
 - Навык — технология, практика или домен (`fintech`, `accessibility`), не soft skills и не «5+ years».
   Языки общения и опыт в годах сюда не пиши. Только реальные требования из текста, а не теги агрегатора.
-- `missing_*` — честно: навык считается «есть», если он упомянут в резюме (в Skills или опыте), в том числе синонимом.
-- `ats_keywords_missing` — 0–5 **формулировок** из вакансии, которых нет дословно в тексте резюме, хотя
-  по смыслу опыт есть или близок («state management», «design system», «cross-functional»). Это то, что ATS не найдёт.
+- `missing_required`, `missing_nice`, `ats_keywords_missing` **больше не заполняй** (устарели; в старых вакансиях остаются и игнорируются).
 - `in_resume_negative` — только при **явной цитате**: вакансия называет минусом или нежелательным то, что есть
   в резюме («no agencies», «not looking for AngularJS-only devs», «job hoppers»). `evidence` — цитата на языке вакансии.
   Локацию, гражданство, возраст сюда не пиши — это `stop_flags`.

@@ -2,10 +2,13 @@
  * Сводный отчёт для анализа резюме и конвейера (playbooks/analyze.md).
  * `npm run insights -- [--days N | --since YYYY-MM-DD] [--no-save]`
  *
- * Резюме: по каждому треку (resume_match.resume) — частота требований, нехватающих навыков,
- *   ATS-формулировок и «негативных» пунктов резюме. Учитываются только релевантные вакансии:
- *   отскоренные, без stop_flags. Вес вакансии = overall/100, selected ×2,
- *   поэтому мусор почти не влияет, а то, куда хочется откликнуться, — сильнее.
+ * Резюме: по каждому треку (resume_match.resume) — спрос рынка и пробелы текущего резюме.
+ *   Выборка — «рынок трека»: отскоренные с resume_match и fit трека ≥ MARKET_FIT, включая вакансии со
+ *   стоп-флагами по локации (рынок тот же, просто нам недоступен); без ru_corporate/inadequate/scam.
+ *   Вес у всех одинаковый: вес по overall давал петлю (overall зависит от совпадения с резюме → пробелы
+ *   резюме прятались). Пробелы считает скрипт по ТЕКУЩЕМУ profile/resumes/<трек>.md (lib/resumeskills.ts),
+ *   а не берёт сохранённые агентом missing_* — после правки резюме отчёт сразу актуален.
+ *   Отдельный срез — вакансии, выбранные пользователем (selected/applied): что общего у того, что нравится.
  *   v3 (scoring_version ≥ 3): топ обязанностей (сырьё для bullets опыта), как пишут навыки (для ATS — писать
  *   самым частым вариантом), домены и типы продукта, soft-требования, медиана требуемых лет.
  * Конвейер: по источникам — объёмы из data/runs/stats.jsonl, доля мусора, стоп-флагов,
@@ -20,6 +23,8 @@ import { appendRunLog } from './lib/runlog.ts';
 import { TRACKS } from './lib/schema.ts';
 import { loadSkills, normSkill } from './lib/skills.ts';
 import { loadAll } from './lib/vacancy.ts';
+import { inMarket, MARKET_FIT, needsMarketFields } from './lib/market.ts';
+import { hasSpelling, resumeText, skillsInText } from './lib/resumeskills.ts';
 
 const args = process.argv.slice(2);
 const opt = (n: string) => (args.includes(n) ? args[args.indexOf(n) + 1] : undefined);
@@ -32,7 +37,10 @@ const respDict = loadSkills(path.join(CONFIG_DIR, 'responsibilities.yaml'));
 const vac = loadAll().filter((v) => String(v.data.collected_at) >= since);
 const scored = vac.filter((v) => v.data.scores);
 const relevant = scored.filter((v) => !(v.data.stop_flags ?? []).length);
-const weight = (d: any) => ((d.scores?.overall ?? 0) / 100) * (d.status === 'selected' ? 2 : 1);
+/** Минимум вакансий на трек для выводов; меньше — отчёт помечается как предварительный. */
+const MIN_SAMPLE = 20;
+const market = scored.filter((v) => inMarket(v.data));
+const weight = (_d: any) => 1;
 const pct = (a: number, b: number) => (b ? `${Math.round((100 * a) / b)}%` : '—');
 
 type Counter = Map<string, { n: number; w: number; ids: string[] }>;
@@ -81,8 +89,8 @@ function v3Block(n3: number, total: number, resp: Counter, spell: Map<string, Ma
 
 const out: string[] = [`## Отчёт с ${since} по ${today()}`, ''];
 out.push(
-  `Вакансий собрано: ${vac.length}, отскорено: ${scored.length}, релевантных (без стоп-флагов): ${relevant.length}, ` +
-    `с resume_match: ${relevant.filter((v) => v.data.resume_match).length}.`,
+  `Вакансий собрано: ${vac.length}, отскорено: ${scored.length}, релевантных (без стоп-флагов): ${relevant.length}. ` +
+    `Рынок треков (fit ≥ ${MARKET_FIT}, включая недоступные по локации): ${market.length}, из них со стоп-флагом: ${market.filter((v) => (v.data.stop_flags ?? []).length).length}.`,
   '',
 );
 
@@ -91,9 +99,14 @@ out.push('### Резюме', '');
 const unknown = new Map<string, number>();
 const unknownResp = new Map<string, number>();
 for (const track of TRACKS) {
-  const vs = relevant.filter((v) => v.data.resume_match?.resume === track);
+  const vs = market.filter((v) => v.data.resume_match?.resume === track);
   if (!vs.length) continue;
-  const req: Counter = new Map(), nice: Counter = new Map(), fresh: Counter = new Map(), miss: Counter = new Map(), missNice: Counter = new Map(), ats: Counter = new Map();
+  const rtext = resumeText(track);
+  const have = rtext ? skillsInText(rtext, dict) : null;
+  const picked = vs.filter((v) => v.data.status === 'selected' || v.data.status === 'applied');
+  const pickedReq: Counter = new Map();
+  const req: Counter = new Map(), nice: Counter = new Map(), fresh: Counter = new Map(), miss: Counter = new Map(), missNice: Counter = new Map();
+  let reqTotal = 0, reqMissing = 0;
   const resp: Counter = new Map(), dom: Counter = new Map(), prod: Counter = new Map(), soft: Counter = new Map();
   const spell = new Map<string, Map<string, number>>();
   const years: number[] = [];
@@ -111,11 +124,16 @@ for (const track of TRACKS) {
       return r.name;
     };
     for (const s of [...(rm.required ?? []), ...(rm.nice_to_have ?? [])]) if (!normSkill(s, dict).known) bump(fresh, normSkill(s, dict).name, w, d.id);
-    for (const s of rm.nice_to_have ?? []) bump(nice, n(s), w, d.id);
-    for (const s of rm.required ?? []) bump(req, n(s), w, d.id);
-    for (const s of rm.missing_required ?? []) bump(miss, n(s), w, d.id);
-    for (const s of rm.missing_nice ?? []) bump(missNice, n(s), w, d.id);
-    for (const s of rm.ats_keywords_missing ?? []) bump(ats, String(s).toLowerCase(), w, d.id);
+    for (const s of rm.nice_to_have ?? []) {
+      bump(nice, n(s), w, d.id);
+      if (have && !have.has(n(s))) bump(missNice, n(s), w, d.id);
+    }
+    for (const s of rm.required ?? []) {
+      bump(req, n(s), w, d.id);
+      if (picked.includes(v)) bump(pickedReq, n(s), 1, d.id);
+      reqTotal++;
+      if (have && !have.has(n(s))) (bump(miss, n(s), w, d.id), reqMissing++);
+    }
     for (const r of rm.responsibilities ?? []) bump(resp, nr(r), w, d.id);
     for (const r of rm.soft_requirements ?? []) bump(soft, String(r).toLowerCase().trim(), w, d.id);
     if (rm.domain) bump(dom, String(rm.domain).toLowerCase(), w, d.id);
@@ -128,12 +146,20 @@ for (const track of TRACKS) {
     }
     for (const x of rm.in_resume_negative ?? []) negative.push(`- **${x.skill}** — ${d.id} (${d.company}): «${x.evidence}»`);
   }
-  const avgMiss = vs.reduce((a, v) => a + (v.data.resume_match.missing_required?.length ?? 0), 0) / vs.length;
-  const avgReq = vs.reduce((a, v) => a + (v.data.resume_match.required?.length ?? 0), 0) / vs.length;
+  const blocked = vs.filter((v) => (v.data.stop_flags ?? []).length).length;
+  // ATS-написания: самое частое написание навыка из вакансий, которого нет дословно в резюме
+  const atsSpell = [...spell]
+    .map(([k, m]) => [k, [...m].sort((a, b) => b[1] - a[1])[0]!] as const)
+    .filter(([k, [x, c]]) => c >= 2 && rtext && (!have || have.has(k)) && !hasSpelling(rtext, x))
+    .map(([k, [x, c]]) => `- ${k}: в вакансиях чаще «${x}» (×${c}) — в резюме так не написано`);
   out.push(
-    `#### ${track} — ${vs.length} вакансий`,
+    `#### ${track} — ${vs.length} вакансий${vs.length < MIN_SAMPLE ? ` ⚠ мало данных (< ${MIN_SAMPLE}), выводы предварительные` : ''}`,
     '',
-    `Покрытие обязательных требований: ${avgReq ? Math.round(100 * (1 - avgMiss / avgReq)) : '—'}% (в среднем не хватает ${avgMiss.toFixed(1)} из ${avgReq.toFixed(1)}).`,
+    `Из них недоступны по стоп-флагу: ${blocked}. Выбрано пользователем (selected/applied): ${picked.length}.`,
+    '',
+    rtext
+      ? `Покрытие обязательных требований текущим резюме: ${reqTotal ? Math.round(100 * (1 - reqMissing / reqTotal)) : '—'}% (не хватает ${reqMissing} из ${reqTotal} упоминаний).`
+      : `⚠ Нет profile/resumes/${track}.md — пробелы не посчитаны.`,
     '',
     '**Не хватает (обязательные):**',
     '',
@@ -141,9 +167,9 @@ for (const track of TRACKS) {
     '**Не хватает (желательные):**',
     '',
     table(missNice, vs.length, 10),
-    '**ATS: формулировки, которых нет в тексте резюме:**',
+    '**ATS: написания навыков, которых нет в резюме дословно:**',
     '',
-    table(ats, vs.length, 10),
+    atsSpell.length ? atsSpell.join('\n') + '\n' : '_нет_\n',
     '**Новые навыки (нет в config/skills.yaml — кандидаты в словарь и, если опыт есть, в резюме):**',
     '',
     table(fresh, vs.length, 15),
@@ -161,10 +187,17 @@ for (const track of TRACKS) {
     table(nice, vs.length, 25),
     '</details>',
     '',
+    `<details><summary>Что требуют в выбранных вами (${picked.length})</summary>`,
+    '',
+    table(pickedReq, picked.length, 15),
+    '</details>',
+    '',
   );
 }
 const noRm = relevant.filter((v) => !v.data.resume_match).length;
-if (noRm) out.push(`⚠ Без resume_match: ${noRm} отскоренных вакансий — в статистику резюме не попали.`, '');
+if (noRm) out.push(`⚠ Без resume_match: ${noRm} отскоренных вакансий без стоп-флагов — в статистику резюме не попали.`, '');
+const noRmBlocked = scored.filter((v) => needsMarketFields(v.data)).length;
+if (noRmBlocked) out.push(`ℹ Со стоп-флагом и fit ≥ ${MARKET_FIT}, но без рыночных полей: ${noRmBlocked} — дозаполни: npm run pending -- --market.`, '');
 if (unknown.size)
   out.push(`⚠ Навыки вне config/skills.yaml: ${[...unknown].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}×${n}`).join(', ')}`, '');
 
