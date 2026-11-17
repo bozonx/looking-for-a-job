@@ -32,7 +32,8 @@
     "apply-set": "node --env-file-if-exists=.env scripts/apply-set.ts",
     "apply-mark": "node --env-file-if-exists=.env scripts/apply-mark.ts",
     "apply-targets": "node --env-file-if-exists=.env scripts/apply-targets.ts",
-    "channels": "node --env-file-if-exists=.env scripts/channels.ts"
+    "channels": "node --env-file-if-exists=.env scripts/channels.ts",
+    "migrate-scoring": "node --env-file-if-exists=.env scripts/migrate-scoring.ts"
   },
   "dependencies": {
     "chokidar": "^6.0.0",

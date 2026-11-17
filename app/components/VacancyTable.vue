@@ -10,8 +10,8 @@ const emit = defineEmits<{
   mark: [ids: string[], status: 'selected' | null];
 }>();
 
-const COLS = [['overall', 'overall'], ['profile', 'профиль'], ['date', 'дата'], ['company', 'Вакансия'], ['region', 'регион']] as const;
-const SCORE_COLS = [['remote', 'R', false], ['startup', 'S', false], ['corporate', 'C', true], ['outsource', 'O', true], ['legitimacy', 'L', false]] as const;
+const COLS = [['overall', 'overall'], ['profile', 'профиль'], ['date', 'дата'], ['company', 'Вакансия'], ['region', 'группа работодателя']] as const;
+const SCORE_COLS = [['salary', 'USD/мес', false], ['hire_from_ar', 'Найм AR', false], ['timezone', 'Часы', false]] as const;
 
 // массовая отметка: видимые строки без решения или уже выбранные
 const markable = computed(() => props.rows.filter((v) => !v.status || v.status === 'selected'));
@@ -60,7 +60,7 @@ const langTitle = (v: Row) => (v.work_languages?.length ? `язык: ${v.vacancy
             />
           </td>
           <td><span class="badge big" :class="tone(v.scores?.overall)">{{ v.scores?.overall ?? '…' }}</span></td>
-          <td>{{ v.best_resume ?? '—' }}</td>
+          <td>{{ v.best_track ?? v.best_resume ?? '—' }}</td>
           <td class="col-date">
             <div class="nowrap date-line">
               <span v-if="isFresh(v, lastRun)" class="dot-new" title="Новая — из последнего сбора"></span>
@@ -89,9 +89,9 @@ const langTitle = (v: Row) => (v.work_languages?.length ? `язык: ${v.vacancy
             </div>
           </td>
           <td class="badges">
-            <template v-if="v.scores">
-              <span v-for="[k, , inv] in SCORE_COLS" :key="k" class="badge" :class="tone(v.scores[k], inv)" :title="k">{{ v.scores[k] }}</span>
-            </template>
+            <span class="badge" title="Нижняя граница зарплаты USD/месяц">{{ v.salary_usd_month?.min ?? '—' }}</span>
+            <span class="badge" :title="v.hire_from_ar_evidence ?? 'Доступность найма из Аргентины'">{{ ({yes: 'да', likely: 'вероятно', no: 'нет'} as Record<string, string>)[v.hire_from_ar] ?? '?' }}</span>
+            <span class="badge" title="Требования к рабочему времени">{{ v.timezone ?? '—' }}</span>
           </td>
         </tr>
         <tr v-if="!rows.length"><td colspan="7" class="muted empty">Пусто</td></tr>

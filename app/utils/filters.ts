@@ -19,6 +19,8 @@ export interface Filters {
   statuses: string[];
   minOverall: number;
   minTrackFit: number;
+  hireFromAr: string[];
+  minSalary: number;
   outcomes: string[];
   appliedVia: string[];
   /** отскорена ли агентом (scores != null) */
@@ -40,7 +42,7 @@ export interface Filters {
 }
 
 export const blankFilters = (): Filters => ({
-  statuses: [], minOverall: 0, minTrackFit: 0, outcomes: [], appliedVia: [], scored: 'any', tracks: [], sources: [], regions: [], countries: [], langs: [], channels: [],
+  statuses: [], minOverall: 0, minTrackFit: 0, hireFromAr: [], minSalary: 0, outcomes: [], appliedVia: [], scored: 'any', tracks: [], sources: [], regions: [], countries: [], langs: [], channels: [],
   employment: [], stopFlags: [], salary: 'any', period: null,
   sorts: [{ key: 'overall', dir: 'desc' }],
 });
@@ -59,6 +61,8 @@ export function normFilters(raw: any): Filters {
     statuses: arr(raw.statuses),
     minOverall: typeof raw.minOverall === 'number' ? raw.minOverall : 0,
     minTrackFit: typeof raw.minTrackFit === 'number' ? Math.max(0, Math.min(100, raw.minTrackFit)) : 0,
+    hireFromAr: arr(raw.hireFromAr),
+    minSalary: typeof raw.minSalary === 'number' ? Math.max(0, raw.minSalary) : 0,
     outcomes: arr(raw.outcomes),
     appliedVia: arr(raw.appliedVia),
     scored: tri(raw.scored),
@@ -128,6 +132,8 @@ export function matchRow(v: Row, fl: Filters, ctx: MatchCtx): boolean {
   if (fl.tracks.length && !fl.tracks.includes(v.best_resume) && !(v.role_tracks ?? []).some((t: string) => fl.tracks.includes(t))) return false;
   if (fl.minTrackFit > 0 && !Object.entries(v.scores?.fit ?? {}).some(([track, fit]) =>
     (!fl.tracks.length || fl.tracks.includes(track)) && typeof fit === 'number' && fit >= fl.minTrackFit)) return false;
+  if (fl.hireFromAr.length && !fl.hireFromAr.includes(v.hire_from_ar ?? 'unknown')) return false;
+  if (fl.minSalary > 0 && (v.salary_usd_month?.min == null || v.salary_usd_month.min < fl.minSalary)) return false;
   if (fl.outcomes.length && !inSel(fl.outcomes, v.outcome)) return false;
   if (fl.appliedVia.length && !inSel(fl.appliedVia, v.applied_via)) return false;
   if (fl.sources.length && !fl.sources.includes(v.source)) return false;
@@ -162,7 +168,10 @@ export const SORT_GET: Record<string, (v: Row) => string | number | null> = {
   overall: (v) => v.scores?.overall ?? null,
   date: (v) => v.posted_at ?? v.collected_at ?? null,
   company: (v) => v.company ?? null,
-  profile: (v) => v.best_resume ?? null,
+  salary: (v) => v.salary_usd_month?.min ?? null,
+  hire_from_ar: (v) => v.hire_from_ar ?? null,
+  timezone: (v) => v.timezone ?? null,
+  profile: (v) => v.best_track ?? v.best_resume ?? null,
   region: (v) => v.region ?? null,
   remote: (v) => v.scores?.remote ?? null,
   startup: (v) => v.scores?.startup ?? null,

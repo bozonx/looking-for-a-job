@@ -59,6 +59,8 @@ const countries = computed(() => valuesOf('company_country', 'не указан�
     <MultiSelect v-model="f.employment" :class="{ act: f.employment.length }" title="занятость" :options="EMPLOYMENT_OPTIONS" />
     <MultiSelect v-model="f.stopFlags" :class="{ act: f.stopFlags.length }" title="стоп-факторы" :options="STOP_OPTIONS" />
     <TriSelect v-model="f.salary" title="зарплата" yes="с зарплатой" no="без зарплаты" />
+    <MultiSelect v-model="f.hireFromAr" title="найм из AR" :options="[{value: 'yes', label: 'да'}, {value: 'likely', label: 'вероятно'}, {value: 'unknown', label: 'неизвестно'}, {value: 'no', label: 'нет'}]" />
+    <label :class="{ act: f.minSalary }">USD/мес от <input v-model.number="f.minSalary" type="number" min="0" step="500" class="num" /></label>
     <PeriodSelect v-model="f.period" />
     <template v-if="modified">
       <button class="ghost" title="Вернуть вкладку к исходным фильтрам" @click="$emit('reset')">↺ сброс</button>
