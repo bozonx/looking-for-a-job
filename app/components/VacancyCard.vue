@@ -170,7 +170,7 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
     </section>
 
     <!-- Сравнение с резюме и аналитика -->
-    <ResumeMatch v-if="v.resume_match" :m="v.resume_match" :missing="full?.resume_missing ?? null" />
+    <ResumeMatch v-if="v.resume_match" :m="v.resume_match" :missing="full?.resume_missing ?? null" :analysis="full?.resume_analysis ?? null" />
 
     <!-- Особые требования -->
     <section v-if="v.requirements_special?.length">

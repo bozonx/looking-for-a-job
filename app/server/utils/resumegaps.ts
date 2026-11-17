@@ -1,13 +1,87 @@
-/** Чего из required/nice_to_have вакансии нет в текущем резюме трека (scripts/lib/resumeskills.ts). */
-import { resumeText, skillsInText } from '../../../scripts/lib/resumeskills.ts';
+/** Анализ пробелов резюме и фактов (profile/resumes/<track>.md и profile/facts.md) относительно resume_match. */
+import fs from 'node:fs';
+import path from 'node:path';
+import { CONFIG_DIR, ROOT } from '../../../scripts/lib/env.ts';
+import { hasSpelling, resumeText, skillsInText } from '../../../scripts/lib/resumeskills.ts';
 import { loadSkills, normSkill } from '../../../scripts/lib/skills.ts';
 
+export interface ResumeAnalysis {
+  missing: string[];
+  inFacts: string[];
+  responsibilitiesMatched: string[];
+  responsibilitiesMissing: string[];
+  softMatched: string[];
+  spellingDiffs: Record<string, string[]>;
+}
+
+function factsText(): string | null {
+  const f = path.join(ROOT, 'profile', 'facts.md');
+  return fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : null;
+}
+
 export function resumeGaps(rm: Record<string, any> | null | undefined): string[] | null {
+  return analyzeResumeMatch(rm)?.missing ?? null;
+}
+
+export function analyzeResumeMatch(rm: Record<string, any> | null | undefined): ResumeAnalysis | null {
   if (!rm?.resume) return null;
   const text = resumeText(rm.resume);
   if (!text) return null;
-  // словарь и резюме читаем на каждый запрос: файлы маленькие, правка резюме видна сразу
+
   const dict = loadSkills();
+  const respDict = loadSkills(path.join(CONFIG_DIR, 'responsibilities.yaml'));
   const have = skillsInText(text, dict);
-  return [...(rm.required ?? []), ...(rm.nice_to_have ?? [])].filter((s: string) => !have.has(normSkill(String(s), dict).name));
+  const haveResp = skillsInText(text, respDict);
+
+  const facts = factsText();
+  const factsSkills = facts ? skillsInText(facts, dict) : new Set<string>();
+  const factsResp = facts ? skillsInText(facts, respDict) : new Set<string>();
+
+  const reqAndNice = [...(rm.required ?? []), ...(rm.nice_to_have ?? [])].map(String);
+  const missing = reqAndNice.filter((s) => !have.has(normSkill(s, dict).name));
+
+  const responsibilitiesMatched: string[] = [];
+  const responsibilitiesMissing: string[] = [];
+  for (const r of (rm.responsibilities ?? []).map(String)) {
+    const canon = normSkill(r, respDict).name;
+    if (haveResp.has(canon) || hasSpelling(text, r)) responsibilitiesMatched.push(r);
+    else responsibilitiesMissing.push(r);
+  }
+
+  const inFacts = new Set<string>();
+  if (facts) {
+    for (const s of missing) {
+      if (factsSkills.has(normSkill(s, dict).name) || hasSpelling(facts, s)) inFacts.add(s);
+    }
+    for (const s of (rm.ats_keywords_missing ?? []).map(String)) {
+      if (factsSkills.has(normSkill(s, dict).name) || hasSpelling(facts, s)) inFacts.add(s);
+    }
+    for (const r of responsibilitiesMissing) {
+      if (factsResp.has(normSkill(r, respDict).name) || hasSpelling(facts, r)) inFacts.add(r);
+    }
+  }
+
+  const softMatched = (rm.soft_requirements ?? [])
+    .map(String)
+    .filter((s: string) => hasSpelling(text, s));
+
+  const spellingDiffs: Record<string, string[]> = {};
+  const ks = rm.keyword_spellings as Record<string, string[]> | undefined;
+  if (ks) {
+    const missingSet = new Set(missing);
+    for (const [skill, spellings] of Object.entries(ks)) {
+      if (missingSet.has(skill)) continue;
+      const missingSpellings = (spellings ?? []).filter((sp) => !hasSpelling(text, sp));
+      if (missingSpellings.length) spellingDiffs[skill] = missingSpellings;
+    }
+  }
+
+  return {
+    missing,
+    inFacts: [...inFacts],
+    responsibilitiesMatched,
+    responsibilitiesMissing,
+    softMatched,
+    spellingDiffs,
+  };
 }

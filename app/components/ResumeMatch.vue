@@ -1,12 +1,30 @@
 <script setup lang="ts">
 /**
  * Сравнение вакансии с резюме best_resume.
- * Требования — из resume_match (скоринг), пробелы `missing` —
- * сервер считает по текущему тексту резюме; нет резюме — по устаревшим missing_* из скоринга.
+ * Требования — из resume_match (скоринг), пробелы и сопоставление —
+ * сервер считает по текущему тексту резюме и profile/facts.md; нет резюме — по устаревшим missing_* из скоринга.
  */
-const props = defineProps<{ m: Record<string, any>; missing: string[] | null }>();
+interface ResumeAnalysis {
+  missing: string[];
+  inFacts: string[];
+  responsibilitiesMatched: string[];
+  responsibilitiesMissing: string[];
+  softMatched: string[];
+  spellingDiffs: Record<string, string[]>;
+}
 
-const missing = computed(() => new Set<string>(props.missing ?? [...(props.m.missing_required ?? []), ...(props.m.missing_nice ?? [])]));
+const props = defineProps<{
+  m: Record<string, any>;
+  missing: string[] | null;
+  analysis?: ResumeAnalysis | null;
+}>();
+
+const { show } = useToast();
+
+const missing = computed(() => new Set<string>(props.analysis?.missing ?? props.missing ?? [...(props.m.missing_required ?? []), ...(props.m.missing_nice ?? [])]));
+const inFacts = computed(() => new Set<string>(props.analysis?.inFacts ?? []));
+const softMatched = computed(() => new Set<string>(props.analysis?.softMatched ?? []));
+const spellingDiffs = computed(() => props.analysis?.spellingDiffs ?? {});
 
 const facts = computed(() =>
   [
@@ -24,65 +42,123 @@ const missingNice = computed(() => (props.m.nice_to_have ?? []).filter((s: strin
 
 const atsMissing = computed(() => (props.m.ats_keywords_missing ?? []) as string[]);
 
-const hasGaps = computed(() => missingRequired.value.length > 0 || missingNice.value.length > 0 || atsMissing.value.length > 0);
+const respMatched = computed(() => props.analysis?.responsibilitiesMatched ?? []);
+const respMissing = computed(() =>
+  props.analysis ? props.analysis.responsibilitiesMissing : ((props.m.responsibilities ?? []) as string[]),
+);
+
+const coverageSummary = computed(() => {
+  const parts: string[] = [];
+  const reqTotal = (props.m.required ?? []).length;
+  if (reqTotal) parts.push(`Обязательные: ${matchedRequired.value.length}/${reqTotal}`);
+  const niceTotal = (props.m.nice_to_have ?? []).length;
+  if (niceTotal) parts.push(`Nice: ${matchedNice.value.length}/${niceTotal}`);
+  const respTotal = (props.m.responsibilities ?? []).length;
+  if (respTotal && props.analysis) parts.push(`Обязанности: ${respMatched.value.length}/${respTotal}`);
+  return parts;
+});
+
+const hasGaps = computed(
+  () => missingRequired.value.length > 0 || missingNice.value.length > 0 || atsMissing.value.length > 0,
+);
+
+function copySkill(s: string) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+    navigator.clipboard.writeText(s).catch(() => {});
+    show(`Скопировано в буфер: ${s}`);
+  }
+}
+
+function gapTitle(s: string) {
+  return inFacts.value.has(s)
+    ? 'Есть в profile/facts.md, но нет в резюме трека — кликните, чтобы скопировать'
+    : 'Нет ни в резюме, ни в profile/facts.md — кликните, чтобы скопировать';
+}
 </script>
 
 <template>
   <section class="match-card">
     <div class="match-header">
-      <h3>Сравнение с резюме · <span class="highlight" :title="`Трек резюме: ${m.resume}`">{{ m.resume }}</span></h3>
-      <div v-if="facts.length" class="facts-pill" title="Параметры требований вакансии">{{ facts.join(' · ') }}</div>
+      <div>
+        <h3>Сравнение с резюме · <span class="highlight">{{ m.resume }}</span></h3>
+        <div v-if="coverageSummary.length" class="small muted">{{ coverageSummary.join(' · ') }}</div>
+      </div>
+      <div v-if="facts.length" class="facts-pill">{{ facts.join(' · ') }}</div>
     </div>
 
     <!-- В резюме найдено -->
     <div v-if="matchedRequired.length || matchedNice.length" class="match-group">
       <div class="group-title good-title">✓ Найдено в резюме ({{ matchedRequired.length + matchedNice.length }}):</div>
       <div class="skills">
-        <span v-for="s in matchedRequired" :key="s" class="skill good" :title="`Обязательный навык найден в резюме: ${s}`">{{ s }}</span>
-        <span v-for="s in matchedNice" :key="s" class="skill good" :title="`Желательный навык найден в резюме: ${s}`">{{ s }} (nice)</span>
+        <span
+          v-for="s in matchedRequired"
+          :key="s"
+          class="skill good"
+          :title="spellingDiffs[s]?.length ? `В резюме есть, но в вакансии иначе: ${spellingDiffs[s].join(', ')}` : 'Обязательный навык найден в резюме'"
+        >
+          {{ s }}<template v-if="spellingDiffs[s]?.length"> <span class="muted">→ {{ spellingDiffs[s][0] }}</span></template>
+        </span>
+        <span
+          v-for="s in matchedNice"
+          :key="s"
+          class="skill good"
+          :title="spellingDiffs[s]?.length ? `В резюме есть, но в вакансии иначе: ${spellingDiffs[s].join(', ')}` : 'Желательный навык найден в резюме'"
+        >
+          {{ s }} (nice)<template v-if="spellingDiffs[s]?.length"> <span class="muted">→ {{ spellingDiffs[s][0] }}</span></template>
+        </span>
       </div>
     </div>
 
     <!-- Пробелы: Чего не найдено в резюме -->
     <div v-if="hasGaps" class="match-group gaps-group">
       <div class="group-title bad-title">
-        <span>⚠ Не найдено в текущем резюме:</span>
+        <span>⚠ Не найдено в текущем резюме (кликните, чтобы скопировать):</span>
       </div>
 
       <div v-if="missingRequired.length" class="skills-line">
-        <span class="muted small sub-label" title="Обязательные навыки, не найденные в резюме">Обязательно:</span>
-        <span
+        <span class="muted small sub-label">Обязательно:</span>
+        <button
           v-for="s in missingRequired"
           :key="s"
-          class="skill bad"
-          :title="`Обязательный навык не найден в резюме: ${s}`"
+          type="button"
+          class="skill bad clickable"
+          :title="gapTitle(s)"
+          @click="copySkill(s)"
         >
-          {{ s }}
-        </span>
+          {{ s }}<span v-if="inFacts.has(s)" class="facts-badge"> · в фактах</span>
+        </button>
       </div>
 
       <div v-if="missingNice.length" class="skills-line">
-        <span class="muted small sub-label" title="Желательные навыки, не найденные в резюме">Желательно:</span>
-        <span
+        <span class="muted small sub-label">Желательно:</span>
+        <button
           v-for="s in missingNice"
           :key="s"
-          class="skill mid"
-          :title="`Желательный навык не найден в резюме: ${s}`"
+          type="button"
+          class="skill mid clickable"
+          :title="gapTitle(s)"
+          @click="copySkill(s)"
         >
-          {{ s }}
-        </span>
+          {{ s }}<span v-if="inFacts.has(s)" class="facts-badge"> · в фактах</span>
+        </button>
       </div>
 
       <div v-if="atsMissing.length" class="skills-line">
-        <span class="muted small sub-label" title="Ключевые слова ATS, не найденные в резюме">ATS-ключевики:</span>
-        <span
+        <span class="muted small sub-label">ATS-ключевики:</span>
+        <button
           v-for="s in atsMissing"
           :key="s"
-          class="skill ats-tag"
-          :title="`ATS-ключевик не найден в резюме: ${s}`"
+          type="button"
+          class="skill ats-tag clickable"
+          :title="gapTitle(s)"
+          @click="copySkill(s)"
         >
-          {{ s }}
-        </span>
+          {{ s }}<span v-if="inFacts.has(s)" class="facts-badge"> · в фактах</span>
+        </button>
+      </div>
+
+      <div class="gap-hint small muted">
+        💡 Если есть пометка <b>«в фактах»</b> — опыт уже описан в <code>profile/facts.md</code>, добавьте его в <code>profile/resumes/{{ m.resume }}.md</code>. Если скоринг ошибся — нажмите <b>⚑ Проблемная</b> (клавиша <b>f</b>).
       </div>
     </div>
 
@@ -90,7 +166,7 @@ const hasGaps = computed(() => missingRequired.value.length > 0 || missingNice.v
     <div v-if="m.in_resume_negative?.length" class="match-group negative-group">
       <div class="group-title bad-title">В резюме упомянуто, но вакансия против:</div>
       <ul class="red small">
-        <li v-for="n in m.in_resume_negative" :key="n.skill" :title="`Негативный фактор: ${n.skill}`">
+        <li v-for="n in m.in_resume_negative" :key="n.skill">
           <b>{{ n.skill }}</b> — {{ n.evidence }}
         </li>
       </ul>
@@ -98,15 +174,24 @@ const hasGaps = computed(() => missingRequired.value.length > 0 || missingNice.v
 
     <!-- Soft skills -->
     <div v-if="m.soft_requirements?.length" class="match-group soft-group small">
-      <span class="muted" title="Гибкие навыки и личные качества">Soft skills:</span>
-      <span class="soft-tags" title="Soft skills (гибкие навыки)"> {{ m.soft_requirements.join(', ') }}</span>
+      <span class="muted">Soft skills: </span>
+      <span v-for="(s, idx) in m.soft_requirements" :key="s">
+        <span :class="softMatched.has(s) ? 'good-title' : ''">{{ softMatched.has(s) ? `✓ ${s}` : s }}</span><span v-if="idx < m.soft_requirements.length - 1">, </span>
+      </span>
     </div>
 
     <!-- Обязанности роли -->
     <div v-if="m.responsibilities?.length" class="match-group resp-group">
-      <div class="group-title" title="Список обязанностей по вакансии">Обязанности роли ({{ m.responsibilities.length }}):</div>
-      <ul class="resp-list">
-        <li v-for="r in m.responsibilities" :key="r">{{ r }}</li>
+      <div class="group-title">Обязанности роли ({{ m.responsibilities.length }}):</div>
+      <ul v-if="respMatched.length" class="resp-list">
+        <li v-for="r in respMatched" :key="r" class="good-title">✓ {{ r }}</li>
+      </ul>
+      <ul v-if="respMissing.length" class="resp-list">
+        <li v-for="r in respMissing" :key="r">
+          <button type="button" class="link-btn" :title="gapTitle(r)" @click="copySkill(r)">
+            {{ analysis ? '⚠ ' : '' }}{{ r }}<span v-if="inFacts.has(r)" class="muted small"> (в фактах)</span>
+          </button>
+        </li>
       </ul>
     </div>
   </section>
