@@ -241,11 +241,8 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
           <tr><th>Проверка активности</th><td>{{ v.alive_checked_at ?? 'не проверялась' }}<template v-if="v.possibly_closed"> (возможно, закрыта)</template></td></tr>
           <tr v-if="v.real_url_tried_at"><th>Поиск прямой ссылки</th><td>{{ v.real_url_tried_at }}</td></tr>
           <tr v-if="v.scoring_version != null"><th>Версия скоринга</th><td>v{{ v.scoring_version }}</td></tr>
-          <tr v-if="v.vacancy_language && (!v.work_languages?.length || v.work_languages.length > 1 || v.work_languages[0] !== v.vacancy_language)">
-            <th>Язык вакансии</th><td>{{ v.vacancy_language }}</td>
-          </tr>
-          <tr v-if="v.work_languages?.length">
-            <th>Рабочие языки</th><td>{{ v.work_languages.join(', ') }}</td>
+          <tr v-if="v.vacancy_language && (!v.work_languages?.length || !v.work_languages.includes(v.vacancy_language))">
+            <th>Язык текста вакансии</th><td>{{ v.vacancy_language }}</td>
           </tr>
           <tr v-if="v.seniority"><th>Грейд (seniority)</th><td>{{ v.seniority }}</td></tr>
           <tr v-if="v.company_stage"><th>Стадия компании</th><td>{{ v.company_stage }}</td></tr>
