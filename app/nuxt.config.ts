@@ -10,7 +10,7 @@ export default defineNuxtConfig({
   css: ['~/assets/main.css'],
   app: { head: { title: 'Вакансии', htmlAttrs: { lang: 'ru' } } },
   nitro: {
-    replace: { 'process.env.JOB_ROOT': JSON.stringify(root) },
+    replace: { 'process.env.JOB_ROOT': JSON.stringify(process.env.JOB_ROOT || root) },
   },
   vite: { server: { fs: { allow: [root] } } },
 });

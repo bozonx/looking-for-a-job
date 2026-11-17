@@ -118,3 +118,31 @@ test('RemoteOK: метаданные пропускаются, HTML разбир
   assert.match(built.body, /Описание/);
   assert.doesNotMatch(built.body, /<p>/);
 });
+
+test('цикл pending → score → validate → top сохраняет решения и завершает батч', () => {
+  reset();
+  const file = put('remoteok-cycle', { status: 'selected', starred: true, notes: 'Моя заметка' });
+  assert.match(cli('pending', ['--paths']), /remoteok-cycle\.md/);
+  const v = parseVacancy(file);
+  writeVacancy(file, { ...v.data,
+    company_country: 'AR', summary: 'Разработка интерфейсов', best_resume: 'vue',
+    score_reasoning: 'Оценки заданы тестовой фикстурой', scoring_version: 3,
+    resume_match: { resume: 'vue', required: [], nice_to_have: [], responsibilities: [], domain: null },
+    scores: { remote: 100, startup: 80, corporate: 0, outsource: 0, legitimacy: 100, language: 100,
+      fit: { vue: 90, react: 50, angular: 0, fullstack: 40, ai_engineer: 0, automation: 0 } },
+  }, v.body);
+  cli('score');
+  cli('validate');
+  const scored = parseVacancy(file);
+  assert.equal(typeof scored.data.scores.overall, 'number');
+  assert.ok(scored.data.scores.overall > 0);
+  assert.equal(scored.data.status, 'selected');
+  assert.equal(scored.data.starred, true);
+  assert.equal(scored.data.notes, 'Моя заметка');
+  assert.equal(scored.body, v.body);
+  assert.equal(cli('pending', ['--paths']).trim(), '');
+  assert.match(cli('top'), /1\. remoteok-cycle/);
+  const before = fs.readFileSync(file, 'utf8');
+  cli('score');
+  assert.equal(fs.readFileSync(file, 'utf8'), before);
+});
