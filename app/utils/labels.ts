@@ -144,3 +144,18 @@ export { hasUserNotes } from '../../scripts/lib/uipatch.ts';
 export function optionsOf(map: Record<string, string>, none?: string): { value: string; label: string }[] {
   return [...(none ? [{ value: 'none', label: none }] : []), ...Object.entries(map).map(([value, label]) => ({ value, label }))];
 }
+
+export const EVERGREEN_DAYS = 60;
+
+/** Возраст публикации в днях (null, если posted_at отсутствует или невалидна). */
+export function postedAgeDays(postedAt: unknown, now = Date.now()): number | null {
+  if (!postedAt) return null;
+  const ms = Date.parse(String(postedAt));
+  if (!Number.isFinite(ms)) return null;
+  return Math.floor((now - ms) / 86_400_000);
+}
+
+export function isEvergreen(postedAt: unknown, now = Date.now()): boolean {
+  const age = postedAgeDays(postedAt, now);
+  return age !== null && age >= EVERGREEN_DAYS;
+}

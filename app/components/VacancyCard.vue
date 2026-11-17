@@ -237,7 +237,7 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
           <tr><th>Источник</th><td>{{ v.source }}</td></tr>
           <tr><th>Метод отклика</th><td>{{ v.apply_method }} → {{ v.apply_target ?? '—' }}</td></tr>
           <tr><th>Дата сбора</th><td>{{ v.collected_at }}<template v-if="v.collected_run"> (раунд: {{ String(v.collected_run).slice(0, 16).replace('T', ' ') }})</template></td></tr>
-          <tr v-if="v.posted_at"><th>Дата публикации</th><td>{{ v.posted_at }}</td></tr>
+          <tr v-if="v.posted_at"><th>Дата публикации</th><td>{{ v.posted_at }}<template v-if="isEvergreen(v.posted_at)"> <span class="badge" :title="'Публикации ' + postedAgeDays(v.posted_at) + ' дн. — возможно, постоянный набор (evergreen)'">evergreen · {{ postedAgeDays(v.posted_at) }} дн.</span></template></td></tr>
           <tr><th>Проверка активности</th><td>{{ v.alive_checked_at ?? 'не проверялась' }}<template v-if="v.possibly_closed"> (возможно, закрыта)</template></td></tr>
           <tr v-if="v.real_url_tried_at"><th>Поиск прямой ссылки</th><td>{{ v.real_url_tried_at }}</td></tr>
           <tr v-if="v.scoring_version != null"><th>Версия скоринга</th><td>v{{ v.scoring_version }}</td></tr>

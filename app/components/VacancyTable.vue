@@ -79,6 +79,7 @@ const langTitle = (v: Row) => (v.work_languages?.length ? `язык: ${v.vacancy
               <span class="badge ch-badge" :class="'ch-' + kind(v)" :title="channelTitle(v)">{{ CHANNEL_LABEL[kind(v)]!.icon }}<template v-if="(v.apply_channels?.length ?? 0) > 1"> +{{ v.apply_channels.length - 1 }}</template></span>
               {{ v.company }}
               <template v-if="v.duplicates?.length"> · <span class="badge dup-badge" :title="'Дубликатов: ' + v.duplicates.length">⧉ {{ v.duplicates.length }}</span></template>
+              <template v-if="isEvergreen(v.posted_at)"> · <span class="badge" :title="'Старая публикация (' + postedAgeDays(v.posted_at) + ' дн.), возможно evergreen'">evergreen</span></template>
               <template v-if="v.stop_flags?.length"> · <span class="flag">⛔ {{ v.stop_flags.map((s: string) => labelOf(STOP_FLAG_LABEL, s)).join(', ') }}</span></template>
             </div>
           </td>
