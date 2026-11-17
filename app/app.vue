@@ -93,7 +93,14 @@ useHotkeys(() => {
     </aside>
 
     <main class="detail">
-      <VacancyCard v-if="current && !rejectedTab" :id="current" :key="current" :rev="currentRow?._rev" @patch="patch" />
+      <VacancyCard
+        v-if="current && !rejectedTab"
+        :id="current"
+        :key="current"
+        :rev="currentRow?._rev"
+        @patch="patch"
+        @tag-click="(tag: string) => { q = (q === tag ? '' : tag); }"
+      />
       <p v-else class="muted empty">{{ rejectedTab ? 'Выберите ссылку отсеянной вакансии или верните её в скоринг' : 'Выберите вакансию' }}</p>
     </main>
     <div v-if="toast" class="toast">{{ toast }}</div>
