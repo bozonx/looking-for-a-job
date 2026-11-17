@@ -102,6 +102,7 @@ async function main() {
   }
   if (!dryRun && !file) insertRunLog('collect', itog.replace('# ИТОГ СБОРА', `## ИТОГ СБОРА — ${new Date().toISOString().slice(11, 16)} UTC`), logOffset);
   console.log(itog);
+  if (!dryRun && !file) console.log(`Подробный лог по источникам: ${logOffset.file.replace(process.cwd() + '/', '')}`);
   if (total && !dryRun) console.log(`NEXT: отскорить ${total} вакансий (npm run pending), поискать real_url, затем npm run score && npm run validate; дописать data/insights.md`);
   if (failed) {
     console.error(`Источников с ошибкой загрузки: ${failed} (см. лог)`);

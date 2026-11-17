@@ -37,11 +37,25 @@ const nextSlot = new Map<string, number>();
  * Источники собираются параллельно, поэтому буфер свой у каждого: lib/collect.ts запускает источник
  * внутри withHttpWarnings(), и warn() пишет в буфер текущего асинхронного контекста.
  */
-const warnScope = new AsyncLocalStorage<string[]>();
-const globalWarnings: string[] = [];
-export const warn = (msg: string) => void (warnScope.getStore() ?? globalWarnings).push(msg);
-export const takeHttpWarnings = () => (warnScope.getStore() ?? globalWarnings).splice(0);
-export const withHttpWarnings = <T>(fn: () => Promise<T>): Promise<T> => warnScope.run([], fn);
+interface Scope {
+  warnings: string[];
+  /** часть списка (лента, категория, запрос) не загрузилась — список неполный */
+  partial: boolean;
+}
+const warnScope = new AsyncLocalStorage<Scope>();
+const globalScope: Scope = { warnings: [], partial: false };
+const scope = () => warnScope.getStore() ?? globalScope;
+export const warn = (msg: string) => void scope().warnings.push(msg);
+export const takeHttpWarnings = () => scope().warnings.splice(0);
+/** Список источника загружен не полностью (eachTolerant) — окно сбора сдвигать нельзя. */
+export const markPartialList = () => void (scope().partial = true);
+export const takePartialList = () => {
+  const s = scope();
+  const p = s.partial;
+  s.partial = false;
+  return p;
+};
+export const withHttpWarnings = <T>(fn: () => Promise<T>): Promise<T> => warnScope.run({ warnings: [], partial: false }, fn);
 
 /** ±20% к паузе */
 const jitter = (ms: number) => Math.round(ms * (0.8 + Math.random() * 0.4));
@@ -127,6 +141,7 @@ export async function eachTolerant<T>(label: string, items: T[], fn: (item: T) =
       ok++;
     } catch (e) {
       last = e;
+      markPartialList();
       warn(`${label} «${name(it)}»: ${(e as Error).message}`);
     }
   }

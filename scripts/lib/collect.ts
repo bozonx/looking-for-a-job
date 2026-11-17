@@ -8,12 +8,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { env, today } from './env.ts';
 import { loadAll, parseVacancy, vacancyPath, writeVacancy, type VacancyFile } from './vacancy.ts';
-import { buildIndex, findDuplicate, key, normUrl, type Index } from './dedupe.ts';
+import { buildIndex, findDuplicate, key, normUrl, unknownCompany, type Index } from './dedupe.ts';
 import { appendRunLog, appendRunStats } from './runlog.ts';
 import { pickApplyTarget } from './target.ts';
-import { SeenStore } from './seen.ts';
+import { MAX_FAILURES, SeenStore } from './seen.ts';
 import { loadPrefilter } from './prefilter.ts';
-import { sleep, takeHttpWarnings, withHttpWarnings } from './http.ts';
+import { sleep, takeHttpWarnings, takePartialList, withHttpWarnings } from './http.ts';
 import { lastAttempt, lastRun, setLastAttempt, setLastRun } from './lastrun.ts';
 
 /** запас окна сбора: площадки публикуют с задержкой, даты бывают в другом поясе */
@@ -133,7 +133,7 @@ export interface CollectResult {
   stopReason?: string;
 }
 
-async function* pages(p: Provider, opts: CollectOptions, onStop: (r: string) => void): AsyncGenerator<RawJob[]> {
+async function* pages(p: Provider, opts: CollectOptions, onStop: (r: string) => void, stopped: () => boolean): AsyncGenerator<RawJob[]> {
   if (opts.file) {
     const text = fs.readFileSync(opts.file, 'utf8');
     let input: unknown = text;
@@ -149,6 +149,7 @@ async function* pages(p: Provider, opts: CollectOptions, onStop: (r: string) => 
   }
   const max = p.paginated ? env.COLLECT_MAX_PAGES : 1;
   for (let i = 0; i < max; i++) {
+    if (stopped()) return;
     if (i > 0) await sleep(p.pageDelayMs ?? 1000);
     const list = await p.fetchPage(i);
     // пустая первая страница — скорее капча/логин/сменилась вёрстка, чем пустая лента
@@ -208,7 +209,11 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
   const startedAt = Date.now();
   const prev = opts.file ? null : lastRun(SOURCE);
 
-  const prevAttempt = opts.file ? null : Math.max(prev ?? 0, lastAttempt(SOURCE) ?? 0) || null;
+  const attempt = opts.file ? null : lastAttempt(SOURCE);
+  const prevAttempt = opts.file ? null : Math.max(prev ?? 0, attempt ?? 0) || null;
+  // прошлый запуск оборвался (лимиты, ошибка, неполный список) — хвост ленты не дочитан и лежит под уже
+  // известными вакансиями: известные не останавливают сбор, только вышедшие из окна по дате
+  const resume = !!attempt && (!prev || attempt > prev);
   if (prevAttempt && p.minIntervalHours && startedAt - prevAttempt < p.minIntervalHours * 3600e3) {
     const next = new Date(prevAttempt + p.minIntervalHours * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
     console.log(`## ${SOURCE} — пропущен: площадка просит не чаще раза в ${p.minIntervalHours} ч (следующий сбор после ${next} UTC)\n`);
@@ -233,6 +238,8 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
   /** лента дочитана до конца или до известных — можно сдвигать окно */
   let complete = true;
   let seenStreak = 0;
+  /** COLLECT_STOP_ON_SEEN сработал: текущую страницу дочитываем, следующие не грузим */
+  let streakStop = false;
   let failed = false;
   const saved: string[] = [];
   const rejected: string[] = [];
@@ -244,7 +251,7 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
   let reopened = 0;
 
   outer: try {
-    for await (const list of pages(p, opts, (r) => ((stopReason = r), (complete = false)))) {
+    for await (const list of pages(p, opts, (r) => ((stopReason = r), (complete = false)), () => streakStop)) {
       stats.pages++;
       stats.listed += list.length;
       for (const j of list) listedIds.add(`${SOURCE}-${j.extId}`);
@@ -277,9 +284,12 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
         if (old || known) {
           if (known) stats.known++;
           else stats.old++;
-          if (++seenStreak >= env.COLLECT_STOP_ON_SEEN) {
-            stopReason = `${seenStreak} известных/вне окна подряд`;
-            break outer;
+          // Остановка на известных экономит только загрузку следующих страниц: страница уже скачана,
+          // а проверка «известна ли» бесплатна. Поэтому страница всегда дочитывается до конца — иначе новые
+          // вакансии, оказавшиеся ниже известных (склейка нескольких лент, хвост прошлого обрыва), теряются.
+          if (p.paginated && (old || !resume) && !streakStop && ++seenStreak >= env.COLLECT_STOP_ON_SEEN) {
+            stopReason = `${seenStreak} известных/вне окна подряд (страница дочитана)`;
+            streakStop = true;
           }
           continue;
         }
@@ -302,9 +312,14 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
 
           // company+title в том же источнике при другом id — та же роль в другой стране/офисе: одна запись,
           // локации сливаются в location, ссылка (с id) — в duplicates; скорить одно и то же дважды незачем
-          const sameSource = !!dup && dup.by === 'company+title' && dup.vacancy.data.source === SOURCE;
+          let sameSource = !!dup && dup.by === 'company+title' && dup.vacancy.data.source === SOURCE;
+          // snapshot (ATS): обе вакансии открыты одновременно, и если локация не отличается — это разные
+          // позиции с одинаковым названием (разные команды), а не одна роль в нескольких офисах
+          const otherRole =
+            sameSource && !!p.snapshot && (!data.location || String(dup!.vacancy.data.location ?? '').includes(data.location));
+          if (otherRole) sameSource = false;
 
-          if (dup) {
+          if (dup && !otherRole) {
             stats.duplicates++;
             const u = normUrl(data.source_url);
             const added = updateVacancy(dup.vacancy, opts.dryRun, (d) => {
@@ -343,13 +358,18 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
           const vf = { file, data, body: built.body };
           idx.byId.set(id, vf);
           for (const u of urls) idx.byUrl.set(normUrl(u), vf);
-          idx.byKey.set(key(data.company, data.title), vf);
+          if (!unknownCompany(data.company) && !otherRole) idx.byKey.set(key(data.company, data.title), vf);
           seen.add(id); // чтобы после удаления файла (cleanup) вакансия не вернулась как новая
           stats.saved++;
           saved.push(file);
         } catch (e) {
           stats.errors++;
-          errors.push(`- ${id} «${j.title}»: ${(e as Error).message}`);
+          const msg = (e as Error).message;
+          // повторяем в следующих сборах, но не бесконечно: после MAX_FAILURES — считаем известной
+          const n = msg.startsWith('[bug]') ? 0 : seen.addFailure(id);
+          if (n && n < MAX_FAILURES && !p.snapshot) complete = false; // окно не сдвигаем — вакансия не выпадет из него
+          const tail = n >= MAX_FAILURES ? ` — попытка ${n} из ${MAX_FAILURES}, больше не пробуем` : n ? ` — попытка ${n} из ${MAX_FAILURES}` : '';
+          errors.push(`- ${id} «${j.title}»: ${msg}${tail}`);
         }
       }
     }
@@ -369,6 +389,11 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
   }
 
   warnings.push(...[...(p.takeWarnings?.() ?? []), ...takeHttpWarnings()].map((w) => `- ${w}`));
+  // часть лент/категорий/запросов не загрузилась — их вакансии придут в следующий раз, окно не сдвигаем
+  if (takePartialList() && !p.snapshot && complete) {
+    complete = false;
+    stopReason += ' (список загружен не полностью — окно не сдвинуто)';
+  }
 
   // snapshot: вакансии источника, пропавшие из полного списка, вероятно закрыты (и наоборот)
   if (p.snapshot && p.covers && !failed && !opts.file) {
@@ -392,7 +417,7 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
   const rel = (f: string) => path.relative(process.cwd(), f);
   const log =
     `## ${SOURCE} — ${new Date().toISOString().slice(11, 16)} UTC${opts.dryRun ? ' (dry-run)' : ''}\n\n` +
-    `- окно: ${windowNote}\n` +
+    `- окно: ${windowNote}${resume ? '; дочитывание после обрыва (остановка только по дате)' : ''}\n` +
     `- страниц: ${stats.pages}, в ленте: ${stats.listed}, просмотрено: ${stats.viewed}\n` +
     `- отсеяно предфильтром: ${stats.prefiltered}\n` +
     `- уже известных (вкл. отсеянные и удалённые ранее): ${stats.known}, вне окна по дате: ${stats.old}, дублей с других площадок: ${stats.duplicates}\n` +
@@ -411,9 +436,11 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
     seen.save();
     if (complete && !opts.file) setLastRun(SOURCE, startedAt);
     if (!opts.file) appendRunStats({ kind: 'collect', source: SOURCE, ...stats, closed, reopened, failed, stop: stopReason });
-    console.log(`Run log: ${rel(appendRunLog('collect', log))}`);
+    appendRunLog('collect', log);
   }
-  console.log(log.replace(/<details>[\s\S]*<\/details>\n?/, `(отсеяно предфильтром: ${rejected.length}, список — в логе)\n`));
+  // подробный лог — только в файле (и в dry-run): агенту хватает «ИТОГ СБОРА», не тратим токены на дубль лога
+  if (opts.dryRun) console.log(log.replace(/<details>[\s\S]*<\/details>\n?/, `(отсеяно предфильтром: ${rejected.length})\n`));
+  else console.log(`${SOURCE}: в ленте ${stats.listed}, новых ${stats.saved}, ошибок ${stats.errors} — ${stopReason}`);
   return {
     source: SOURCE,
     saved: stats.saved,

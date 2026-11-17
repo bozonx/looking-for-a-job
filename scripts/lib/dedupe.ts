@@ -11,6 +11,15 @@ export function normCompany(s: string): string {
     .replace(/[^a-z0-9]+/g, '');
 }
 
+/**
+ * Компания скрыта или неизвестна (Bumeran/ZonaJobs: «Confidencial», «Importante empresa…»): по названию такие
+ * вакансии не сравниваются — одинаковый заголовок у разных скрытых работодателей не делает их дублями.
+ */
+export function unknownCompany(s: string | null | undefined): boolean {
+  const c = normCompany(s ?? '');
+  return !c || /^(unknown|confidencial|confidential|reservado|anonimo|anonymous|na)$|^importante(empresa|compania)|confidencial$/.test(c);
+}
+
 export function normTitle(s: string): string {
   // локации в заголовке («(Poland)», «| UK | Remote») убираются ДО чистки символов — иначе разделители уже потеряны
   return translit(stripLocationSegments(s)).replace(/[^a-z0-9 ]+/g, ' ').replace(STOP, ' ').replace(/\s+/g, ' ').trim();
@@ -41,7 +50,7 @@ export function buildIndex(all: VacancyFile[]): Index {
     const d = v.data;
     if (d.id) idx.byId.set(d.id, v);
     for (const u of [d.source_url, d.real_url, ...(d.duplicates ?? []).map((x: any) => x?.url)]) if (u) idx.byUrl.set(normUrl(u), v);
-    if (d.company && d.title) idx.byKey.set(key(d.company, d.title), v);
+    if (d.company && d.title && !unknownCompany(d.company)) idx.byKey.set(key(d.company, d.title), v);
   }
   return idx;
 }
@@ -55,6 +64,7 @@ export function findDuplicate(idx: Index, c: { id: string; urls: string[]; compa
     const hit = u && idx.byUrl.get(normUrl(u));
     if (hit) return { vacancy: hit, by: 'url' };
   }
+  if (unknownCompany(c.company)) return null;
   const byKey = idx.byKey.get(key(c.company, c.title));
   if (byKey) return { vacancy: byKey, by: 'company+title' };
   return null;
