@@ -22,7 +22,23 @@ function saveNotes() {
   if (notes.value !== (v.value?.notes ?? '')) emit('patch', props.id, { notes: notes.value });
 }
 
-const SCORE_KEYS = [['remote', false], ['startup', false], ['legitimacy', false], ['region', false], ['language', false], ['corporate', true], ['outsource', true]] as const;
+const SCORE_KEYS = [
+  ['remote', false],
+  ['startup', false],
+  ['legitimacy', false],
+  ['corporate', true],
+  ['outsource', true],
+] as const;
+
+const SCORE_TITLES: Record<string, string> = {
+  remote: 'Удалённая работа (0–100)',
+  startup: 'Стартап-культура (0–100)',
+  legitimacy: 'Легитимность и надёжность компании (0–100)',
+  corporate: 'Корпоративность и бюрократия (0–100, меньше — лучше)',
+  outsource: 'Признаки аутсорса / галеры (0–100, меньше — лучше)',
+  region: 'Соответствие региону найма (0–100)',
+  language: 'Соответствие языковым требованиям (0–100)',
+};
 
 const canManual = computed(() => !v.value?.status || v.value.status === 'selected' || (v.value.status === 'applied' && v.value.applied_via === 'manual'));
 </script>
@@ -32,16 +48,16 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
     <header class="card-header">
       <div class="title-row">
         <h2 class="card-title">
-          <span class="track-tag">{{ v.best_resume ?? '—' }}</span>
+          <span class="track-tag" :title="`Основной подходящий трек: ${v.best_resume ?? 'не определён'}`">{{ v.best_resume ?? '—' }}</span>
           {{ v.title }}
         </h2>
         <div v-if="v.scores" class="score-pills">
-          <div class="score-pill main-score" :class="tone(v.scores.overall)" title="Общий балл (overall)">
+          <div class="score-pill main-score" :class="tone(v.scores.overall)" title="Общий балл соответствия (overall, 0–100)">
             <span class="score-label">OVERALL</span>
             <span class="score-val">{{ v.scores.overall ?? '—' }}</span>
           </div>
-          <div v-if="v.best_resume && v.scores.fit?.[v.best_resume] != null" class="score-pill fit-score" :class="tone(v.scores.fit[v.best_resume])" :title="`Фит для трека ${v.best_resume}`">
-            <span class="score-label">FIT {{ v.best_resume }}</span>
+          <div v-if="v.best_resume && v.scores.fit?.[v.best_resume] != null" class="score-pill fit-score" :class="tone(v.scores.fit[v.best_resume])" :title="`Фит для трека ${v.best_resume}: ${v.scores.fit[v.best_resume]}`">
+            <span class="score-label">FIT трек</span>
             <span class="score-val">{{ v.scores.fit[v.best_resume] }}</span>
           </div>
         </div>
@@ -49,22 +65,25 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
 
       <!-- Компания и ключевые условия -->
       <div class="company-row">
-        <span class="company-name">{{ v.company }}</span>
-        <template v-if="v.company_country"> · <span>{{ v.company_country }}</span></template>
-        <template v-if="v.location"> · <span>{{ v.location }}</span></template>
-        <template v-if="v.salary"> · <span class="salary-tag">{{ fmtSalary(v.salary) }}</span></template>
-        · <span>{{ labelOf(EMPLOYMENT_LABEL, v.employment) }}</span>
+        <span class="company-name" title="Работодатель">{{ v.company }}</span>
+        <template v-if="v.company_country"> · <span title="Страна компании">{{ v.company_country }}</span></template>
+        <template v-if="v.location"> · <span title="Локация вакансии">{{ v.location }}</span></template>
+        <template v-if="v.salary"> · <span class="salary-tag" title="Уровень зарплаты">{{ fmtSalary(v.salary) }}</span></template>
+        · <span title="Формат занятости">{{ labelOf(EMPLOYMENT_LABEL, v.employment) }}</span>
       </div>
 
       <!-- Основная линия бейджей -->
       <div class="badges-row">
-        <span v-if="v.region" class="badge-item region-badge">
+        <span v-if="v.region" class="badge-item region-badge" :title="`Регион вакансии: ${labelOf(REGION_LABEL, v.region)}`">
           🌐 {{ labelOf(REGION_LABEL, v.region) }}
         </span>
-        <span v-if="v.work_languages?.length" class="badge-item lang-item" title="Рабочие языки команды">
+        <span v-if="v.employer_group" class="badge-item employer-group-badge" :title="`Группа работодателя: ${labelOf(REGION_LABEL, v.employer_group)}`">
+          🏛 {{ labelOf(REGION_LABEL, v.employer_group) }}
+        </span>
+        <span v-if="v.work_languages?.length" class="badge-item lang-item" :title="`Рабочие языки команды: ${v.work_languages.join(', ')}`">
           🗣 {{ v.work_languages.join(', ') }}
         </span>
-        <span v-if="v.ru_speaking_team != null" class="badge-item ru-team" :class="v.ru_speaking_team ? 'good' : 'muted'" title="Русскоязычная команда">
+        <span v-if="v.ru_speaking_team != null" class="badge-item ru-team" :class="v.ru_speaking_team ? 'good' : 'muted'" :title="v.ru_speaking_team ? 'Русскоязычная команда: да' : 'Русскоязычная команда: нет'">
           🇷🇺 рус. команда: {{ v.ru_speaking_team ? 'да' : 'нет' }}
         </span>
         <span v-if="v.tags?.length" class="tag-list">
@@ -73,24 +92,33 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
             :key="t"
             type="button"
             class="tag-btn"
-            title="Кликните, чтобы фильтровать список по тегу"
+            :title="`Кликните, чтобы фильтровать список по тегу #${t}`"
             @click="emit('tagClick', t)"
           >#{{ t }}</button>
         </span>
       </div>
 
+      <!-- Факторы скоринга (компактная плашка) - выше кнопок действий -->
+      <div v-if="v.scores" class="criteria-bar">
+        <div v-for="[k, inv] in SCORE_KEYS" :key="k" class="criteria-item" :title="`${SCORE_TITLES[k] ?? k}: ${v.scores[k] ?? '—'}`">
+          <span class="criteria-label">{{ k }}</span>
+          <span class="badge" :class="tone(v.scores[k], inv)" :title="`${SCORE_TITLES[k] ?? k}: ${v.scores[k] ?? '—'}`">{{ v.scores[k] ?? '—' }}</span>
+        </div>
+      </div>
+      <div v-else class="muted small criteria-bar">Ещё не отскорена агентом.</div>
+
       <!-- Панель действий -->
       <div class="actions">
-        <button :class="{ on: v.status === 'selected' }" :disabled="!!v.status && v.status !== 'selected'" title="a / u" @click="emit('patch', id, { status: v.status === 'selected' ? null : 'selected' })">✓ Откликнуться</button>
+        <button :class="{ on: v.status === 'selected' }" :disabled="!!v.status && v.status !== 'selected'" title="a / u — выбрать для отклика" @click="emit('patch', id, { status: v.status === 'selected' ? null : 'selected' })">✓ Откликнуться</button>
         <button
           v-if="canManual"
           :class="{ on: v.status === 'applied' }"
           title="m — откликнулся сам (форма, почта, мессенджер); повторный клик / u — отменить"
           @click="emit('patch', id, { status: v.status === 'applied' ? null : 'applied' })"
         >📨 Откликнулся сам</button>
-        <button :class="{ on: v.starred }" title="s" @click="emit('patch', id, { starred: !v.starred })">★</button>
+        <button :class="{ on: v.starred }" title="s — пометить избранным" @click="emit('patch', id, { starred: !v.starred })">★</button>
         <button :class="{ on: v.flagged }" title="f — скоринг/данные неверны, агент перепроверит" @click="emit('patch', id, { flagged: !v.flagged })">⚑ Проблемная</button>
-        <span v-if="v.status" class="status" :data-s="v.status">
+        <span v-if="v.status" class="status" :data-s="v.status" :title="`Статус вакансии: ${labelOf(STATUS_LABEL, v.status)}`">
           {{ labelOf(STATUS_LABEL, v.status) }}<template v-if="v.status === 'applied'"> · {{ v.applied_via === 'manual' ? 'сам' : 'агент' }}<template v-if="v.applied_at"> {{ String(v.applied_at).slice(0, 10) }}</template></template>
         </span>
         <select
@@ -103,15 +131,6 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
           <option v-for="o in OUTCOMES" :key="o" :value="o">{{ OUTCOME_LABEL[o] }}</option>
         </select>
       </div>
-
-      <!-- Факторы скоринга (компактная плашка) -->
-      <div v-if="v.scores" class="criteria-bar">
-        <div v-for="[k, inv] in SCORE_KEYS" :key="k" class="criteria-item">
-          <span class="criteria-label">{{ k }}</span>
-          <span class="badge" :class="tone(v.scores[k], inv)">{{ v.scores[k] ?? '—' }}</span>
-        </div>
-      </div>
-      <div v-else class="muted small criteria-bar">Ещё не отскорена агентом.</div>
     </header>
 
     <!-- Предупреждения: внимание / стоп-факторы / закрыта -->
@@ -130,10 +149,6 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
 
     <!-- Заключение от ИИ (вердикт скоринга) - вынесено ВВЕРХ -->
     <section v-if="v.score_reasoning" class="ai-verdict">
-      <div class="verdict-header">
-        <span class="verdict-icon">💡</span>
-        <span class="verdict-title">Вердикт скоринга</span>
-      </div>
       <p class="verdict-text">{{ v.score_reasoning }}</p>
     </section>
 
@@ -200,33 +215,44 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
       <table class="tech-table">
         <tbody>
           <tr><th>ID вакансии</th><td><code>{{ v.id }}</code></td></tr>
+          <tr v-if="v.scores?.fit">
+            <th>Все фит-оценки (fit)</th>
+            <td>
+              <div class="fit-all-list">
+                <span v-for="t in TRACKS" :key="t" class="fit-all-item" :class="{ best: v.best_resume === t }" :title="`Фит для трека ${t}: ${v.scores.fit[t] ?? '—'}`">
+                  {{ t }}: <b :class="tone(v.scores.fit[t])">{{ v.scores.fit[t] ?? '—' }}</b>
+                </span>
+              </div>
+            </td>
+          </tr>
+          <tr v-if="v.scores?.region != null">
+            <th>Скоринг: регион (region)</th>
+            <td><span class="badge" :class="tone(v.scores.region)" :title="`Оценка соответствия региону: ${v.scores.region}`">{{ v.scores.region }}</span></td>
+          </tr>
+          <tr v-if="v.scores?.language != null">
+            <th>Скоринг: язык (language)</th>
+            <td><span class="badge" :class="tone(v.scores.language)" :title="`Оценка соответствия языку: ${v.scores.language}`">{{ v.scores.language }}</span></td>
+          </tr>
           <tr v-if="full?.file"><th>Файл на диске</th><td><code>{{ full.file }}</code></td></tr>
           <tr><th>Источник</th><td>{{ v.source }}</td></tr>
           <tr><th>Метод отклика</th><td>{{ v.apply_method }} → {{ v.apply_target ?? '—' }}</td></tr>
-          <tr><th>Дата сбора</th><td>{{ v.collected_at }}<template v-if="v.collected_run"> (раун: {{ String(v.collected_run).slice(0, 16).replace('T', ' ') }})</template></td></tr>
+          <tr><th>Дата сбора</th><td>{{ v.collected_at }}<template v-if="v.collected_run"> (раунд: {{ String(v.collected_run).slice(0, 16).replace('T', ' ') }})</template></td></tr>
           <tr v-if="v.posted_at"><th>Дата публикации</th><td>{{ v.posted_at }}</td></tr>
           <tr><th>Проверка активности</th><td>{{ v.alive_checked_at ?? 'не проверялась' }}<template v-if="v.possibly_closed"> (возможно, закрыта)</template></td></tr>
           <tr v-if="v.real_url_tried_at"><th>Поиск прямой ссылки</th><td>{{ v.real_url_tried_at }}</td></tr>
           <tr v-if="v.scoring_version != null"><th>Версия скоринга</th><td>v{{ v.scoring_version }}</td></tr>
-          <tr><th>Язык вакансии</th><td>{{ v.vacancy_language ?? '—' }}</td></tr>
-          <tr v-if="v.work_languages?.length"><th>Рабочие языки</th><td>{{ v.work_languages.join(', ') }}</td></tr>
+          <tr v-if="v.vacancy_language && (!v.work_languages?.length || v.work_languages.length > 1 || v.work_languages[0] !== v.vacancy_language)">
+            <th>Язык вакансии</th><td>{{ v.vacancy_language }}</td>
+          </tr>
+          <tr v-if="v.work_languages?.length">
+            <th>Рабочие языки</th><td>{{ v.work_languages.join(', ') }}</td>
+          </tr>
           <tr v-if="v.seniority"><th>Грейд (seniority)</th><td>{{ v.seniority }}</td></tr>
           <tr v-if="v.company_stage"><th>Стадия компании</th><td>{{ v.company_stage }}</td></tr>
           <tr v-if="v.employer_group"><th>Группа работодателя</th><td>{{ v.employer_group }}</td></tr>
           <tr v-if="v.hire_from_ar"><th>Найм из AR</th><td>{{ v.hire_from_ar }}<template v-if="v.hire_from_ar_evidence"> ({{ v.hire_from_ar_evidence }})</template></td></tr>
           <tr v-if="v.timezone"><th>Таймзона</th><td>{{ v.timezone }}</td></tr>
           <tr v-if="v.salary_usd_month"><th>Зарплата USD/мес</th><td>{{ v.salary_usd_month.min ?? '?' }}–{{ v.salary_usd_month.max ?? '?' }}</td></tr>
-          <tr v-if="v.role_tracks?.length"><th>Все треки роли</th><td>{{ v.role_tracks.join(', ') }}</td></tr>
-          <tr v-if="v.scores?.fit">
-            <th>Все фит-оценки (fit)</th>
-            <td>
-              <div class="fit-all-list">
-                <span v-for="t in TRACKS" :key="t" class="fit-all-item" :class="{ best: v.best_resume === t }">
-                  {{ t }}: <b :class="tone(v.scores.fit[t])">{{ v.scores.fit[t] ?? '—' }}</b>
-                </span>
-              </div>
-            </td>
-          </tr>
           <tr v-if="v.scores?.end_client_corporate != null"><th>end_client_corporate</th><td>{{ v.scores.end_client_corporate }}</td></tr>
           <tr v-if="v.prefilter_reason"><th>Отсев предфильтра</th><td>{{ v.prefilter_reason }}</td></tr>
           <tr v-if="v.applied_via"><th>Способ отклика</th><td>{{ v.applied_via }}</td></tr>
@@ -240,7 +266,6 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
             </td>
           </tr>
           <tr v-if="v.stop_flags?.length"><th>Стоп-флаги (raw)</th><td>{{ v.stop_flags.join(', ') }}</td></tr>
-          <tr v-if="v.tags?.length"><th>Теги (raw)</th><td>{{ v.tags.join(', ') }}</td></tr>
         </tbody>
       </table>
     </details>
