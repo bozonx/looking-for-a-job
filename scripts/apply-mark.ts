@@ -34,6 +34,7 @@ switch (action) {
     d.status = 'applied';
     d.applied_at = now;
     d.apply_log = logFile;
+    d.applied_via = 'agent';
     d.attention_reason = null;
     d.attention_details = null;
     setApplicationFields(d.id, { state: 'submitted', submitted_at: now });
@@ -44,7 +45,7 @@ switch (action) {
     line = `пропущено`;
     break;
   case 'not-fit':
-    d.notes = [d.notes, `${now.slice(0, 10)} не подходит (отклик): ${text || 'без причины'}`].filter(Boolean).join('\n');
+    d.notes = [d.notes, `[агент ${now.slice(0, 10)}] не подходит (отклик): ${text || 'без причины'}`].filter(Boolean).join('\n');
     setApplicationFields(d.id, { state: 'skipped' });
     line = `не подходит`;
     break;

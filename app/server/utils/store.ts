@@ -51,11 +51,11 @@ export function findById(id: string): VacancyFile | undefined {
 }
 
 /** Re-read from disk before writing so concurrent agent edits are not lost. */
-export function patchVacancy(id: string, patch: Record<string, unknown>): VacancyFile | undefined {
+export function patchVacancy(id: string, patch: Record<string, unknown> | ((cur: Record<string, any>) => Record<string, any>)): VacancyFile | undefined {
   const cached = findById(id);
   if (!cached) return undefined;
   const fresh = parseVacancy(cached.file);
-  const data = { ...fresh.data, ...patch };
+  const data = typeof patch === 'function' ? patch(fresh.data) : { ...fresh.data, ...patch };
   writeVacancy(cached.file, data, fresh.body);
   const v = { file: cached.file, data, body: fresh.body };
   byFile.set(cached.file, v);

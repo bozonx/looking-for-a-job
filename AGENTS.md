@@ -11,7 +11,7 @@
 | «запусти скоринг», «скоринг» | Скоринг следующего батча из очереди — см. раздел «Скоринг следующего батча» ниже |
 | «открой UI», «покажи вакансии» | `npm run dev` → http://localhost:3000 (этап 2, `app/`) |
 | «проанализируй журнал», «что улучшить в резюме / поиске» | `playbooks/analyze.md` |
-| «проверь проблемные» | `playbooks/flagged.md` (вакансии с `flagged: true`) |
+| «проверь проблемные», «разбери ⚑» | `playbooks/flagged.md` (вакансии с `flagged: true`: разбор → отчёт с предложениями → применение одобренного) |
 | «проверь, живы ли вакансии» | `npm run check-alive` (по real_url, пишет `possibly_closed`) |
 | «найди прямые ссылки» | `npm run resolve-urls` (real_url и контакты со страниц агрегаторов) |
 | «найди каналы отклика», «куда откликаться» | `npm run channels` (без сети: `apply_channels` из ссылок и текста, `--force` — переизвлечь) |
@@ -46,8 +46,8 @@
 - Код скриптов — только TypeScript; после изменений — `npm run typecheck` и `npm test`.
 - `data/` и `profile/` — личное, в git не коммитить.
 - Заявки агент не отправляет: Submit нажимает пользователь (`dev_docs/apply-plan.md`).
-- `status` — решение: `null` (нет решения), `selected` (на отклик), `applied`/`needs_attention`/`apply_failed` (агент). Неотскоренная = `scores: null`.
+- `status` — решение: `null` (нет решения), `selected` (на отклик), `applied` (агент или сам пользователь — `applied_via: agent|manual`), `needs_attention`/`apply_failed` (агент). Неотскоренная = `scores: null`.
 - Новизна — `collected_run` == `data/state/last-collect.json`. ★ — личная пометка, в скоринге и анализе не учитывается.
-- Чистка (`cleanup`; автоматически после `collect` при `CLEANUP_ON_COLLECT`): `status: null` без ★/⚑ старше `CLEANUP_DEFAULT_DAYS`. Закрытые (`possibly_closed`) только помечаются и удаляются по тому же правилу.
+- Чистка (`cleanup`; автоматически после `collect` при `CLEANUP_ON_COLLECT`): удаляет только неотмеченные — `status: null`, без ★/⚑ и без заметки пользователя (строки `[агент …]` не в счёт) — старше `CLEANUP_DEFAULT_DAYS`. Всё отмеченное хранится бессрочно. Закрытые (`possibly_closed`) только помечаются и удаляются по тому же правилу.
 - Жизненный цикл вакансии — `dev_docs/design.md`.
-- UI (`app/`) пишет в front matter только `status` (`null`/`selected`), `starred`, `flagged`, `notes`; остальные поля — агент и скрипты. Устройство UI — `docs/running.md`.
+- UI (`app/`) пишет в front matter только `status` (`null`/`selected`, ручной отклик `applied` + `applied_at`/`applied_via: manual`), `starred`, `flagged`, `notes`; статусы агента UI не меняет (`scripts/lib/uipatch.ts`); остальные поля — агент и скрипты. Устройство UI — `docs/running.md`.

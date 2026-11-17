@@ -61,3 +61,6 @@ export function channelHref(c: { type: string; value: string }): string | null {
   if (c.type === 'whatsapp' && /^\+?\d+$/.test(c.value)) return `https://wa.me/${c.value.replace(/^\+/, '')}`;
   return /^https?:/.test(c.value) ? c.value : null;
 }
+
+/** Есть ли в заметках текст пользователя — такие вакансии чистка не удаляет. */
+export { hasUserNotes } from '../../scripts/lib/uipatch.ts';

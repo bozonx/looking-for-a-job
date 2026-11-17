@@ -100,6 +100,7 @@ export const VacancySchema = z.object({
   alive_checked_at: date.nullable().optional(), // когда npm run check-alive последний раз проверял real_url
   applied_at: z.string().nullable().optional(),
   apply_log: z.string().nullable().optional(),
+  applied_via: z.enum(['agent', 'manual']).nullable().optional(), // manual — пользователь откликнулся сам и отметил в UI
   scoring_version: z.number().int().nullable().optional(),
 });
 

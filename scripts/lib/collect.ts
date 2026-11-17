@@ -107,6 +107,7 @@ export function blankVacancy(source: string, extId: string) {
     possibly_closed: false,
     applied_at: null,
     apply_log: null,
+    applied_via: null,
     scoring_version: null,
   };
 }

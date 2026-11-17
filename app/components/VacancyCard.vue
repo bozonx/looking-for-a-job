@@ -83,9 +83,15 @@ function saveNotes() {
       <div v-if="v.tags?.length" class="sub small">теги: {{ v.tags.join(', ') }}</div>
       <div class="actions">
         <button :class="{ on: v.status === 'selected' }" @click="emit('patch', id, { status: v.status === 'selected' ? null : 'selected' })" :disabled="!!v.status && v.status !== 'selected'" title="a / u">✓ Откликнуться</button>
+        <button
+          v-if="!v.status || v.status === 'selected' || (v.status === 'applied' && v.applied_via === 'manual')"
+          :class="{ on: v.status === 'applied' }"
+          @click="emit('patch', id, { status: v.status === 'applied' ? null : 'applied' })"
+          title="m — откликнулся сам (форма, почта, мессенджер); повторный клик / u — отменить"
+        >📨 Откликнулся сам</button>
         <button :class="{ on: v.starred }" @click="emit('patch', id, { starred: !v.starred })" title="s">★</button>
         <button :class="{ on: v.flagged }" @click="emit('patch', id, { flagged: !v.flagged })" title="f — скоринг/данные неверны, агент перепроверит">⚑ Проблемная</button>
-        <span v-if="v.status" class="status" :data-s="v.status">{{ STATUS_LABEL[v.status] ?? v.status }}</span>
+        <span v-if="v.status" class="status" :data-s="v.status">{{ STATUS_LABEL[v.status] ?? v.status }}<template v-if="v.status === 'applied'"> · {{ v.applied_via === 'manual' ? 'сам' : 'агент' }}<template v-if="v.applied_at"> {{ String(v.applied_at).slice(0, 10) }}</template></template></span>
       </div>
     </header>
 

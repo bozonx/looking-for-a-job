@@ -31,7 +31,7 @@
 | `npm run dedupe` | диагностика индекса дублей |
 | `npm run channels -- [--force] [--dry-run] [id …]` | каналы отклика (`apply_channels`: ATS, форма, email, Telegram, WhatsApp, Facebook, личка) из ссылок и текста, пересчёт `apply_method`/`apply_target` |
 | `npm run fetch-page -- <url\|file.html> [--out f.md]` | страница → markdown (для HTML-площадок и поиска `real_url`) |
-| `npm run cleanup` | удаление старых вакансий: `--older-than 30d` (по умолчанию `CLEANUP_DEFAULT_DAYS`), `--status rejected,applied`, `--dry-run`; со звездой не трогает |
+| `npm run cleanup` | удаление старых вакансий: `--older-than 30d` (по умолчанию `CLEANUP_DEFAULT_DAYS`), `--dry-run`; отмеченные (статус, ★, ⚑, заметка пользователя) не трогает |
 | `npm run render-resume -- --track vue [--lang en\|ru\|es]` | PDF резюме трека в `data/generated/base/` (шапка из `about.md`, проекты из `projects.md`). `--all` — все треки × готовые переводы; `--file <md>` — адаптированное под вакансию; `--projects a,b` — свой набор проектов; `--html` — только HTML; фото `profile/photo.jpg` — только в ru (`--photo` / `--no-photo`). Переводы и адаптацию делает агент — `playbooks/tailor.md` |
 | `npm run dev` | UI на http://localhost:3000 |
 | `npm run ui:build` | production-сборка UI в `app/.output/` |
@@ -98,7 +98,7 @@ npm run score && npm run validate
 | `j` / `↓`, `k` / `↑` | следующая / предыдущая |
 | `/` | поиск |
 
-UI пишет в файл только `status` (`null`/`selected`), `starred`, `flagged`, `notes`. Перед записью файл перечитывается с диска, запись атомарная — правки агента не затираются. Кнопка **⟳ rescore** — то же, что `npm run rescore`; **✓ живость** — `npm run check-alive` в фоне (Shift+клик — перепроверить и проверенные сегодня). Файлы, которые не удалось разобрать, показываются списком ошибок.
+UI пишет в файл только `status` (`null`/`selected`; «📨 Откликнулся сам» / клавиша `m` — `applied` с `applied_via: manual`, отменяется только такой ручной отклик), `starred`, `flagged`, `notes`. Статусы агента (`applied` агентом, `needs_attention`, `apply_failed`) из UI не меняются — сервер вернёт 409. Встроенные вкладки: Все, Новые, Выбранные, Отклики, Внимание, ★, ⚑ Проблемные, Закрытые; в фильтре статусов есть ★, ⚑ и «с заметкой». Перед записью файл перечитывается с диска, запись атомарная — правки агента не затираются. Кнопка **⟳ rescore** — то же, что `npm run rescore`; **✓ живость** — `npm run check-alive` в фоне (Shift+клик — перепроверить и проверенные сегодня). Файлы, которые не удалось разобрать, показываются списком ошибок.
 
 ## Где смотреть результаты
 

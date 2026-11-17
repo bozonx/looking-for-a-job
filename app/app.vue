@@ -41,7 +41,10 @@ const BUILTIN: View[] = (
     ['all', 'Все', {}],
     ['new', 'Новые', { period: 'last' }],
     ['selected', 'Выбранные', { statuses: ['selected'] }],
-    ['flagged', '⚑ Проблемные', { statuses: ['flagged'] }],
+    ['applied', 'Отклики', { statuses: ['applied', 'closed'] }],
+    ['attention', 'Внимание', { statuses: ['needs_attention', 'apply_failed', 'closed'] }],
+    ['starred', '★', { statuses: ['starred', 'closed'] }],
+    ['flagged', '⚑ Проблемные', { statuses: ['flagged', 'closed'] }],
     ['closed', 'Закрытые', { statuses: ['closed'] }],
   ] as [string, string, Partial<Filters>][]
 ).map(([id, name, p]) => {
@@ -53,7 +56,9 @@ const BUILTIN: View[] = (
 const STATUS_OPTIONS = [
   { value: 'none', label: 'без решения' },
   ...Object.entries(STATUS_LABEL).map(([value, label]) => ({ value, label })),
+  { value: 'starred', label: '★ со звездой' },
   { value: 'flagged', label: '⚑ проблемные' },
+  { value: 'noted', label: '✎ с заметкой' },
   { value: 'closed', label: 'закрытые' },
 ];
 
@@ -189,15 +194,21 @@ function cutoff(days: number): string {
 }
 
 /**
- * Статусы: выбранные значения объединяются через ИЛИ.
- * Закрытые видны, только если выбрано «закрытые»; «закрытые» в одиночку — только закрытые.
+ * Статусы и пометки (★, ⚑, заметка): выбранные значения объединяются через ИЛИ.
+ * «закрытые» вместе с другими значениями — включить и закрытые; «закрытые» в одиночку — только закрытые.
+ * Без «закрытых» закрытые скрыты.
  */
 function matchStatus(v: Row, sel: string[]) {
   const rest = sel.filter((s) => s !== 'closed');
   const withClosed = rest.length < sel.length;
   if (v.possibly_closed && !withClosed) return false;
   if (!rest.length) return !!v.possibly_closed || !withClosed;
-  return rest.includes(v.status ?? 'none') || (rest.includes('flagged') && !!v.flagged);
+  return (
+    rest.includes(v.status ?? 'none') ||
+    (rest.includes('flagged') && !!v.flagged) ||
+    (rest.includes('starred') && !!v.starred) ||
+    (rest.includes('noted') && hasUserNotes(v.notes))
+  );
 }
 
 /** все типы каналов вакансии (для фильтра): основной + все из apply_channels */
@@ -304,7 +315,7 @@ const SCORE_COLS = [
 ] as const;
 
 // ---- массовая отметка для автоотклика (видимые строки, кроме уже откликнутых) ----
-const markable = computed(() => rows.value.filter((v) => v.status !== 'applied'));
+const markable = computed(() => rows.value.filter((v) => !v.status || v.status === 'selected'));
 const allMarked = computed(() => markable.value.length > 0 && markable.value.every((v) => v.status === 'selected'));
 const someMarked = computed(() => markable.value.some((v) => v.status === 'selected'));
 async function markAll(on: boolean) {
@@ -415,10 +426,11 @@ function onKey(e: KeyboardEvent) {
     ArrowDown: () => move(1),
     k: () => move(-1),
     ArrowUp: () => move(-1),
-    a: () => id && patch(id, { status: 'selected' }),
+    a: () => id && !cur?.status && patch(id, { status: 'selected' }),
     f: () => id && patch(id, { flagged: !cur?.flagged }),
     s: () => id && patch(id, { starred: !cur?.starred }),
-    u: () => id && cur?.status === 'selected' && patch(id, { status: null }),
+    u: () => id && (cur?.status === 'selected' || (cur?.status === 'applied' && cur?.applied_via === 'manual')) && patch(id, { status: null }),
+    m: () => id && (!cur?.status || cur?.status === 'selected') && patch(id, { status: 'applied' }),
     '/': () => (document.querySelector('#q') as HTMLInputElement)?.focus(),
   };
   const fn = map[e.key];
@@ -544,8 +556,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
                 <input
                   type="checkbox"
                   :checked="v.status === 'selected' || v.status === 'applied'"
-                  :disabled="v.status === 'applied'"
-                  title="Отметить для автоотклика"
+                  :disabled="!!v.status && v.status !== 'selected'"
+                  :title="v.status && v.status !== 'selected' ? 'Статус: ' + (STATUS_LABEL[v.status] ?? v.status) : 'Отметить для автоотклика'"
                   @change="patch(v.id, { status: ($event.target as HTMLInputElement).checked ? 'selected' : null })"
                 />
               </td>
@@ -593,7 +605,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
           </tbody>
         </table>
       </div>
-      <footer class="muted small">j/k — навигация · a — выбрать · u — снять выбор · s — звезда · f — проблемная · / — поиск · Shift+клик по заголовку — доп. сортировка</footer>
+      <footer class="muted small">j/k — навигация · a — выбрать · m — откликнулся сам · u — снять выбор/ручной отклик · s — звезда · f — проблемная · / — поиск · Shift+клик по заголовку — доп. сортировка</footer>
     </aside>
 
     <main class="detail">
