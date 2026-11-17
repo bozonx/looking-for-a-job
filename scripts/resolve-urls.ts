@@ -1,5 +1,5 @@
 /**
- * Поиск прямой ссылки отклика (real_url) на странице агрегатора — обычным GET, без браузера и агента.
+ * Поиск прямой ссылки отклика (real_url) и других каналов (email, Telegram, WhatsApp, Facebook — apply_channels) на странице агрегатора — обычным GET, без браузера и агента.
  * `npm run resolve-urls -- [--limit 40] [--status none,selected] [--dry-run] [--force] [id|путь …]`
  *
  * Бережно к площадкам (без бана):
@@ -10,13 +10,17 @@
  *
  * Правила извлечения (проверены на живых страницах, 2026-11):
  * - vuejobs, weworkremotely: href кнопки «Apply» — внешняя ссылка (обычно ATS);
- * - любая площадка: если на странице ровно одна ссылка на конкретную вакансию в известной ATS — берём её.
+ * - любая площадка: если на странице ровно одна ссылка на конкретную вакансию в известной ATS — берём её;
+ * - любая площадка: mailto:/t.me/wa.me/facebook и адреса в тексте рядом со словами про отклик — в apply_channels.
  * Не используются: workingnomads «Apply now» (там реклама), himalayas (403 от защиты), getonbrd/habr/jobicy/remotive/YC
  * (отклик на самой площадке или за логином), HN (ссылки из комментария извлекает агент при скоринге).
  */
 import { fetchWithRetry, sleep } from './lib/http.ts';
 import { loadAll, parseVacancy, resolveTargets, writeVacancy, type VacancyFile } from './lib/vacancy.ts';
-import { applyMethodFromUrl } from './lib/target.ts';
+import { deriveApply } from './lib/target.ts';
+import { channelFromUrl, extractChannels, mergeChannels, type Channel } from './lib/channels.ts';
+import { htmlToMarkdown } from './lib/html.ts';
+import { hasChannel } from './lib/apply.ts';
 import { appendRunLog } from './lib/runlog.ts';
 
 const GAP_MS = 3000;
@@ -96,7 +100,7 @@ async function main() {
   const files: VacancyFile[] = positional.length ? resolveTargets(positional).map(parseVacancy) : loadAll();
   const date = (v: VacancyFile) => String(v.data.posted_at ?? v.data.collected_at ?? '');
   const queue = files
-    .filter((v) => positional.length || (statuses.has(v.data.status ?? 'none') && !v.data.real_url && (force || !v.data.real_url_tried_at)))
+    .filter((v) => positional.length || (statuses.has(v.data.status ?? 'none') && !hasChannel(v.data) && (force || !v.data.real_url_tried_at)))
     .filter((v) => v.data.source_url && !SKIP_HOSTS.has(new URL(v.data.source_url).hostname))
     .sort((a, b) => date(b).localeCompare(date(a)));
 
@@ -130,9 +134,12 @@ async function main() {
           return;
         }
         tried++;
-        const hit = res.ok ? extractApplyUrl(await res.text(), res.url) : (await res.body?.cancel().catch(() => {}), null);
+        const html = res.ok ? await res.text() : (await res.body?.cancel().catch(() => {}), '');
+        const hit = html ? extractApplyUrl(html, res.url) : null;
+        const chans: Channel[] = html ? extractChannels(htmlToMarkdown(html)).map((c) => ({ ...c, by: 'resolve' as const })) : [];
+        if (chans.length) console.log(`  каналы ${v.data.id}: ${chans.map((c) => `${c.type} ${c.value}`).join(', ')}`);
+        if (hit || chans.length) found.push(`${v.data.id} → ${[hit?.url, ...chans.map((c) => `${c.type} ${c.value}`)].filter(Boolean).join(', ')}${hit ? ` (${hit.how})` : ''}`);
         if (hit) {
-          found.push(`${v.data.id} → ${hit.url} (${hit.how})`);
           console.log(`✓ ${v.data.id} → ${hit.url} (${hit.how})`);
         } else console.log(`· ${v.data.id}: ${res.ok ? 'ссылки нет' : `HTTP ${res.status}`}`);
         if (dryRun) continue;
@@ -141,14 +148,16 @@ async function main() {
         if (hit && !fresh.data.real_url) {
           fresh.data.real_url = hit.url;
           delete fresh.data.alive_checked_at; // проверялась ссылка агрегатора — пусть check-alive проверит новую
-          if (!fresh.data.apply_method || fresh.data.apply_method === 'unknown') fresh.data.apply_method = applyMethodFromUrl(hit.url);
         }
+        const before = JSON.stringify(fresh.data.apply_channels ?? []);
+        fresh.data.apply_channels = mergeChannels(fresh.data.apply_channels, [channelFromUrl(fresh.data.real_url, 'resolve'), ...chans]);
+        if (hit || before !== JSON.stringify(fresh.data.apply_channels)) deriveApply(fresh.data);
         writeVacancy(v.file, fresh.data, fresh.body);
       }
     }),
   );
 
-  const summary = `- загружено страниц: ${tried} из ${total}; real_url найден: ${found.length}${notes.length ? `\n${notes.map((n) => `- ⚠ ${n}`).join('\n')}` : ''}`;
+  const summary = `- загружено страниц: ${tried} из ${total}; real_url/канал найден: ${found.length}${notes.length ? `\n${notes.map((n) => `- ⚠ ${n}`).join('\n')}` : ''}`;
   console.log(`\n# ИТОГ ПОИСКА REAL_URL${dryRun ? ' (dry-run)' : ''}\n${summary}`);
   if (found.length) console.log('NEXT: npm run score (apply_target), npm run check-alive');
   if (!dryRun && tried) appendRunLog('resolve-urls', `## resolve-urls\n\n${summary}\n${found.map((s) => `\n- ${s}`).join('')}`);

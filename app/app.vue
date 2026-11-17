@@ -17,6 +17,8 @@ interface Filters {
   sources: string[];
   regions: string[];
   langs: string[];
+  /** тип канала отклика: ats, form, email, telegram… (utils/labels.ts channelKind) */
+  channels: string[];
   period: Period;
   sorts: SortKey[];
 }
@@ -30,7 +32,7 @@ interface View {
 }
 
 const blank = (): Filters => ({
-  statuses: [], minOverall: 0, tracks: [], sources: [], regions: [], langs: [], period: null,
+  statuses: [], minOverall: 0, tracks: [], sources: [], regions: [], langs: [], channels: [], period: null,
   sorts: [{ key: 'overall', dir: 'desc' }],
 });
 const clone = (x: Filters): Filters => JSON.parse(JSON.stringify(x));
@@ -69,6 +71,7 @@ function normFilters(raw: any): Filters {
     sources: arr(raw.sources),
     regions: arr(raw.regions),
     langs: arr(raw.langs),
+    channels: arr(raw.channels),
     period: raw.period === 'last' || typeof raw.period === 'number' ? raw.period : typeof raw.days === 'number' ? raw.days : null,
     sorts: sorts.length ? sorts : d.sorts,
   };
@@ -197,6 +200,17 @@ function matchStatus(v: Row, sel: string[]) {
   return rest.includes(v.status ?? 'none') || (rest.includes('flagged') && !!v.flagged);
 }
 
+/** все типы каналов вакансии (для фильтра): основной + все из apply_channels */
+function rowKinds(v: Row): string[] {
+  const ks = new Set<string>([channelKind(v.apply_method)]);
+  for (const c of v.apply_channels ?? []) ks.add(c.type);
+  if (ks.size > 1) ks.delete('unknown');
+  return [...ks];
+}
+const CHANNEL_OPTIONS = Object.entries(CHANNEL_LABEL).map(([value, l]) => ({ value, label: `${l.icon} ${l.label}` }));
+const channelTitle = (v: Row) =>
+  [`Отклик: ${CHANNEL_LABEL[channelKind(v.apply_method)]!.label} → ${v.apply_target ?? '—'}`, ...(v.apply_channels ?? []).map((c: any) => `${CHANNEL_LABEL[c.type]?.icon ?? ''} ${c.value}`)].join('\n');
+
 function matchRow(v: Row, fl: Filters) {
   if (!matchStatus(v, fl.statuses)) return false;
   if (fl.minOverall && (v.scores?.overall ?? 0) < fl.minOverall) return false;
@@ -204,6 +218,7 @@ function matchRow(v: Row, fl: Filters) {
   if (fl.sources.length && !fl.sources.includes(v.source)) return false;
   if (fl.regions.length && !fl.regions.includes(v.region)) return false;
   if (fl.langs.length && !fl.langs.includes(v.vacancy_language)) return false;
+  if (fl.channels.length && !rowKinds(v).some((k) => fl.channels.includes(k))) return false;
   if (fl.period === 'last' && !isFresh(v)) return false;
   if (typeof fl.period === 'number' && fl.period > 0) {
     const d = v.posted_at ?? v.collected_at;
@@ -466,6 +481,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
         <MultiSelect v-model="f.sources" :class="{ act: f.sources.length }" title="источник" :options="uniq('source')" />
         <MultiSelect v-model="f.regions" :class="{ act: f.regions.length }" title="регион" :options="REGIONS" />
         <MultiSelect v-model="f.langs" :class="{ act: f.langs.length }" title="язык" :options="uniq('vacancy_language')" />
+        <MultiSelect v-model="f.channels" :class="{ act: f.channels.length }" title="отклик" :options="CHANNEL_OPTIONS" />
         <select :class="{ act: f.period != null }" :value="periodValue" @change="onPeriod(($event.target as HTMLSelectElement).value)">
           <option value="">период: всё время</option>
           <option value="last">последний сбор</option>
@@ -547,6 +563,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
               <td class="title">
                 <div><span v-if="v.starred" class="star">★</span><span v-if="v.flagged" class="flag" title="Проблемная">⚑</span><s v-if="v.possibly_closed" title="Возможно, закрыта">{{ v.title }}</s><template v-else>{{ v.title }}</template></div>
                 <div class="muted small">
+                  <span class="badge ch-badge" :class="'ch-' + channelKind(v.apply_method)" :title="channelTitle(v)">{{ CHANNEL_LABEL[channelKind(v.apply_method)]!.icon }}<template v-if="(v.apply_channels?.length ?? 0) > 1"> +{{ v.apply_channels.length - 1 }}</template></span>
                   {{ v.company }}
                   <template v-if="v.duplicates?.length"> · <span class="badge dup-badge" :title="'Дубликатов: ' + v.duplicates.length">⧉ {{ v.duplicates.length }}</span></template>
                   <template v-if="v.stop_flags?.length"> · <span class="flag">⛔ {{ v.stop_flags.join(', ') }}</span></template>
@@ -666,6 +683,8 @@ th.sortable:hover { color: var(--fg); }
 .col-region { white-space: nowrap; }
 .region-line { display: flex; align-items: center; gap: 4px; }
 .lang-badge { min-width: auto; padding: 0 4px; font-size: 11px; font-weight: 500; background: color-mix(in srgb, var(--line) 80%, transparent); color: var(--fg); border-radius: 3px; text-transform: uppercase; margin: 0; }
+.ch-badge { min-width: auto; padding: 0 3px; font-size: 11px; margin: 0 2px 0 0; background: color-mix(in srgb, var(--line) 60%, transparent); border-radius: 3px; }
+.ch-badge.ch-unknown { opacity: 0.6; }
 .dup-badge { min-width: auto; padding: 0 4px; font-size: 11px; background: color-mix(in srgb, var(--line) 70%, transparent); color: var(--muted); border-radius: 3px; margin: 0; }
 .empty { text-align: center; padding: 40px; }
 .errors { padding: 6px 12px; color: var(--bad); font-size: 12px; }
@@ -687,6 +706,10 @@ ul.red li::marker { color: var(--bad); }
 .score.best span:first-child { font-weight: 600; text-decoration: underline; }
 .reason { color: var(--muted); white-space: pre-wrap; }
 .links { list-style: none; padding: 0 !important; word-break: break-all; }
+.channels { list-style: none; padding: 0 !important; word-break: break-all; }
+.channels li { padding: 1px 0; }
+.channels li.main { font-weight: 500; }
+.channels .copy { border: 0; background: none; cursor: pointer; color: var(--muted); padding: 0 4px; font-size: 12px; }
 textarea { width: 100%; resize: vertical; }
 .body { margin-top: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; overflow-wrap: anywhere; }
 .body img { max-width: 100%; }

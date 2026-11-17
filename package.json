@@ -27,7 +27,8 @@
     "browser:start": "node --env-file-if-exists=.env scripts/browser.ts start",
     "apply-set": "node --env-file-if-exists=.env scripts/apply-set.ts",
     "apply-mark": "node --env-file-if-exists=.env scripts/apply-mark.ts",
-    "apply-targets": "node --env-file-if-exists=.env scripts/apply-targets.ts"
+    "apply-targets": "node --env-file-if-exists=.env scripts/apply-targets.ts",
+    "channels": "node --env-file-if-exists=.env scripts/channels.ts"
   },
   "dependencies": {
     "chokidar": "^6.0.0",

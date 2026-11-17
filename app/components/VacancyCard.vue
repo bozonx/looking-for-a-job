@@ -8,6 +8,21 @@ const { data: full, refresh } = useFetch(() => `/api/vacancies/${encodeURICompon
 defineExpose({ refresh });
 
 const v = computed(() => (full.value as any)?.data);
+
+/** каналы отклика: основной (совпадает с apply_target) — первым */
+const channels = computed(() => {
+  const list = (v.value?.apply_channels ?? []) as { type: string; value: string; by?: string; note?: string | null }[];
+  const main = channelKind(v.value?.apply_method);
+  return [...list].sort((a, b) => Number(b.type === main) - Number(a.type === main));
+});
+const copied = ref('');
+async function copy(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    copied.value = text;
+    setTimeout(() => (copied.value === text ? (copied.value = '') : null), 1500);
+  } catch {}
+}
 const showBody = ref(false);
 const notes = ref('');
 // Take server notes unless the user has unsaved edits (the file may be refreshed while typing).
@@ -120,6 +135,24 @@ function saveNotes() {
       <ul>
         <li v-for="(r, i) in v.requirements_special" :key="i">
           <b>{{ r.type }}</b><template v-if="!r.standard"> (нестандартное)</template>: {{ r.details }}
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Куда откликаться</h3>
+      <p v-if="!channels.length" class="muted">
+        {{ CHANNEL_LABEL.unknown!.icon }} канал неизвестен — нужен real_url, email или другой контакт (<code>npm run resolve-urls -- {{ v.id }}</code>)
+      </p>
+      <ul v-else class="channels">
+        <li v-for="(c, i) in channels" :key="c.type + c.value" :class="{ main: i === 0 && c.type === channelKind(v.apply_method) }">
+          <span :title="CHANNEL_LABEL[c.type]?.label">{{ CHANNEL_LABEL[c.type]?.icon ?? '•' }}</span>
+          <b>{{ CHANNEL_LABEL[c.type]?.label ?? c.type }}</b>:
+          <a v-if="channelHref(c)" :href="channelHref(c)!" target="_blank" rel="noopener">{{ c.value }}</a>
+          <template v-else>{{ c.value }}</template>
+          <button class="copy" type="button" :title="'Скопировать ' + c.value" @click="copy(c.value)">{{ copied === c.value ? '✓' : '⧉' }}</button>
+          <span v-if="c.note" class="muted"> — {{ c.note }}</span>
+          <span v-if="c.by" class="muted small"> · {{ c.by }}</span>
         </li>
       </ul>
     </section>

@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
 import { DATA_DIR, env } from './env.ts';
-import { targetFromUrl } from './target.ts';
+import { primaryChannel, targetFromUrl } from './target.ts';
+import { channelHref, type Channel } from './channels.ts';
 import type { VacancyFile } from './vacancy.ts';
 
 export const GENERATED_DIR = path.join(DATA_DIR, 'generated');
@@ -13,8 +14,11 @@ const AGGREGATORS = new Set(['remoteok', 'himalayas', 'weworkremotely', 'remotiv
 
 export const overall = (d: Record<string, any>): number | null => d.scores?.overall ?? null;
 
-/** Ссылка, которую открывать для отклика: та, что соответствует apply_target; иначе real_url → source_url. */
+/** Ссылка, которую открывать для отклика: канал apply_target (mailto:/t.me/…); иначе ссылка apply_target; иначе real_url → source_url. */
 export function applyUrl(d: Record<string, any>): string {
+  const c = primaryChannel(d);
+  const href = c && channelHref(c);
+  if (href) return href;
   const t = d.apply_target;
   if (d.real_url && (!t || targetFromUrl(d.real_url) === t)) return d.real_url;
   for (const x of (d.duplicates ?? []) as { source: string; url: string }[]) if (t && (targetFromUrl(x.url, x.source) === t || x.source === t)) return x.url;
@@ -22,8 +26,11 @@ export function applyUrl(d: Record<string, any>): string {
   return d.real_url ?? d.source_url;
 }
 
-/** Агрегатор без прямой ссылки: откликнуться там нельзя, нужен real_url. */
-export const needsRealUrl = (d: Record<string, any>) => !d.real_url && AGGREGATORS.has(d.source) && (!d.apply_target || AGGREGATORS.has(d.apply_target));
+/** Есть ли хоть один способ отклика (канал или прямая ссылка). */
+export const hasChannel = (d: Record<string, any>) => !!d.real_url || ((d.apply_channels ?? []) as Channel[]).length > 0;
+
+/** Агрегатор-витрина без единого канала: откликнуться там нельзя, нужен real_url / email / другой канал. */
+export const needsChannel = (d: Record<string, any>) => !hasChannel(d) && AGGREGATORS.has(d.source) && (!d.apply_target || AGGREGATORS.has(d.apply_target));
 
 export function inMode(d: Record<string, any>, mode: Mode): 'selected' | 'scored' | 'retry' | null {
   if ((mode === 'all' || mode === 'selected') && d.status === 'selected') return 'selected';

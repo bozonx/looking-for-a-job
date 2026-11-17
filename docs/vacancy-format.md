@@ -106,14 +106,25 @@ ISO 3166-1 alpha-2 заглавными (`US`, `CY`) — страна **реги
 
 Записывается только при уверенности, что это та же вакансия. Ничего не отправляется. Важна, потому что даёт место отклика с высоким приоритетом (см. `apply_target`) и уводит отклики с LinkedIn.
 
-### `apply_method` · С/Р
-Как откликаться: `easy-apply` | `ats-<name>` | `email` | `comment` | `external` | `unknown`. Определяется по `real_url`: домен известной ATS → `ats-greenhouse` и т.п.; `mailto:` → `email`; любой другой сайт → `external`; ссылки нет → `unknown`. `npm run score` заполняет его, только если он был `unknown`, а `real_url` появился. `easy-apply` и `comment` — для LinkedIn (в будущем).
+### `apply_channels` · С/А/Р
+Все известные способы отклика — куда физически слать резюме:
+```yaml
+apply_channels:
+  - { type: ats, value: https://jobs.ashbyhq.com/acme/…, by: collect }
+  - { type: email, value: jobs@acme.com, by: text, note: "тема: Senior FE — Имя" }
+```
+`type`: `ats` · `form` (форма на сайте компании) · `email` · `telegram` (`@handle`) · `whatsapp` (ссылка/номер) · `facebook` (страница, пост, Messenger) · `linkedin` · `platform` (отклик на hh/habr/djinni/getonbrd… — нужен аккаунт) · `dm` (личка: `x @handle`) · `other`.
+`by`: `collect` (API площадки, `real_url`, дубли), `resolve` (`npm run resolve-urls` со страницы площадки), `text` (извлечено из текста, `scripts/lib/channels.ts`), `agent` (агент при скоринге). `note` — требования к отклику.
+Заполняется при сборе и `npm run channels` (без сети: ссылки + текст; извлечение из текста консервативное — служебные адреса отбрасываются), дополняется `resolve-urls` и агентом. Агент правит список руками; скрипты существующие каналы не удаляют.
+
+### `apply_method` · Р
+Тип основного канала (того, что выбран в `apply_target`): `ats-<name>` | `external` (форма на сайте) | `email` | `telegram` | `whatsapp` | `facebook` | `linkedin` | `platform` | `dm` | `other` | `unknown` (только витрина-агрегатор, канал не найден). Пересчитывается из `apply_channels` при сборе, в `score`/`rescore`, `resolve-urls`, `npm run channels`. Руками не править.
 
 ### `duplicates` · С
 Та же вакансия на других площадках: `{ source, url, seen_at? }`. Пополняется скриптом сбора, когда находит совпадение (по id, по любому известному URL или по `company+title`). Все URL отсюда тоже участвуют в дедупликации. Дубль повторно не скорится. UI показывает число дублей.
 
 ### `apply_target` · Р
-Куда откликаться. Выбирается среди `real_url`, `source` и всех `duplicates` по порядку из `config/source-priority.yaml`: сайт компании и ATS > нишевые площадки > агрегаторы > LinkedIn. Хранит конкретное значение (`ats-ashby`, `company-site`, `wellfound`, `linkedin`…); ATS, которой нет в списке, ранжируется как `ats-other`. Пересчитывается при сборе, при добавлении дубля и в `score`/`rescore`. Руками не править — правьте приоритеты или `real_url`.
+Куда откликаться. Выбирается среди `apply_channels`, `real_url`, `source` и всех `duplicates` по порядку из `config/source-priority.yaml`: сайт компании и ATS > email/Telegram/WhatsApp/личка/Facebook > нишевые площадки > агрегаторы > LinkedIn. Хранит конкретное значение (`ats-ashby`, `company-site`, `wellfound`, `linkedin`…); ATS, которой нет в списке, ранжируется как `ats-other`. Пересчитывается при сборе, при добавлении дубля и в `score`/`rescore`. Руками не править — правьте приоритеты или `real_url`.
 
 ## Даты
 

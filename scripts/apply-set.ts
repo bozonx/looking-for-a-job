@@ -12,7 +12,7 @@
  */
 import { env } from './lib/env.ts';
 import { loadAll, parseVacancy, resolveTargets } from './lib/vacancy.ts';
-import { applicationState, applyUrl, inMode, isLinkedIn, linkedinToday, needsRealUrl, overall, type Mode } from './lib/apply.ts';
+import { applicationState, applyUrl, inMode, isLinkedIn, linkedinToday, needsChannel, overall, type Mode } from './lib/apply.ts';
 
 const args = process.argv.slice(2);
 const json = args.includes('--json');
@@ -30,6 +30,7 @@ interface Row {
   overall: number | null;
   why: string;
   target: string;
+  channels: string;
   url: string;
   lang: string;
   track: string;
@@ -55,7 +56,7 @@ for (const v of files) {
     excluded.push(`${d.id} — ${issues.join(', ')}`);
     continue;
   }
-  if (needsRealUrl(d)) issues.push('агрегатор без real_url — найти прямую ссылку');
+  if (needsChannel(d)) issues.push('агрегатор без канала отклика — найти real_url / email / Telegram');
   if (d.status === 'needs_attention') issues.push(`attention: ${d.attention_reason ?? '?'} — ${d.attention_details ?? ''}`.trim());
   rows.push({
     id: d.id,
@@ -65,6 +66,7 @@ for (const v of files) {
     why,
     target: d.apply_target ?? d.apply_method ?? '?',
     url: applyUrl(d),
+    channels: ((d.apply_channels ?? []) as { type: string; value: string; note?: string | null }[]).map((c) => `${c.type}: ${c.value}${c.note ? ` (${c.note})` : ''}`).join('; '),
     lang: d.vacancy_language ?? 'en',
     track: d.best_resume ?? '?',
     state,
@@ -107,6 +109,7 @@ if (json) {
     console.log(`        ${r.company} — ${r.title}`);
     console.log(`        ${r.target} · ${r.lang} · трек ${r.track}${r.state ? ` · пакет: ${r.state}` : ''}`);
     console.log(`        ${r.url}`);
+    if (r.channels) console.log(`        каналы: ${r.channels}`);
     for (const i of r.issues) console.log(`        ⚠ ${i}`);
   }
   if (rows.some((r) => r.confirm)) console.log('\n? — попали только по скорингу: подтвердить у пользователя (APPLY_CONFIRM_SCORED)');

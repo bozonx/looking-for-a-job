@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import YAML from 'yaml';
 import { CONFIG_DIR } from './env.ts';
+import { channelMethod, channelTarget, type Channel } from './channels.ts';
 
 const ATS = ['greenhouse', 'lever', 'ashby', 'workable', 'smartrecruiters', 'recruitee', 'teamtailor', 'breezy', 'bamboohr', 'personio', 'workday', 'jobvite'];
 
@@ -51,6 +52,12 @@ function host(url: string): string {
   }
 }
 
+/** id площадки по ссылке (linkedin, hh, vuejobs…) или null. */
+export function boardFromUrl(url: string): string | null {
+  const h = host(url);
+  return Object.entries(BOARDS).find(([d]) => h === d || h.endsWith(`.${d}`))?.[1] ?? null;
+}
+
 /** apply_method по ссылке отклика: ats-<name> | email | external | unknown. */
 export function applyMethodFromUrl(url: string | null | undefined): string {
   if (!url) return 'unknown';
@@ -63,9 +70,8 @@ export function applyMethodFromUrl(url: string | null | undefined): string {
 /** Место отклика, которое даёт ссылка: ats-*, источник-агрегатор или company-site. */
 export function targetFromUrl(url: string | null | undefined, fallbackSource?: string): string | null {
   if (!url) return fallbackSource ?? null;
-  const h = host(url);
-  const board = Object.entries(BOARDS).find(([d]) => h === d || h.endsWith(`.${d}`));
-  if (board) return board[1];
+  const board = boardFromUrl(url);
+  if (board) return board;
   const m = applyMethodFromUrl(url);
   if (m.startsWith('ats-')) return m;
   if (m === 'external') return 'company-site';
@@ -85,9 +91,10 @@ function rank(target: string): number {
   return i < 0 ? p.length : i;
 }
 
-/** Лучшее место отклика среди основной ссылки и всех дублей. */
+/** Лучшее место отклика среди каналов (apply_channels), основной ссылки и всех дублей. */
 export function pickApplyTarget(d: Record<string, any>): string {
   const cands = [
+    ...((d.apply_channels ?? []) as Channel[]).map(channelTarget),
     targetFromUrl(d.real_url),
     d.source,
     ...((d.duplicates ?? []) as { source: string; url: string }[]).map((x) => {
@@ -97,4 +104,22 @@ export function pickApplyTarget(d: Record<string, any>): string {
     }),
   ].filter((x): x is string => !!x);
   return cands.sort((a, b) => rank(a) - rank(b))[0] ?? d.source;
+}
+
+/** Канал, соответствующий apply_target (лучший по приоритету), или null. */
+export function primaryChannel(d: Record<string, any>): Channel | null {
+  const chans = (d.apply_channels ?? []) as Channel[];
+  if (!chans.length) return null;
+  const t = d.apply_target ?? pickApplyTarget(d);
+  return chans.find((c) => channelTarget(c) === t) ?? [...chans].sort((a, b) => rank(channelTarget(a)) - rank(channelTarget(b)))[0]!;
+}
+
+/** apply_target и apply_method из каналов: вызывать после любого изменения apply_channels / real_url / duplicates. */
+export function deriveApply(d: Record<string, any>): void {
+  d.apply_target = pickApplyTarget(d);
+  const c = ((d.apply_channels ?? []) as Channel[]).find((x) => channelTarget(x) === d.apply_target);
+  if (c) d.apply_method = channelMethod(c);
+  else if (d.real_url && targetFromUrl(d.real_url) === d.apply_target) d.apply_method = applyMethodFromUrl(d.real_url);
+  else if (d.apply_target === 'linkedin') d.apply_method = 'linkedin';
+  else d.apply_method = 'unknown'; // витрина-агрегатор без канала: куда слать — неизвестно
 }

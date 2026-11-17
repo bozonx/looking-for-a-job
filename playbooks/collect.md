@@ -32,6 +32,8 @@
       стоп-флагов нет и `overall` вероятно будет заметным: найди вакансию на сайте компании / в её ATS (careers-страница,
       `boards.greenhouse.io/<company>`, `jobs.lever.co/<company>`, `jobs.ashbyhq.com/<company>`).
       Нашёл с уверенностью — запиши в `real_url`. Ничего не отправляй. Не нашёл — оставь `null`.
+      Если в тексте вакансии отклик по email / Telegram / WhatsApp / Facebook / в личку — это тоже канал:
+      добавь в `apply_channels` (`playbooks/scoring.md`), искать `real_url` тогда не нужно.
       **Не больше 3 запросов/страниц на вакансию**, затем `null` — не трать токены на поиск.
       `apply_method` и `apply_target` пересчитает `npm run score`.
    `npm run score` — посчитает `overall`, `scores.region`, `apply_target`; `npm run validate` — исправь ошибки.

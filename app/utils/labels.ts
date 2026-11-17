@@ -28,3 +28,36 @@ export function fmtSalary(s: any): string {
   const per = { year: '/год', month: '/мес', hour: '/ч' }[s.period as string] ?? '';
   return `${k(s.min)}–${k(s.max)} ${s.currency}${per}`;
 }
+
+/** Канал отклика (apply_channels[].type / apply_method): иконка и подпись. */
+export const CHANNEL_LABEL: Record<string, { icon: string; label: string }> = {
+  ats: { icon: '📝', label: 'ATS-форма' },
+  form: { icon: '🌐', label: 'форма на сайте' },
+  email: { icon: '✉️', label: 'email' },
+  telegram: { icon: '✈️', label: 'Telegram' },
+  whatsapp: { icon: '💬', label: 'WhatsApp' },
+  facebook: { icon: '📘', label: 'Facebook' },
+  linkedin: { icon: '🔗', label: 'LinkedIn' },
+  platform: { icon: '🏢', label: 'на площадке (аккаунт)' },
+  dm: { icon: '📨', label: 'личное сообщение' },
+  other: { icon: '•', label: 'другое' },
+  unknown: { icon: '❓', label: 'неизвестно' },
+};
+
+/** apply_method → тип канала (ats-greenhouse → ats, external → form). */
+export function channelKind(method: string | null | undefined): string {
+  if (!method || method === 'unknown') return 'unknown';
+  if (method.startsWith('ats-')) return 'ats';
+  if (method === 'external') return 'form';
+  if (method === 'easy-apply') return 'linkedin';
+  if (method === 'comment') return 'dm';
+  return CHANNEL_LABEL[method] ? method : 'other';
+}
+
+/** Ссылка для открытия канала. */
+export function channelHref(c: { type: string; value: string }): string | null {
+  if (c.type === 'email') return `mailto:${c.value}`;
+  if (c.type === 'telegram') return `https://t.me/${c.value.replace(/^@/, '')}`;
+  if (c.type === 'whatsapp' && /^\+?\d+$/.test(c.value)) return `https://wa.me/${c.value.replace(/^\+/, '')}`;
+  return /^https?:/.test(c.value) ? c.value : null;
+}

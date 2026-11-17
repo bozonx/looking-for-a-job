@@ -1,4 +1,5 @@
-# Куда откликаться при дублях: выше в списке — приоритетнее.
+# Куда откликаться при нескольких каналах/дублях: выше в списке — приоритетнее.
+# email/telegram/whatsapp/dm/facebook/other — каналы из apply_channels (scripts/lib/channels.ts).
 priority:
   - company-site
   - ats-greenhouse
@@ -7,6 +8,12 @@ priority:
   - ats-workable
   - ats-other
   - ats
+  - email
+  - telegram
+  - whatsapp
+  - dm
+  - facebook
+  - other
   - wellfound
   - getonbrd
   - bumeran

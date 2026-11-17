@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CHANNEL_BY, CHANNEL_TYPES } from './channels.ts';
 
 const score = z.number().min(0).max(100);
 const nscore = score.nullable();
@@ -53,7 +54,11 @@ export const VacancySchema = z.object({
   source_url: z.string().url(),
   real_url: z.string().url().nullable().optional(),
   real_url_tried_at: date.nullable().optional(), // когда npm run resolve-urls искал real_url на странице источника
-  apply_method: z.string().regex(/^(easy-apply|ats-[a-z0-9-]+|email|comment|external|unknown)$/),
+  apply_method: z.string().regex(/^(easy-apply|ats-[a-z0-9-]+|email|telegram|whatsapp|facebook|linkedin|platform|dm|other|comment|external|unknown)$/),
+  // все известные способы отклика; apply_method/apply_target вычисляются из них (scripts/lib/channels.ts)
+  apply_channels: z
+    .array(z.object({ type: z.enum(CHANNEL_TYPES), value: z.string().min(1), by: z.enum(CHANNEL_BY).optional(), note: z.string().nullable().optional() }))
+    .optional(),
   duplicates: z.array(z.object({ source: z.string(), url: z.string().url(), seen_at: date.optional(), id: z.string().optional() })).default([]),
   apply_target: z.string().nullable().optional(),
   collected_at: date,

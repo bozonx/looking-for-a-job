@@ -131,7 +131,7 @@ overall = 1385 / 15.5 = 89.4 → **89**.
 
 ## Выбор места отклика (`apply_target`)
 
-`scripts/lib/target.ts`. Кандидаты: `real_url`, `source`, все `duplicates`. Каждая ссылка классифицируется:
+`scripts/lib/target.ts`. Кандидаты: каналы `apply_channels` (`scripts/lib/channels.ts`: email → `email`, Telegram → `telegram`, WhatsApp, Facebook, личка `dm`, форма → `company-site`, ATS → `ats-<name>`, отклик на площадке → id площадки), `real_url`, `source`, все `duplicates`. `apply_method` — тип канала-победителя. Каждая ссылка классифицируется:
 - домен известного агрегатора (remoteok, linkedin, wellfound, getonbrd, hh, himalayas, weworkremotely) → его id;
 - домен известной ATS (greenhouse, lever, ashby, workable, smartrecruiters, …) → `ats-<name>`;
 - любой другой → `company-site`.

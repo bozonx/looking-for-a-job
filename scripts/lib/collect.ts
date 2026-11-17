@@ -10,7 +10,8 @@ import { env, today } from './env.ts';
 import { loadAll, parseVacancy, vacancyPath, writeVacancy, type VacancyFile } from './vacancy.ts';
 import { buildIndex, findDuplicate, key, normUrl, unknownCompany, type Index } from './dedupe.ts';
 import { appendRunLog, appendRunStats } from './runlog.ts';
-import { pickApplyTarget } from './target.ts';
+import { deriveApply } from './target.ts';
+import { baseChannels, mergeChannels, type Channel } from './channels.ts';
 import { MAX_FAILURES, SeenStore } from './seen.ts';
 import { loadPrefilter } from './prefilter.ts';
 import { sleep, takeHttpWarnings, takePartialList, withHttpWarnings } from './http.ts';
@@ -75,6 +76,7 @@ export function blankVacancy(source: string, extId: string) {
     source_url: '',
     real_url: null as string | null,
     apply_method: 'unknown',
+    apply_channels: [] as Channel[],
     duplicates: [] as { source: string; url: string; seen_at?: string; id?: string }[],
     apply_target: null as string | null,
     collected_at: today(),
@@ -333,7 +335,8 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
               if (sameSource && data.location && !String(d.location ?? '').includes(data.location))
                 d.location = d.location ? `${d.location}; ${data.location}` : data.location;
               if (data.real_url && !d.real_url) d.real_url = data.real_url;
-              d.apply_target = pickApplyTarget(d);
+              d.apply_channels = mergeChannels(d.apply_channels, baseChannels({ ...data, apply_channels: [] }, built.body));
+              deriveApply(d);
               return true;
             });
             if (added) idx.byUrl.set(u, dup.vacancy);
@@ -351,7 +354,8 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
             continue;
           }
 
-          data.apply_target = pickApplyTarget(data);
+          data.apply_channels = baseChannels(data, built.body);
+          deriveApply(data);
           let file = vacancyPath(data.collected_at, SOURCE, data.company, data.title, j.extId);
           if (fs.existsSync(file)) throw new Error(`[bug] коллизия имени файла (другая вакансия уже записана под этим именем): ${path.relative(process.cwd(), file)}`);
           if (!opts.dryRun) writeVacancy(file, data, built.body);

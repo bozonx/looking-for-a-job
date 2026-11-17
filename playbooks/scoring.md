@@ -32,6 +32,7 @@
 | `best_resume` | трек с лучшим fit |
 | `score_reasoning` | 2–4 предложения: на чём основаны ключевые оценки и флаги |
 | `requirements_special` | нестандартные требования отклика (видео, кодовое слово, тест в форме) |
+| `apply_channels` | **куда слать отклик.** Скрипты уже заполнили из ссылок и текста (`by: collect/resolve/text`) — проверь по тексту: убери служебные адреса (accommodations, «для вопросов», антифрод), добавь пропущенные с `by: agent`. Типы: `ats` (ссылка ATS), `form` (форма на сайте компании), `email`, `telegram` (`@handle`), `whatsapp` (ссылка или номер), `facebook` (страница/пост/Messenger), `linkedin`, `platform` (отклик на hh/habr/djinni… — нужен аккаунт), `dm` (личка: `x @handle`, `linkedin <url>`), `other`. `value` — адрес/ссылка/хэндл; `note` — требования к отклику из текста (тема письма, кодовое слово, что приложить). Ничего не нашёл — оставь как есть; `apply_method`/`apply_target` не трогай — пересчитает `npm run score` |
 | `resume_match` | сравнение с резюме `best_resume` — см. раздел ниже |
 | `scoring_version` | 3 |
 
