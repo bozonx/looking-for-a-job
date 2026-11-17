@@ -21,7 +21,7 @@
 | `profile/resumes/<трек>.md` | заготовка трека (en): Summary, Skills, Experience. Образование и soft skills сюда не пишутся — их подставляет рендер |
 | `profile/resumes/i18n/<трек>.<lang>.md` | переводы заготовок |
 | `profile/projects.md` | пет-проекты: описание по умолчанию на en/ru/es + грани `hl[теги]` для описания под вакансию |
-| `profile/soft-skills.md` | soft skills — выводятся в каждом резюме как есть (разделы `## en/ru/es`) |
+| `profile/soft-skills.md` | пул soft skills в порядке приоритета (`## <id>`, `tags`, `en/ru/es`, `proof`): в базовом резюме берутся первые N (7), под вакансию — выбираются релевантные |
 | `profile/questions.md` | открытые вопросы пользователю и ответы на них |
 | `profile/about.md` | шапка (контакты, локация, языки) — подставляет скрипт |
 | вакансия | `resume_match` (required, nice_to_have, keyword_spellings, responsibilities, domain, soft_requirements, in_resume_negative), `red_flags`, текст |
@@ -59,7 +59,7 @@
 ## §3. Резюме под вакансию
 
 Вход: вакансия, `best_resume`. Язык = язык вакансии (en, если неясно). Выход: `data/generated/<id>/resume.<lang>.md`,
-front matter: `title`, `projects`, `lang`, `vacancy: <id>`.
+front matter: `title`, `projects`, `soft_skills`, `lang`, `vacancy: <id>`.
 
 1. **Основа** — заготовка трека `best_resume` на нужном языке; набор пунктов — из `facts.md`.
 2. **Стек по местам.** Фреймворки и стек вакансии — на последних двух местах (JBS, ContentX), самый приоритетный — на JBS.
@@ -86,9 +86,12 @@ front matter: `title`, `projects`, `lang`, `vacancy: <id>`.
    по умолчанию и 1–2 граней `hl[...]`, совпадающих с требованиями (мобильные → Tauri mobile; графика → WebGPU/PixiJS;
    биллинг/платежи → billing-ai-apps); ≤ 2 строк, на языке резюме:
    `projects: [{id: fastcat, desc: "…"}, tyco]`.
-8. **Образование и soft skills** — не трогать: рендер подставляет их как есть.
-9. **Проверка и рендер.**
-   `npm run resume-check -- --file data/generated/<id>/resume.<lang>.md` — исправь все ✗; ⚠ про required вне фактов → вопрос.
+8. **Soft skills (7–10)** — во front matter укажи `soft_skills`:
+   - сначала все навыки из `profile/soft-skills.md`, которые совпадают с `resume_match.soft_requirements` и текстом вакансии (по `tags`); при желании формулировку можно уточнить под слова вакансии: `{id: mentoring, text: "…"}`;
+   - затем добери самыми приоритетными навыками сверху `profile/soft-skills.md` (в порядке файла), чтобы всего получилось **7–10 пунктов** (с учётом лимита в 2 страницы PDF).
+9. **Образование** — не трогать: рендер подставляет его из `facts.md` как есть.
+10. **Проверка и рендер.**
+   `npm run resume-check -- --file data/generated/<id>/resume.<lang>.md` — исправь все ✗ и проверь ⚠ (включая пропущенные `soft_requirements`); ⚠ про required вне фактов → вопрос.
    `npm run render-resume -- --file data/generated/<id>/resume.<lang>.md` → PDF рядом; ≤ 2 страниц, текстовый слой (`pdftotext`).
-10. **Отчёт** `data/generated/<id>/tailor.md` (по-русски): какие обязанности и required каким пунктом закрыты, что додумано
-    (новые `~` в `facts.md`), какие проекты и почему, открытые вопросы. Это шпаргалка к собеседованию.
+11. **Отчёт** `data/generated/<id>/tailor.md` (по-русски): какие обязанности и required каким пунктом закрыты, что додумано
+    (новые `~` в `facts.md`), какие проекты и soft skills выбраны и почему, открытые вопросы. Это шпаргалка к собеседованию.

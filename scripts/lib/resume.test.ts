@@ -1,7 +1,7 @@
 /** Разбор резюме и профиля: `npm test`. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { anachronisms, langSection, parseEducation, parseJobs, parseProjects, projectRefs } from './resume.ts';
+import { anachronisms, langSection, parseEducation, parseJobs, parseProjects, parseSoftSkills, projectRefs, resolveSoftSkills, softSkillRefs } from './resume.ts';
 
 const BODY = `## Summary
 x
@@ -48,4 +48,15 @@ test('soft skills и образование по языку', () => {
   assert.deepEqual(langSection('## en\n- A\n- B\n\n## ru\n- В\n', 'ru'), ['В']);
   assert.deepEqual(langSection('## en\n- A\n- B\n\n## ru\n- В\n', 'en'), ['A', 'B']);
   assert.deepEqual(parseEducation('## Образование\n- en: X\n- ru: Икс\n\n## Другое\n- en: no\n', 'en'), ['X']);
+
+  const pool = parseSoftSkills(
+    `## ownership\n- tags: ownership, autonomy\n- en: Own EN\n- ru: Own RU\n\n## mentoring\n- tags: mentoring\n- en: Mentor EN\n- ru: Mentor RU\n\n## adaptability\n- tags: adaptability\n- en: Adapt EN\n- ru: Adapt RU\n`,
+  );
+  assert.equal(pool.size, 3);
+  assert.deepEqual(pool.get('ownership')!.tags, ['ownership', 'autonomy']);
+  assert.deepEqual(resolveSoftSkills(pool, 'en', undefined, 2), ['Own EN', 'Mentor EN']);
+  assert.deepEqual(
+    resolveSoftSkills(pool, 'ru', softSkillRefs(['adaptability', { id: 'ownership', text: 'Кастом' }]), 2),
+    ['Adapt RU', 'Кастом'],
+  );
 });

@@ -74,15 +74,97 @@ export function projectRefs(raw: unknown): ProjectRef[] {
 
 // ---------- soft skills, образование
 
-/** Пункты из раздела «## <lang>» файла (soft-skills.md). */
+export interface SoftSkill {
+  id: string;
+  tags: string[];
+  text: Partial<Record<Lang, string>>;
+  proof?: string;
+}
+
+/** Элемент `soft_skills:` во front matter: id или {id, text} (формулировка под вакансию). */
+export type SoftSkillRef = { id: string; text?: string };
+export function softSkillRefs(raw: unknown): SoftSkillRef[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((s) => (typeof s === 'string' ? { id: s } : { id: String(s?.id ?? ''), text: s?.text ? String(s.text) : undefined }));
+}
+
+/** Пункты из раздела «## <lang>» файла (обратная совместимость для старого формата soft-skills.md). */
 export function langSection(text: string, lang: Lang): string[] {
   const m = stripComments(text).match(new RegExp(`^## ${lang}\\s*\\n([\\s\\S]*?)(?=^## |$(?![\\s\\S]))`, 'm'));
   return (m?.[1] ?? '').split('\n').map((l) => l.match(/^- (.+)$/)?.[1]?.trim()).filter((s): s is string => !!s);
 }
 
-export function readSoftSkills(lang: Lang): string[] {
+/** Пул soft skills в порядке приоритета из profile/soft-skills.md (секции `## <id>` или legacy `## en/ru/es`). */
+export function parseSoftSkills(text: string): Map<string, SoftSkill> {
+  const clean = stripComments(text);
+  const secs = clean.split(/^## /m).slice(1);
+  const headings = secs.map((s) => s.split('\n')[0]!.trim());
+  const out = new Map<string, SoftSkill>();
+  if (headings.length && headings.every((h) => (LANGS as readonly string[]).includes(h) || /доказательства|proof/i.test(h))) {
+    const byLang: Record<Lang, string[]> = { en: langSection(clean, 'en'), ru: langSection(clean, 'ru'), es: langSection(clean, 'es') };
+    const max = Math.max(byLang.en.length, byLang.ru.length, byLang.es.length);
+    for (let i = 0; i < max; i++) {
+      const id = `skill-${i + 1}`;
+      out.set(id, { id, tags: [], text: { en: byLang.en[i], ru: byLang.ru[i], es: byLang.es[i] } });
+    }
+    return out;
+  }
+  for (const sec of secs) {
+    const [idLine, ...rest] = sec.split('\n');
+    const id = idLine!.trim();
+    if (!id || /доказательства|proof/i.test(id)) continue;
+    const f: Record<string, string> = {};
+    for (const l of rest) {
+      const m = l.match(/^- (\w+):\s*(.*)$/);
+      if (m) f[m[1]!] = m[2]!.trim();
+    }
+    out.set(id, {
+      id,
+      tags: (f.tags ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+      text: { en: f.en, ru: f.ru, es: f.es },
+      proof: f.proof || undefined,
+    });
+  }
+  return out;
+}
+
+export function readSoftSkillsPool(): Map<string, SoftSkill> {
   const f = join(PROFILE, 'soft-skills.md');
-  return existsSync(f) ? langSection(readFileSync(f, 'utf8'), lang) : [];
+  return existsSync(f) ? parseSoftSkills(readFileSync(f, 'utf8')) : new Map();
+}
+
+/**
+ * Список строк soft skills для резюме:
+ * - если переданы refs (из front matter `soft_skills:` или CLI `--soft-skills`) — берём их в указанном порядке;
+ * - иначе — первые `defaultCount` (по умолчанию из config/resume-tracks.yaml → limits.soft_skills_default ?? 7) из пула.
+ */
+export function resolveSoftSkills(
+  pool: Map<string, SoftSkill>,
+  lang: Lang,
+  refs?: SoftSkillRef[],
+  defaultCount = 7,
+): string[] {
+  const chosen: SoftSkillRef[] = refs?.length
+    ? refs
+    : [...pool.keys()].slice(0, defaultCount).map((id) => ({ id }));
+  const out: string[] = [];
+  for (const { id, text } of chosen) {
+    const item = pool.get(id);
+    if (!item) {
+      if (text) out.push(text);
+      continue;
+    }
+    const line = text ?? item.text[lang] ?? item.text.en ?? '';
+    if (line) out.push(line);
+  }
+  return out;
+}
+
+export function readSoftSkills(lang: Lang, refs?: SoftSkillRef[], defaultCount?: number): string[] {
+  const pool = readSoftSkillsPool();
+  if (!pool.size) return [];
+  const limit = defaultCount ?? (loadTracks().limits.soft_skills_default ?? 7);
+  return resolveSoftSkills(pool, lang, refs, limit);
 }
 
 /** Строки «- <lang>: …» из раздела «## Образование» facts.md. */
@@ -101,9 +183,16 @@ export function readEducation(lang: Lang): string[] {
 export interface TracksConfig {
   stacks: Record<string, Record<string, string | string[]>>;
   jobs: string[];
-  tracks: Record<string, { file?: string; title: string; projects: string[]; places: Record<string, { stack: string[]; title: string; focus?: string }> }>;
+  tracks: Record<string, { file?: string; title: string; projects: string[]; soft_skills?: string[]; places: Record<string, { stack: string[]; title: string; focus?: string }> }>;
   title_variants: string[];
-  limits: { bullets: number[]; min_bullets: number[]; projects: [number, number]; pages: number };
+  limits: {
+    bullets: number[];
+    min_bullets: number[];
+    projects: [number, number];
+    soft_skills_default?: number;
+    soft_skills?: [number, number];
+    pages: number;
+  };
 }
 
 export const loadTracks = (): TracksConfig => parseYaml(readFileSync(join(ROOT, 'config', 'resume-tracks.yaml'), 'utf8'));

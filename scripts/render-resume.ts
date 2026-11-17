@@ -24,8 +24,8 @@ import { marked } from 'marked';
 const ROOT = resolve(import.meta.dirname, '..');
 const RESUMES = join(PROFILE, 'resumes');
 import {
-  PROFILE, LANGS, type Lang, type Project, splitFrontMatter, stripComments, readProjects, projectRefs,
-  readSoftSkills, readEducation,
+  PROFILE, LANGS, type Lang, type Project, type SoftSkillRef, splitFrontMatter, stripComments, readProjects, projectRefs,
+  softSkillRefs, readSoftSkills, readEducation, loadTracks,
 } from './lib/resume.ts';
 export { splitFrontMatter };
 
@@ -148,7 +148,7 @@ const EDU_RE = /education|образование|educaci[oó]n|formaci[oó]n/i;
 
 /** Хвост резюме из профиля: пет-проекты → образование (facts.md) → soft skills (soft-skills.md).
  *  Если в теле уже есть секция образования (старые файлы) — проекты встают перед ней, образование не дублируется. */
-function assembleTail(body: string, projects: string, lang: Lang): string {
+function assembleTail(body: string, projects: string, lang: Lang, softRefs?: SoftSkillRef[]): string {
   let out = body.trimEnd() + '\n';
   if (hasSection(out, EDU_RE)) {
     if (projects) {
@@ -162,7 +162,7 @@ function assembleTail(body: string, projects: string, lang: Lang): string {
     else console.warn(`⚠ нет образования «- ${lang}: …» в profile/facts.md (## Образование)`);
   }
   if (!hasSection(out, /soft|личные|habilidades blandas/i)) {
-    const soft = readSoftSkills(lang);
+    const soft = readSoftSkills(lang, softRefs);
     if (soft.length) out += `\n## ${T[lang].soft}\n\n${soft.map((e) => `- ${e}`).join('\n')}\n`;
   }
   return out;
@@ -263,7 +263,7 @@ function trackSource(track: string, lang: Lang): string {
   return lang === 'en' ? join(RESUMES, `${track}.md`) : join(RESUMES, 'i18n', `${track}.${lang}.md`);
 }
 
-function build(job: Job, header: Header, projects: Map<string, Project>, opts: { projects?: string[]; htmlOnly: boolean }): void {
+function build(job: Job, header: Header, projects: Map<string, Project>, opts: { projects?: string[]; softSkills?: string[]; htmlOnly: boolean }): void {
   const { data, body } = splitFrontMatter(readFileSync(job.src, 'utf8'));
   if (job.track && job.lang !== 'en') {
     const en = readFileSync(trackSource(job.track, 'en'), 'utf8');
@@ -271,7 +271,15 @@ function build(job: Job, header: Header, projects: Map<string, Project>, opts: {
   }
   const title = data.title ?? die(`${job.src}: нет title во front matter`);
   const refs = opts.projects ? opts.projects.map((id) => ({ id })) : projectRefs(data.projects);
-  const md = assembleTail(stripComments(body), projectsMd(refs, projects, job.lang), job.lang);
+  const trackSoft = job.track ? loadTracks().tracks[job.track]?.soft_skills : undefined;
+  const softRefs = opts.softSkills
+    ? opts.softSkills.map((id) => ({ id }))
+    : data.soft_skills
+      ? softSkillRefs(data.soft_skills)
+      : trackSoft?.length
+        ? trackSoft.map((id) => ({ id }))
+        : undefined;
+  const md = assembleTail(stripComments(body), projectsMd(refs, projects, job.lang), job.lang, softRefs);
   const usePhoto = flag('photo') || (job.lang === 'ru' && !flag('no-photo'));
   const html = renderHtml(header, job.lang, title, md, usePhoto ? photoDataUri() : null);
   mkdirSync(dirname(job.out), { recursive: true });
@@ -291,6 +299,7 @@ function main(): void {
   const fileSlug = header.nameLatin.replace(/\s+/g, '_');
   const htmlOnly = flag('html');
   const projOverride = arg('projects')?.split(',').map((s) => s.trim()).filter(Boolean);
+  const softOverride = arg('soft-skills')?.split(',').map((s) => s.trim()).filter(Boolean);
   const baseDir = join(ROOT, 'data', 'generated', 'base');
   const jobs: Job[] = [];
 
@@ -321,7 +330,7 @@ function main(): void {
   }
 
   if (!jobs.length) die('нечего собирать');
-  for (const j of jobs) build(j, header, projects, { projects: projOverride, htmlOnly });
+  for (const j of jobs) build(j, header, projects, { projects: projOverride, softSkills: softOverride, htmlOnly });
 }
 
 /** Хэш английского трека — для source_hash в переводах. `npm run render-resume -- --hash vue` */

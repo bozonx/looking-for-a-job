@@ -82,9 +82,11 @@ title_variants:
   - Full Stack Developer
   - Frontend Developer
 
-# Лимиты длины (resume-check): пункты по местам [последнее → первое], проекты, страницы.
+# Лимиты длины (resume-check): пункты по местам [последнее → первое], проекты, soft skills, страницы.
 limits:
   bullets: [6, 5, 4, 3]
   min_bullets: [4, 3, 2, 2]
   projects: [2, 3]
+  soft_skills_default: 7
+  soft_skills: [7, 10]
   pages: 2

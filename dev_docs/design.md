@@ -86,7 +86,7 @@ Chromium по CDP), `apply-set` (набор с лимитами), `apply-mark` (
 
 **Адаптация (`tailor.md`):**
 
-- Данные профиля разнесены: банк фактов `facts.md` (+ образование) → заготовки треков `profile/resumes/<трек>.md` (en, генерирует агент по `playbooks/resume-update.md` с учётом `config/resume-tracks.yaml` и рынка) + переводы `resumes/i18n/`; пет-проекты `projects.md` (2–3 по теме вакансии, описание под вакансию), `soft-skills.md` (как есть), вопросы `questions.md`, шапка — `about.md`. Проверка — `npm run resume-check`. Подробно — `playbooks/tailor.md`.
+- Данные профиля разнесены: банк фактов `facts.md` (+ образование) → заготовки треков `profile/resumes/<трек>.md` (en, генерирует агент по `playbooks/resume-update.md` с учётом `config/resume-tracks.yaml` и рынка) + переводы `resumes/i18n/`; пет-проекты `projects.md` (2–3 по теме вакансии, описание под вакансию), `soft-skills.md` (пул по приоритету: топ-7 в базовом резюме, 7–10 релевантных под вакансию), вопросы `questions.md`, шапка — `about.md`. Проверка — `npm run resume-check`. Подробно — `playbooks/tailor.md`.
 - База — `best_resume` из `profile/resumes/`; переставить акценты, подобрать формулировки и ключевые слова вакансии под ATS.
 - **Граница:** переформулировать, переупорядочивать, опускать и подсвечивать только то, что уже есть в резюме/`facts.md`/`projects.md`/`about.md`. Не добавлять технологии, годы, должности, проекты, которых нет; отсутствующие ключевые слова не вписывать.
 - Письмо — по `profile/cover-letter.md`, на языке вакансии.

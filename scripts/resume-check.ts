@@ -13,12 +13,12 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { ROOT } from './lib/env.ts';
+import { ROOT, CONFIG_DIR } from './lib/env.ts';
 import { loadAll } from './lib/vacancy.ts';
 import { loadSkills, normSkill } from './lib/skills.ts';
 import { skillsInText } from './lib/resumeskills.ts';
 import {
-  PROFILE, splitFrontMatter, stripComments, readProjects, projectRefs, loadTracks, loadTechDates, parseJobs, anachronisms,
+  PROFILE, splitFrontMatter, stripComments, readProjects, projectRefs, softSkillRefs, readSoftSkillsPool, loadTracks, loadTechDates, parseJobs, anachronisms,
 } from './lib/resume.ts';
 
 const arg = (n: string) => {
@@ -74,6 +74,15 @@ function checkFile(file: string, track: string | null, vacancyId: string | null)
   const [pmin, pmax] = cfg.limits.projects;
   if (refs.length < pmin || refs.length > pmax) r.warns.push(`проектов ${refs.length}, нужно ${pmin}–${pmax}`);
 
+  // soft skills
+  const softPool = readSoftSkillsPool();
+  const softRefs = softSkillRefs(data.soft_skills);
+  for (const s of softRefs) if (!softPool.has(s.id)) r.errors.push(`soft skill «${s.id}» не найден в profile/soft-skills.md`);
+  if (softRefs.length && cfg.limits.soft_skills) {
+    const [smin, smax] = cfg.limits.soft_skills;
+    if (softRefs.length < smin || softRefs.length > smax) r.warns.push(`soft skills ${softRefs.length}, нужно ${smin}–${smax}`);
+  }
+
   // покрытие вакансии
   const vid = vacancyId ?? data.vacancy ?? null;
   if (vid) {
@@ -91,6 +100,23 @@ function checkFile(file: string, track: string | null, vacancyId: string | null)
           if (have.has(n)) continue;
           if (pool.has(n)) (kind === 'required' ? r.errors : r.warns).push(`${kind} «${s}» есть в facts.md, но не в резюме`);
           else r.warns.push(`${kind} «${s}» нет в facts.md — вопрос пользователю (profile/questions.md)`);
+        }
+      }
+
+      // покрытие soft_requirements вакансии
+      if (softPool.size) {
+        const softDict = loadSkills(join(CONFIG_DIR, 'soft-requirements.yaml'));
+        const defaultCount = cfg.limits.soft_skills_default ?? 7;
+        const activeIds = new Set(softRefs.length ? softRefs.map((s) => s.id) : [...softPool.keys()].slice(0, defaultCount));
+        for (const req of (v.data.resume_match.soft_requirements ?? []) as string[]) {
+          const canon = normSkill(String(req), softDict).name.toLowerCase();
+          const raw = String(req).toLowerCase().trim();
+          const matching = [...softPool.values()].filter(
+            (sk) => sk.id === canon || sk.id === raw || sk.tags.some((t) => t === canon || t === raw || normSkill(t, softDict).name.toLowerCase() === canon),
+          );
+          if (matching.length && !matching.some((sk) => activeIds.has(sk.id))) {
+            r.warns.push(`soft_requirements «${req}» покрывается в soft-skills.md (${matching.map((m) => m.id).join(', ')}), но не включён в soft_skills резюме`);
+          }
         }
       }
     }
