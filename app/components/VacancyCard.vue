@@ -249,7 +249,6 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
           </tr>
           <tr v-if="v.seniority"><th>Грейд (seniority)</th><td>{{ v.seniority }}</td></tr>
           <tr v-if="v.company_stage"><th>Стадия компании</th><td>{{ v.company_stage }}</td></tr>
-          <tr v-if="v.employer_group"><th>Группа работодателя</th><td>{{ v.employer_group }}</td></tr>
           <tr v-if="v.hire_from_ar"><th>Найм из AR</th><td>{{ v.hire_from_ar }}<template v-if="v.hire_from_ar_evidence"> ({{ v.hire_from_ar_evidence }})</template></td></tr>
           <tr v-if="v.timezone"><th>Таймзона</th><td>{{ v.timezone }}</td></tr>
           <tr v-if="v.salary_usd_month"><th>Зарплата USD/мес</th><td>{{ v.salary_usd_month.min ?? '?' }}–{{ v.salary_usd_month.max ?? '?' }}</td></tr>
