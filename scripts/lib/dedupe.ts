@@ -30,7 +30,7 @@ export function normUrl(u: string): string {
     const x = new URL(u);
     x.hash = '';
     for (const k of [...x.searchParams.keys()]) if (/^(utm_|ref|source|src|gh_src|lever-source)/i.test(k)) x.searchParams.delete(k);
-    return `${x.host.replace(/^www\./, '')}${x.pathname.replace(/\/+$/, '')}${x.search}`.toLowerCase();
+    return `${x.host.replace(/^www\./, '')}${x.pathname.replace(/\/+$/, '')}${x.search}`;
   } catch {
     return u.toLowerCase();
   }

@@ -30,10 +30,14 @@ export function channelFromUrl(url: string | null | undefined, by?: Channel['by'
   if (!url) return null;
   const u = url.trim();
   if (/^mailto:/i.test(u)) {
-    const addr = decodeURIComponent(u.slice(7).split('?')[0]!).trim().toLowerCase();
-    if (!EMAIL_RE_FULL.test(addr)) return null;
-    const subj = /[?&]subject=([^&]+)/i.exec(u)?.[1];
-    return { type: 'email', value: addr, by, ...(subj ? { note: `тема: ${decodeURIComponent(subj.replace(/\+/g, ' '))}` } : {}) };
+    try {
+      const addr = decodeURIComponent(u.slice(7).split('?')[0]!).trim().toLowerCase();
+      if (!EMAIL_RE_FULL.test(addr)) return null;
+      const subj = /[?&]subject=([^&]+)/i.exec(u)?.[1];
+      return { type: 'email', value: addr, by, ...(subj ? { note: `тема: ${decodeURIComponent(subj.replace(/\+/g, ' '))}` } : {}) };
+    } catch {
+      return null; // Некорректное percent-кодирование во внешней ссылке.
+    }
   }
   if (/^tg:|^https?:\/\/(www\.)?(t\.me|telegram\.me)\//i.test(u)) {
     const h = /(?:t\.me|telegram\.me)\/([A-Za-z0-9_]{4,})/i.exec(u)?.[1] ?? /domain=([A-Za-z0-9_]+)/.exec(u)?.[1];
