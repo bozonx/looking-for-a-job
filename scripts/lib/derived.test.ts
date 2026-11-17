@@ -7,8 +7,12 @@ test('трек учитывает веса, отключённые треки и
   assert.equal(bestTrack({ vue: 100, react: 60 }, { vue: 0, react: 1 }), 'react');
   assert.equal(bestTrack({}, { vue: 1 }), null);
 });
-test('зарплата в месяц без неявных курсов и предположений о часах', () => {
+test('нормализация зарплаты в USD/мес с учётом валют и периодов', () => {
   assert.deepEqual(monthlyUsd({ min: 120000, max: null, currency: 'USD', period: 'year' }), { min: 10000, max: null });
-  assert.equal(monthlyUsd({ min: 50, max: 80, currency: 'USD', period: 'hour' }), null);
-  assert.equal(monthlyUsd({ min: 5000, max: 8000, currency: 'CAD', period: 'month' }), null);
+  assert.deepEqual(monthlyUsd({ min: 50, max: 80, currency: 'USD', period: 'hour' }), { min: 8000, max: 12800 });
+  assert.deepEqual(monthlyUsd({ min: 5000, max: 8000, currency: 'CAD', period: 'month' }), { min: 3650, max: 5840 });
+  assert.deepEqual(monthlyUsd({ min: null, max: 150000, currency: 'RUB', period: 'month' }), { min: null, max: 1575 });
+  assert.equal(monthlyUsd({ min: 1000, max: 2000, currency: 'UNKNOWN_CURRENCY', period: 'month' }), null);
+  assert.equal(monthlyUsd({ min: 1000, max: 2000, currency: 'USD', period: 'day' }), null);
+  assert.equal(monthlyUsd(null), null);
 });

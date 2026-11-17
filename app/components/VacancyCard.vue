@@ -192,7 +192,7 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
         <li><a :href="v.source_url" target="_blank" rel="noopener">{{ v.source }}</a> — источник</li>
         <li v-if="v.real_url"><a :href="v.real_url" target="_blank" rel="noopener">{{ v.real_url }}</a> — прямая</li>
         <li v-else-if="v.real_url_tried_at" class="muted small">прямая ссылка не найдена (искали {{ v.real_url_tried_at }})</li>
-        <li v-for="d in v.duplicates" :key="d.url"><a :href="d.url" target="_blank" rel="noopener">{{ d.source }}</a> — дубль<template v-if="d.seen_at"> ({{ d.seen_at }})</template></li>
+        <li v-for="d in v.duplicates" :key="d.url"><a :href="d.url" target="_blank" rel="noopener">{{ d.source }}</a> — дубль<template v-if="d.id"> ({{ d.id }})</template><template v-if="d.seen_at"> ({{ d.seen_at }})</template></li>
       </ul>
     </section>
 
@@ -241,7 +241,7 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
           <tr><th>Проверка активности</th><td>{{ v.alive_checked_at ?? 'не проверялась' }}<template v-if="v.possibly_closed"> (возможно, закрыта)</template></td></tr>
           <tr v-if="v.real_url_tried_at"><th>Поиск прямой ссылки</th><td>{{ v.real_url_tried_at }}</td></tr>
           <tr v-if="v.scoring_version != null"><th>Версия скоринга</th><td>v{{ v.scoring_version }}</td></tr>
-          <tr v-if="v.vacancy_language && (!v.work_languages?.length || !v.work_languages.includes(v.vacancy_language))">
+          <tr v-if="v.vacancy_language">
             <th>Язык текста вакансии</th><td>{{ v.vacancy_language }}</td>
           </tr>
           <tr v-if="v.seniority"><th>Грейд (seniority)</th><td>{{ v.seniority }}</td></tr>
@@ -249,10 +249,13 @@ const canManual = computed(() => !v.value?.status || v.value.status === 'selecte
           <tr v-if="v.hire_from_ar"><th>Найм из AR</th><td>{{ v.hire_from_ar }}<template v-if="v.hire_from_ar_evidence"> ({{ v.hire_from_ar_evidence }})</template></td></tr>
           <tr v-if="v.timezone"><th>Таймзона</th><td>{{ v.timezone }}</td></tr>
           <tr v-if="v.salary_usd_month"><th>Зарплата USD/мес</th><td>{{ v.salary_usd_month.min ?? '?' }}–{{ v.salary_usd_month.max ?? '?' }}</td></tr>
+          <tr v-if="v.best_track"><th>Лучший трек (best_track)</th><td>{{ v.best_track }}</td></tr>
+          <tr v-if="v.role_tracks?.length"><th>Направления роли (role_tracks)</th><td>{{ v.role_tracks.join(', ') }}</td></tr>
           <tr v-if="v.scores?.end_client_corporate != null"><th>end_client_corporate</th><td>{{ v.scores.end_client_corporate }}</td></tr>
           <tr v-if="v.prefilter_reason"><th>Отсев предфильтра</th><td>{{ v.prefilter_reason }}</td></tr>
           <tr v-if="v.applied_via"><th>Способ отклика</th><td>{{ v.applied_via }}</td></tr>
-          <tr v-if="v.outcome_at"><th>Дата результата</th><td>{{ v.outcome_at }}</td></tr>
+          <tr v-if="v.outcome"><th>Результат отклика</th><td>{{ labelOf(OUTCOME_LABEL, v.outcome) }} ({{ v.outcome }})<template v-if="v.outcome_at"> · {{ v.outcome_at }}</template></td></tr>
+          <tr v-else-if="v.outcome_at"><th>Дата результата</th><td>{{ v.outcome_at }}</td></tr>
           <tr v-if="v.resume_match?.keyword_spellings && Object.keys(v.resume_match.keyword_spellings).length">
             <th>Написания терминов</th>
             <td>
