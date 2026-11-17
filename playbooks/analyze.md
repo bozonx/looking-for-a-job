@@ -10,6 +10,7 @@
 - **предфильтр** — `npm run prefilter-review` (что отсеяно и не зря ли) и утечки из `npm run insights`;
 - **источники** — таблица источников в `npm run insights`, записи `[source]` журнала;
 - **калибровка скоринга** — через пользователя: ⚑ и выборка `npm run calibrate` (`playbooks/flagged.md`), `data/flagged-cases.md`, записи `[scoring]`;
+- **отклики и ответы форм** — записи `[apply]` в журнале, `data/runs/*-apply.md`, «Ждут ответа» в `profile/answers.md`, `profile/questions.md`;
 - **рынок → резюме** — только сводка (п. 5).
 
 ## Данные
@@ -18,7 +19,7 @@
 |---|---|
 | Сводка (источники, утечки фильтра, спрос треков, отклики) | `npm run insights` (по умолчанию 30 дней; `-- --days N` / `-- --since YYYY-MM-DD`) → `data/runs/<дата>-insights.md` |
 | Что отсеял предфильтр | `npm run prefilter-review` → `data/runs/<дата>-prefilter.md` |
-| Журнал действий | `data/insights.md` (теги `[filter] [source] [scoring] [bug]`, служебные `[analysis] [resume-update]`) |
+| Журнал действий | `data/insights.md` (теги `[filter] [source] [scoring] [apply] [bug]`, служебные `[analysis] [resume-update]`) |
 | Типичные ошибки скоринга | `data/flagged-cases.md` |
 | Прошлые отчёты | `data/runs/*-insights.md` — сравни с прошлым: что изменилось после правок |
 | Фильтры | `config/prefilter.yaml`, `config/sources.yaml`, `config/skills.yaml`, `config/responsibilities.yaml`, `playbooks/scoring.md` |
@@ -41,7 +42,10 @@
    заметно изменился, или конверсия версии заготовок хуже предыдущей при ≥ 10 откликах.
 6. **Скоринг и баги**: повторяющиеся `[scoring]` и случаи из `data/flagged-cases.md` — правки `playbooks/scoring.md`;
    `[bug]` — задачи на исправление. Много вакансий без `real_url` при высоком overall — идеи, как находить ссылку.
-7. Отчёт пользователю (по-русски), разделы «Система» и «Резюме (сводка)»; в каждом пункте — **цифры и id примеров**,
+7. **Отклики и ответы форм (`[apply]`)**: по записям `[apply]`, `data/runs/*-apply.md`, «Ждут ответа» в `profile/answers.md` и `profile/questions.md`:
+   - каких фактов и ответов не хватает чаще всего → предложить добавить в `profile/facts.md` или `profile/answers.md`;
+   - какие ошибки заполнения или правки пользователя повторяются → предложить правки правил в `profile/answers.md`, `config/cover-letter.md` или `playbooks/apply.md`.
+8. Отчёт пользователю (по-русски), разделы «Система» и «Резюме (сводка)»; в каждом пункте — **цифры и id примеров**,
    правка и ожидаемый эффект. В конце — топ-3 действия по пользе.
-8. После применённых правок — удали из журнала закрытые записи (или допиши «(сделано)»), чтобы они не всплывали снова.
+9. После применённых правок — удали из журнала закрытые записи (или допиши «(сделано)»), чтобы они не всплывали снова.
    Допиши `- [analysis] проведён анализ за <период>, отчёт data/runs/<дата>-insights.md`.
