@@ -77,3 +77,11 @@ test('уровень junior ограничивает итог, сохраняя 
   assert.equal(computeOverall(weights, scores, [], 'senior').overall, 89);
   assert.equal(computeOverall(weights, scores, ['location_restricted'], 'junior').overall, 0);
 });
+
+test('границы scam/fit и отсутствие оценок', () => {
+  assert.equal(computeOverall(W, base({ legitimacy: 30 }), []).flags.includes('scam'), false);
+  assert.equal(computeOverall(W, base({ legitimacy: 29 }), []).overall, 0);
+  assert.ok(computeOverall(W, base({ fit: fit({ vue: 40 }) }), []).overall > 35);
+  assert.equal(computeOverall(W, {}, []).overall, 0);
+  assert.deepEqual(computeOverall(W, {}, ['scam', 'scam']).flags, ['scam']);
+});
