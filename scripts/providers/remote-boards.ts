@@ -106,6 +106,8 @@ export const remotive: Provider = {
   async fetchPage(page) {
     if (page > 0) return [];
     const cats = sourceConfig<{ categories?: string[] }>('remotive')?.categories ?? ['software-dev'];
+    // minIntervalHours считается на источник, а каждая категория — отдельный запрос: больше одной — превышение лимита
+    if (cats.length > 1) throw new Error('config/sources.yaml: remotive.categories — не больше одной категории (лимит 4 запроса в день)');
     const out: RawJob[] = [];
     await eachTolerant('remotive: категория', cats, async (c) => {
       out.push(...remotiveParse(await fetchJson(`https://remotive.com/api/remote-jobs?category=${encodeURIComponent(c)}`)));

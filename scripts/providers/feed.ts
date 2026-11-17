@@ -19,7 +19,10 @@ export interface FeedConfig {
   company_field?: string;
   tags_field?: string;
   employment_field?: string;
-  /** регулярка по заголовку с именованными группами title / company / location (вместо title_format) */
+  /**
+   * регулярка по заголовку с именованными группами title / company / location / salary (вместо title_format);
+   * salary — текст вида «от 100 000 до 150 000 ₽» (месячная), разбирается parseSalaryText
+   */
   title_regex?: string;
   /** регулярка по тексту описания (без HTML, абзац = строка) с группами company / location — когда площадка пишет их в описание */
   description_regex?: string;
@@ -177,6 +180,16 @@ function hash(s: string): number {
   return h;
 }
 
+const CURRENCY: Record<string, string> = { '₽': 'RUB', '$': 'USD', '€': 'EUR', '₸': 'KZT', '₴': 'UAH', '£': 'GBP' };
+
+/** «от 100 000 до 150 000 ₽» / «до 250 000 ₽» / «от 3 000 $» → месячная вилка; не разобралось — null. */
+export function parseSalaryText(text: string): { min: number | null; max: number | null; currency: string; period: 'month' } | null {
+  const num = (s?: string) => (s ? Number(s.replace(/[\s\u00a0]/g, '')) || null : null);
+  const m = text.match(/^(?:от\s+([\d\s\u00a0]+?))?\s*(?:до\s+([\d\s\u00a0]+?))?\s*([₽$€₸₴£]|[A-Z]{3})\s*$/u);
+  if (!m || (!m[1] && !m[2])) return null;
+  return { min: num(m[1]), max: num(m[2]), currency: CURRENCY[m[3]!] ?? m[3]!, period: 'month' };
+}
+
 export function feedProvider(cfg: FeedConfig): Provider {
   const name = cfg.name ?? cfg.id;
   const titleRe = cfg.title_regex ? new RegExp(cfg.title_regex, 'u') : null;
@@ -189,6 +202,7 @@ export function feedProvider(cfg: FeedConfig): Provider {
     const title = tg?.title?.trim() || split.title;
     const company = tg?.company?.trim() || dg?.company?.trim() || split.company;
     const location = tg?.location?.trim() || dg?.location?.trim() || null;
+    const salary = tg?.salary ? parseSalaryText(tg.salary) : null;
     const f = (k?: string) => (k ? decodeEntities(it.fields[k]) || null : null);
     const tags = cfg.tags_field ? (f(cfg.tags_field) ?? '').split(/,\s*|\s+and\s+/).filter(Boolean) : it.categories;
     const job = makeJob({
@@ -201,6 +215,7 @@ export function feedProvider(cfg: FeedConfig): Provider {
       sourceUrl: cleanLink(it.link),
       location: f(cfg.location_field) ?? location,
       employment: normEmployment(f(cfg.employment_field)),
+      salary,
       extra: cfg.tags_field ? { Skills: f(cfg.tags_field) } : undefined,
       html: it.html,
     });

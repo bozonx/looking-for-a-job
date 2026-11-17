@@ -1,5 +1,5 @@
 /**
- * Способ отклика по URL и выбор apply_target по config/source-priority.yaml (design.md §5.3).
+ * Способ отклика по URL и выбор apply_target по config/apply-priority.yaml (design.md §5.3).
  * apply_target хранит конкретное значение (ats-ashby, company-site, linkedin…);
  * неизвестный в списке ats-* ранжируется как ats-other.
  */
@@ -9,10 +9,28 @@ import YAML from 'yaml';
 import { CONFIG_DIR } from './env.ts';
 import { channelMethod, channelTarget, type Channel } from './channels.ts';
 
-const ATS = ['greenhouse', 'lever', 'ashby', 'workable', 'smartrecruiters', 'recruitee', 'teamtailor', 'breezy', 'bamboohr', 'personio', 'workday', 'jobvite'];
+/** Домены ATS (совпадение — сам домен или поддомен; подстрока не годится: cleverbridge.com ≠ lever). */
+const ATS_DOMAINS: Record<string, string> = {
+  'greenhouse.io': 'greenhouse',
+  'lever.co': 'lever',
+  'ashbyhq.com': 'ashby',
+  'workable.com': 'workable',
+  'smartrecruiters.com': 'smartrecruiters',
+  'recruitee.com': 'recruitee',
+  'teamtailor.com': 'teamtailor',
+  'breezy.hr': 'breezy',
+  'bamboohr.com': 'bamboohr',
+  'personio.de': 'personio',
+  'personio.com': 'personio',
+  'myworkdayjobs.com': 'workday',
+  'workday.com': 'workday',
+  'jobvite.com': 'jobvite',
+};
+
+const matchDomain = (h: string, map: Record<string, string>) => Object.entries(map).find(([d]) => h === d || h.endsWith(`.${d}`))?.[1] ?? null;
 
 /** Площадки-агрегаторы: ссылка на них не считается «сайтом компании». */
-const BOARDS: Record<string, string> = {
+export const BOARDS: Record<string, string> = {
   'remoteok.com': 'remoteok',
   'remoteok.io': 'remoteok',
   'linkedin.com': 'linkedin',
@@ -55,7 +73,7 @@ function host(url: string): string {
 /** id площадки по ссылке (linkedin, hh, vuejobs…) или null. */
 export function boardFromUrl(url: string): string | null {
   const h = host(url);
-  return Object.entries(BOARDS).find(([d]) => h === d || h.endsWith(`.${d}`))?.[1] ?? null;
+  return matchDomain(h, BOARDS);
 }
 
 /** apply_method по ссылке отклика: ats-<name> | email | external | unknown. */
@@ -63,7 +81,7 @@ export function applyMethodFromUrl(url: string | null | undefined): string {
   if (!url) return 'unknown';
   if (url.startsWith('mailto:')) return 'email';
   const h = host(url);
-  const ats = ATS.find((a) => h.includes(a));
+  const ats = matchDomain(h, ATS_DOMAINS);
   return ats ? `ats-${ats}` : 'external';
 }
 
@@ -79,8 +97,8 @@ export function targetFromUrl(url: string | null | undefined, fallbackSource?: s
 }
 
 let priority: string[] | null = null;
-function loadPriority(): string[] {
-  priority ??= (YAML.parse(fs.readFileSync(path.join(CONFIG_DIR, 'source-priority.yaml'), 'utf8')) as { priority: string[] }).priority;
+export function loadPriority(): string[] {
+  priority ??= (YAML.parse(fs.readFileSync(path.join(CONFIG_DIR, 'apply-priority.yaml'), 'utf8')) as { priority: string[] }).priority;
   return priority;
 }
 

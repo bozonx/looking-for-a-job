@@ -30,7 +30,7 @@
 `npm run collect` → общий конвейер `scripts/lib/collect.ts`; провайдер `scripts/providers/<источник>.ts` только отдаёт страницы списка и маппинг полей. Шаги:
 
 1. **Индекс известных** — из всех файлов в `data/vacancies/`: по `id`, по всем URL (`source_url`, `real_url`, URL из `duplicates`), по `company+title`. Плюс `data/state/seen-<источник>.json`.
-2. **Лента** — от новых к старым, постранично. Окно по дате — с прошлого полного сбора источника (−2 дня запаса, не дальше `COLLECT_MAX_AGE_DAYS`); вакансии вне окна пропускаются. Остановка при первом из условий: `COLLECT_STOP_ON_SEEN` известных/старых подряд (только с пагинацией, страница дочитывается; после обрыва — только по дате); `--limit` или `COLLECT_MAX_NEW`; `COLLECT_MAX_PAGES` страниц; конец ленты. Запросы повторяются при 429/5xx; 429 после повторов ставит хост на паузу (≥ 1 ч, `data/state/host-cooldown.json`), два 403 за запуск — пропуск хоста до конца запуска. См. [env.md](env.md).
+2. **Лента** — от новых к старым, постранично. Окно по дате — с прошлого полного сбора источника (−2 дня запаса, не дальше `COLLECT_MAX_AGE_DAYS` и `freshness_days` источника); вакансии вне окна пропускаются. Остановка при первом из условий: `COLLECT_STOP_ON_SEEN` известных/старых подряд (только с пагинацией, страница дочитывается; после обрыва — только по дате); `--limit` или `COLLECT_MAX_NEW`; `COLLECT_MAX_PAGES` страниц; конец ленты. Запросы повторяются при 429/5xx; 429 после повторов ставит хост на паузу (≥ 1 ч, `data/state/host-cooldown.json`), два 403 за запуск — пропуск хоста до конца запуска. См. [env.md](env.md).
 3. **Предфильтр** (`config/prefilter.yaml`), без LLM:
    - заголовок содержит слово из `exclude_title` → отсеять (exclude важнее include);
    - иначе заголовок содержит слово из `include_title` **или** среди тегов есть `include_tags` → пропустить;
@@ -132,11 +132,11 @@ overall = 1745 / 19.5 = 89.5 → **89**.
 ## Выбор места отклика (`apply_target`)
 
 `scripts/lib/target.ts`. Кандидаты: каналы `apply_channels` (`scripts/lib/channels.ts`: email → `email`, Telegram → `telegram`, WhatsApp, Facebook, личка `dm`, форма → `company-site`, ATS → `ats-<name>`, отклик на площадке → id площадки), `real_url`, `source`, все `duplicates`. `apply_method` — тип канала-победителя. Каждая ссылка классифицируется:
-- домен известного агрегатора (remoteok, linkedin, wellfound, getonbrd, hh, himalayas, weworkremotely) → его id;
-- домен известной ATS (greenhouse, lever, ashby, workable, smartrecruiters, …) → `ats-<name>`;
+- домен известной площадки (`BOARDS` в `target.ts`: все источники сбора, кроме `ats`, плюс linkedin, wellfound) → её id;
+- домен известной ATS (`ATS_DOMAINS`: greenhouse.io, lever.co, ashbyhq.com, workable.com, myworkdayjobs.com, …) → `ats-<name>`; сравнивается домен или поддомен, не подстрока;
 - любой другой → `company-site`.
 
-Побеждает кандидат, стоящий выше в `config/source-priority.yaml`. Неизвестная списку ATS ранжируется как `ats-other`, но в поле пишется конкретное имя.
+Побеждает кандидат, стоящий выше в `config/apply-priority.yaml`. В этом списке — не источники сбора, а места отклика: площадки, ATS, каналы (email, telegram…) и `company-site`. Кандидат, которого нет в списке, идёт последним — поэтому `npm test` требует, чтобы там был каждый источник. Неизвестная списку ATS ранжируется как `ats-other`, но в поле пишется конкретное имя.
 
 Зачем: отклик напрямую в ATS доходит до рекрутера надёжнее, чем через агрегатор, и снижает нагрузку на LinkedIn-аккаунт (риск блокировки). Поэтому агент при скоринге ищет `real_url` для интересных вакансий с агрегаторов.
 

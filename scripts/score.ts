@@ -2,7 +2,7 @@
  * Детерминированный расчёт scores.overall по config/weights.yaml.
  * Без аргументов — все отскоренные вакансии, у которых overall ещё не посчитан.
  * Заодно пересчитывает производные поля: region и scores.region (config/regions.yaml по company_country / ru_speaking_team),
- * apply_method (если unknown, а real_url найден) и apply_target (config/source-priority.yaml).
+ * apply_method (если unknown, а real_url найден) и apply_target (config/apply-priority.yaml).
  * --all — пересчитать все (rescore). Либо список id/путей.
  */
 import { listVacancyFiles, parseVacancy, resolveTargets, writeVacancy } from './lib/vacancy.ts';

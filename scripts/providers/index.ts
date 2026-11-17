@@ -1,6 +1,6 @@
 /**
  * Реестр провайдеров сбора. Новый источник: scripts/providers/<id>.ts + строка здесь + config/sources.md
- * и config/source-priority.yaml. Стандартные ленты (RSS/Atom/JSON Feed) добавляются без кода —
+ * и config/apply-priority.yaml. Стандартные ленты (RSS/Atom/JSON Feed) добавляются без кода —
  * секция `feeds` в config/sources.yaml.
  */
 import type { Provider } from '../lib/collect.ts';

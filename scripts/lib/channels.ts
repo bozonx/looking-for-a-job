@@ -133,7 +133,7 @@ export function mergeChannels(base: Channel[] | null | undefined, add: (Channel 
   return out;
 }
 
-/** Значение apply_target для канала (сравнивается с config/source-priority.yaml). */
+/** Значение apply_target для канала (сравнивается с config/apply-priority.yaml). */
 export function channelTarget(c: Channel): string {
   switch (c.type) {
     case 'ats':

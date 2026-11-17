@@ -1,0 +1,41 @@
+# Куда откликаться при нескольких каналах/дублях: выше в списке — приоритетнее (scripts/lib/target.ts).
+# Это места отклика, а не источники сбора: company-site, ats-<name> (по домену ссылки; неизвестная ATS — как ats-other),
+# каналы и площадки. Каждый источник из config/sources.yaml должен быть здесь (проверяет `npm test`), иначе он
+# молча уходит в самый конец.
+# email/telegram/whatsapp/dm/facebook/other — каналы из apply_channels (scripts/lib/channels.ts).
+priority:
+  - company-site
+  - ats-greenhouse
+  - ats-lever
+  - ats-ashby
+  - ats-workable
+  - ats-other
+  - ats
+  - email
+  - telegram
+  - whatsapp
+  - dm
+  - facebook
+  - other
+  - wellfound
+  - getonbrd
+  - bumeran
+  - zonajobs
+  - computrabajo
+  - hn
+  - yc
+  - habr
+  - getmatch
+  - geekjob
+  - djinni
+  - landingjobs
+  - hh
+  - remoteok
+  - himalayas
+  - weworkremotely
+  - remotive
+  - jobicy
+  - vuejobs
+  - nodesk
+  - workingnomads
+  - linkedin
