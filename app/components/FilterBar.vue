@@ -28,8 +28,16 @@ function valuesOf(k: string, none?: string) {
   return none && vals.some((v) => v == null || v === '') ? [{ value: 'none', label: none }, ...opts] : opts;
 }
 const sources = computed(() => valuesOf('source'));
-const langs = computed(() => valuesOf('vacancy_language', 'не указан'));
-const countries = computed(() => valuesOf('company_country', 'не указана'));
+const countryNames = new Intl.DisplayNames(['ru'], { type: 'region' });
+const languageNames = new Intl.DisplayNames(['ru'], { type: 'language' });
+function named(opts: {value: string; label: string}[], names: Intl.DisplayNames) {
+  return opts.map(o => {
+    if (o.value === 'none') return o;
+    try { return { ...o, label: o.value + ' — ' + (names.of(o.value) ?? o.value) }; } catch { return o; }
+  });
+}
+const langs = computed(() => named(valuesOf('vacancy_language', 'не указан'), languageNames));
+const countries = computed(() => named(valuesOf('company_country', 'не указана'), countryNames));
 </script>
 
 <template>

@@ -80,3 +80,12 @@ test('результат и способ отклика фильтруются �
   assert.equal(matchRow(v, f({ outcomes: ['offer'] }), ctx), false);
   assert.equal(matchRow(v, f({ appliedVia: ['agent'] }), ctx), false);
 });
+
+test('фильтры найма и зарплаты сохраняют неизвестность и проверяют нижнюю границу', () => {
+  assert.equal(matchRow(row(), f({ hireFromAr: ['unknown'] }), ctx), true);
+  assert.equal(matchRow(row({ hire_from_ar: 'no' }), f({ hireFromAr: ['yes', 'likely'] }), ctx), false);
+  assert.equal(matchRow(row({ salary_usd_month: { min: 4000, max: 9000 } }), f({ minSalary: 5000 }), ctx), false);
+  assert.equal(matchRow(row({ salary_usd_month: { min: 5000, max: null } }), f({ minSalary: 5000 }), ctx), true);
+  assert.equal(matchRow(row(), f({ minSalary: 5000 }), ctx), false);
+  assert.deepEqual(normFilters({}).hireFromAr, []);
+});

@@ -60,6 +60,7 @@ function parseCompany(ats: AtsName, slug: string, json: any, title?: string | nu
         applyUrl: j.applyUrl ?? j.hostedUrl,
         location: (c.allLocations?.length ? c.allLocations.join('; ') : c.location) ?? null,
         employment: normEmployment(c.commitment),
+        geo: { workplace: j.workplaceType, officeCountry: j.country },
         extra: { Workplace: j.workplaceType, Country: j.country, Team: [c.department, c.team].filter(Boolean).join(' / ') },
         html: `${j.description ?? ''}${lists}${j.additional ?? ''}`,
       });

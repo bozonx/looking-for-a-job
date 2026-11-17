@@ -72,6 +72,8 @@ export function blankVacancy(source: string, extId: string) {
     title: '',
     company: 'Unknown',
     company_country: null as string | null,
+    hire_from_ar: 'unknown' as string,
+    hire_from_ar_evidence: null as string | null,
     source,
     source_url: '',
     real_url: null as string | null,

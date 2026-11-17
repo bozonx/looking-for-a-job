@@ -33,6 +33,7 @@ function himalayasRaw(j: any): RawJob {
     company: j.companyName,
     tags: [...(j.categories ?? []), ...(j.seniority ?? [])],
     sourceName: 'Himalayas',
+    geo: { allowedCountries: j.locationRestrictions },
     sourceUrl: url,
     applyUrl: external(j.applicationLink, /himalayas\.app/i),
     location: j.locationRestrictions?.length ? j.locationRestrictions.join(', ') : 'Worldwide',

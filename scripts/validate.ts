@@ -4,6 +4,7 @@ import { listVacancyFiles, parseVacancy, resolveTargets } from './lib/vacancy.ts
 import { ScoredVacancySchema, VacancySchema } from './lib/schema.ts';
 import { loadSkills, normSkill } from './lib/skills.ts';
 import fs from 'node:fs';
+import { CONFIG_DIR } from './lib/env.ts';
 import { DATA_DIR } from './lib/env.ts';
 import { checkJournal } from './lib/journal.ts';
 
@@ -16,6 +17,10 @@ const skills = loadSkills();
 for (const c of skills.conflicts) console.warn(`config/skills.yaml: написание в двух навыках ${c}`);
 const unknownSkills = new Map<string, number>();
 let warned = 0;
+const vocabularies = Object.fromEntries([
+  ['domain', 'domains.yaml'], ['product_type', 'product-types.yaml'], ['soft_requirements', 'soft-requirements.yaml'],
+].map(([field, file]) => [field!, loadSkills(path.join(CONFIG_DIR, file!))]));
+
 
 /**
  * Проверки resume_match: обязателен при scoring_version ≥ 2 (кроме вакансий со stop_flags), навыки канонические.
@@ -65,6 +70,14 @@ for (const f of files) {
     if (!r.success) errs = r.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`);
     if (data.scores && typeof data.scores.overall !== 'number') errs.push('scores.overall: not computed — run npm run score');
     checkResumeMatch(data, errs, warns);
+    for (const [field, dictionary] of Object.entries(vocabularies)) {
+      const value = data.resume_match?.[field];
+      for (const raw of (Array.isArray(value) ? value : value == null ? [] : [value])) {
+        const n = normSkill(String(raw), dictionary);
+        if (n.aliased) warns.push('resume_match.' + field + ': «' + raw + '» → «' + n.name + '»');
+        else if (!n.known) warns.push('resume_match.' + field + ': нет в словаре «' + raw + '»');
+      }
+    }
     if (ids.has(data.id)) errs.push(`id duplicates ${ids.get(data.id)}`);
     ids.set(data.id, rel);
   } catch (e) {

@@ -1,3 +1,4 @@
+import { geoscreen, type GeoInput } from './geoscreen.ts';
 /**
  * Общий построитель RawJob для провайдеров: провайдер нормализует поля площадки в JobFields,
  * а тело вакансии (заголовок, ссылка на источник, доп. поля, описание) собирается здесь единообразно.
@@ -11,6 +12,7 @@ import { applyMethodFromUrl } from './target.ts';
 import { safeExtId, type RawJob, type VacancyData } from './collect.ts';
 
 export interface JobFields {
+  geo?: GeoInput;
   extId: string | number;
   /** время публикации, мс; null — неизвестно */
   postedAt: number | null;
@@ -97,6 +99,7 @@ export function makeJob(f: JobFields): RawJob {
         '\n';
       return {
         data: {
+          ...geoscreen(f.geo ?? {}),
           source_url: f.sourceUrl,
           real_url: apply && /^https?:/.test(apply) ? apply : null,
           apply_method: applyMethodFromUrl(apply),
