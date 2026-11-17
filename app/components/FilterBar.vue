@@ -48,7 +48,10 @@ const countries = computed(() => valuesOf('company_country', 'не указан�
     <TriSelect v-model="f.scored" title="скоринг" yes="отскоренные" no="не отскоренные" />
     <label :class="{ act: f.minOverall }">overall ≥ <input v-model.number="f.minOverall" type="number" min="0" max="100" step="5" class="num" /></label>
     <MultiSelect v-model="f.tracks" :class="{ act: f.tracks.length }" title="профиль" :options="TRACKS" />
-    <MultiSelect v-model="f.sources" :class="{ act: f.sources.length }" title="источник" :options="sources" />
+    <label :class="{ act: f.minTrackFit }">fit профиля ≥ <input v-model.number="f.minTrackFit" type="number" min="0" max="100" step="5" class="num" /></label>
+    <MultiSelect v-model="f.outcomes" title="результат" :options="[{value: 'none', label: 'нет результата'}, {value: 'no_reply', label: 'без ответа'}, {value: 'rejected', label: 'отказ'}, {value: 'screen', label: 'скрининг'}, {value: 'interview', label: 'интервью'}, {value: 'offer', label: 'оффер'}]" />
+    <MultiSelect v-model="f.appliedVia" title="способ отклика" :options="[{value: 'agent', label: 'с агентом'}, {value: 'manual', label: 'вручную'}, {value: 'none', label: 'не указан'}]" />
+    <MultiSelect v-model="f.sources"  :class="{ act: f.sources.length }" title="источник" :options="sources" />
     <MultiSelect v-model="f.regions" :class="{ act: f.regions.length }" title="регион" :options="REGION_OPTIONS" />
     <MultiSelect v-model="f.countries" :class="{ act: f.countries.length }" title="страна" :options="countries" />
     <MultiSelect v-model="f.langs" :class="{ act: f.langs.length }" title="язык" :options="langs" />

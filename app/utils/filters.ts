@@ -18,6 +18,9 @@ export interface Filters {
   /** статусы + псевдостатусы: none, starred, flagged, noted, closed */
   statuses: string[];
   minOverall: number;
+  minTrackFit: number;
+  outcomes: string[];
+  appliedVia: string[];
   /** отскорена ли агентом (scores != null) */
   scored: TriState;
   tracks: string[];
@@ -37,7 +40,7 @@ export interface Filters {
 }
 
 export const blankFilters = (): Filters => ({
-  statuses: [], minOverall: 0, scored: 'any', tracks: [], sources: [], regions: [], countries: [], langs: [], channels: [],
+  statuses: [], minOverall: 0, minTrackFit: 0, outcomes: [], appliedVia: [], scored: 'any', tracks: [], sources: [], regions: [], countries: [], langs: [], channels: [],
   employment: [], stopFlags: [], salary: 'any', period: null,
   sorts: [{ key: 'overall', dir: 'desc' }],
 });
@@ -55,6 +58,9 @@ export function normFilters(raw: any): Filters {
   return {
     statuses: arr(raw.statuses),
     minOverall: typeof raw.minOverall === 'number' ? raw.minOverall : 0,
+    minTrackFit: typeof raw.minTrackFit === 'number' ? Math.max(0, Math.min(100, raw.minTrackFit)) : 0,
+    outcomes: arr(raw.outcomes),
+    appliedVia: arr(raw.appliedVia),
     scored: tri(raw.scored),
     tracks: arr(raw.tracks),
     sources: arr(raw.sources),
@@ -118,8 +124,12 @@ export const isFresh = (v: Row, lastRun: string | null) => !!v.collected_run && 
 export function matchRow(v: Row, fl: Filters, ctx: MatchCtx): boolean {
   if (!matchStatus(v, fl.statuses)) return false;
   if (!tri(fl.scored, v.scores != null)) return false;
-  if (fl.minOverall && (v.scores?.overall ?? 0) < fl.minOverall) return false;
+  if (fl.minOverall && v.scores != null && (v.scores.overall ?? 0) < fl.minOverall) return false;
   if (fl.tracks.length && !fl.tracks.includes(v.best_resume) && !(v.role_tracks ?? []).some((t: string) => fl.tracks.includes(t))) return false;
+  if (fl.minTrackFit > 0 && !Object.entries(v.scores?.fit ?? {}).some(([track, fit]) =>
+    (!fl.tracks.length || fl.tracks.includes(track)) && typeof fit === 'number' && fit >= fl.minTrackFit)) return false;
+  if (fl.outcomes.length && !inSel(fl.outcomes, v.outcome)) return false;
+  if (fl.appliedVia.length && !inSel(fl.appliedVia, v.applied_via)) return false;
   if (fl.sources.length && !fl.sources.includes(v.source)) return false;
   if (fl.regions.length && !inSel(fl.regions, v.region)) return false;
   if (fl.countries.length && !inSel(fl.countries, v.company_country)) return false;

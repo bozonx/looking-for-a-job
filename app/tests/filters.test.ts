@@ -62,3 +62,21 @@ test('сортировка: ★ сверху, пустые в конце; nextSo
   assert.equal(s2.length, 2);
   assert.deepEqual(nextSorts(nextSorts(s2, 'company', true), 'company', true), s1);
 });
+
+test('порог fit применяется к выбранному треку, а не к лучшему соседнему', () => {
+  const v = row({ best_resume: 'react', role_tracks: ['vue', 'react'], scores: { overall: 80, fit: { vue: 30, react: 90 } } });
+  assert.equal(matchRow(v, f({ tracks: ['vue'], minTrackFit: 60 }), ctx), false);
+  assert.equal(matchRow(v, f({ tracks: ['react'], minTrackFit: 60 }), ctx), true);
+});
+
+test('порог overall сохраняет неотскоренные; явный фильтр скоринга скрывает их', () => {
+  assert.equal(matchRow(row({ scores: null }), f({ minOverall: 70 }), ctx), true);
+  assert.equal(matchRow(row({ scores: null }), f({ minOverall: 70, scored: 'yes' }), ctx), false);
+});
+
+test('результат и способ отклика фильтруются независимо', () => {
+  const v = row({ status: 'applied', outcome: 'interview', applied_via: 'manual' });
+  assert.equal(matchRow(v, f({ outcomes: ['interview'], appliedVia: ['manual'] }), ctx), true);
+  assert.equal(matchRow(v, f({ outcomes: ['offer'] }), ctx), false);
+  assert.equal(matchRow(v, f({ appliedVia: ['agent'] }), ctx), false);
+});
