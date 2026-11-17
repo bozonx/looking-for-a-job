@@ -69,9 +69,39 @@ export function tone(v: unknown, inverse = false): string {
 
 export function fmtSalary(s: any): string {
   if (!s) return '';
-  const k = (n: number | null) => (n == null ? '?' : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
+  const k = (n: number | null) => {
+    if (n == null) return '?';
+    if (n >= 1000) {
+      const inK = n / 1000;
+      return Number.isInteger(inK) ? `${inK}k` : `${inK.toFixed(1).replace(/\.0$/, '')}k`;
+    }
+    return String(n);
+  };
   const per = { year: '/год', month: '/мес', hour: '/ч' }[s.period as string] ?? '';
-  return `${k(s.min)}–${k(s.max)} ${s.currency}${per}`;
+  const cur = s.currency ? ` ${s.currency}` : '';
+
+  if (s.min != null && s.max != null) {
+    if (s.min === s.max) return `${k(s.min)}${cur}${per}`;
+    return `${k(s.min)}–${k(s.max)}${cur}${per}`;
+  }
+  if (s.min != null && s.max == null) {
+    return `от ${k(s.min)}${cur}${per}`;
+  }
+  if (s.min == null && s.max != null) {
+    return `до ${k(s.max)}${cur}${per}`;
+  }
+  return `?${cur}${per}`;
+}
+
+export function fmtSalaryUsdMonth(s: { min: number | null; max: number | null } | null | undefined): string {
+  if (!s || (s.min == null && s.max == null)) return '';
+  const num = (n: number | null) => (n == null ? '?' : `$${n.toLocaleString('en-US')}`);
+  if (s.min != null && s.max != null) {
+    if (s.min === s.max) return num(s.min);
+    return `${num(s.min)}–${num(s.max)}`;
+  }
+  if (s.min != null) return `от ${num(s.min)}`;
+  return `до ${num(s.max)}`;
 }
 
 /** Канал отклика (apply_channels[].type / apply_method): иконка и подпись. */

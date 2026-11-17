@@ -356,7 +356,7 @@ null ◀──▶ selected ──▶ applied
 | **Особые требования** | `requirements_special` (`type`, `standard`, `details`) |
 | **Каналы отклика** (`ApplyChannels.vue`) | `apply_channels` (`type`, `value`, `note`, `by`), `apply_method` |
 | **Ссылки и заметки** | `source_url`, `source`, `real_url`, `real_url_tried_at`, `duplicates` (`source`, `url`, `seen_at`, `id`), `notes`, `applied_at`, `apply_log` |
-| **Свернутый блок деталей** (`tech-details`) | `id`, все оценки `scores.fit.*`, `scores.region`, `scores.language`, файл на диске, `source`, `apply_method` → `apply_target`, `collected_at`, `collected_run`, `posted_at`, `alive_checked_at`, `possibly_closed`, `real_url_tried_at`, `scoring_version`, `vacancy_language`, `seniority`, `company_stage`, `hire_from_ar` + `hire_from_ar_evidence`, `timezone`, `salary_usd_month`, `best_track`, `role_tracks`, `scores.end_client_corporate`, `prefilter_reason`, `applied_via`, `outcome` + `outcome_at`, `resume_match.keyword_spellings`, сырые `stop_flags` |
+| **Свернутый блок деталей** (`tech-details`) | `id`, все оценки `scores.fit.*`, `scores.region`, `scores.language`, файл на диске, `source`, `apply_method` → `apply_target`, `collected_at`, `collected_run`, `posted_at`, `alive_checked_at`, `possibly_closed`, `real_url_tried_at`, `scoring_version`, `seniority`, `company_stage`, `hire_from_ar` + `hire_from_ar_evidence`, `timezone`, `salary_usd_month`, `scores.end_client_corporate`, `prefilter_reason`, `applied_via`, `outcome` + `outcome_at`, `resume_match.keyword_spellings`, сырые `stop_flags` |
 | **Тело вакансии** (`VacancyBody.vue`) | Исходный markdown-текст описания вакансии |
 
 ## Тело файла

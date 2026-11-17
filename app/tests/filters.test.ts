@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { blankFilters, matchQuery, matchRow, nextSorts, normFilters, sortRows, NONE } from '../utils/filters.ts';
+import { fmtSalary, fmtSalaryUsdMonth } from '../utils/labels.ts';
 
 const ctx = { lastRun: 'r2', now: new Date('2026-11-17T12:00:00') };
 const row = (o: Record<string, any> = {}) => ({ id: 'x', title: 'Vue dev', company: 'Acme', status: null, scores: { overall: 70 }, stop_flags: [], ...o });
@@ -88,4 +89,18 @@ test('фильтры найма и зарплаты сохраняют неиз�
   assert.equal(matchRow(row({ salary_usd_month: { min: 5000, max: null } }), f({ minSalary: 5000 }), ctx), true);
   assert.equal(matchRow(row(), f({ minSalary: 5000 }), ctx), false);
   assert.deepEqual(normFilters({}).hireFromAr, []);
+});
+
+test('форматирование зарплаты в карточке и деталях', () => {
+  assert.equal(fmtSalary({ min: 150, max: 150, currency: 'USD', period: 'hour' }), '150 USD/ч');
+  assert.equal(fmtSalary({ min: 2200, max: 3500, currency: 'USD', period: 'month' }), '2.2k–3.5k USD/мес');
+  assert.equal(fmtSalary({ min: null, max: 150000, currency: 'RUB', period: 'month' }), 'до 150k RUB/мес');
+  assert.equal(fmtSalary({ min: 5000, max: null, currency: 'EUR', period: 'month' }), 'от 5k EUR/мес');
+  assert.equal(fmtSalary(null), '');
+
+  assert.equal(fmtSalaryUsdMonth({ min: 2200, max: 3500 }), '$2,200–$3,500');
+  assert.equal(fmtSalaryUsdMonth({ min: 24000, max: 24000 }), '$24,000');
+  assert.equal(fmtSalaryUsdMonth({ min: 5000, max: null }), 'от $5,000');
+  assert.equal(fmtSalaryUsdMonth({ min: null, max: 1575 }), 'до $1,575');
+  assert.equal(fmtSalaryUsdMonth(null), '');
 });

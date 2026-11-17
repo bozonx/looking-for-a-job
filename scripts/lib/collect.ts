@@ -8,6 +8,7 @@ import { freshnessDays } from './freshness.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { env, today } from './env.ts';
+import { monthlyUsd } from './derived.ts';
 import { loadAll, parseVacancy, vacancyPath, writeVacancy, type VacancyFile } from './vacancy.ts';
 import { buildIndex, findDuplicate, key, normUrl, unknownCompany, type Index } from './dedupe.ts';
 import { appendRunLog, appendRunStats } from './runlog.ts';
@@ -89,6 +90,7 @@ export function blankVacancy(source: string, extId: string) {
     location: null as string | null,
     region: null as string | null,
     salary: null as null | { min: number | null; max: number | null; currency: string; period: string },
+    salary_usd_month: null as null | { min: number | null; max: number | null },
     employment: 'unknown',
     vacancy_language: null as string | null,
     work_languages: null as string[] | null,
@@ -322,6 +324,9 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
 
           const built = await j.build();
           const data: VacancyData = { ...blankVacancy(SOURCE, j.extId), title: j.title, company: j.company || 'Unknown', tags: j.tags, ...built.data, id };
+          if (data.salary && !data.salary_usd_month) {
+            data.salary_usd_month = monthlyUsd(data.salary);
+          }
           const builtGeo = geoscreen({ location: data.location });
           if (builtGeo.hire_from_ar === 'no') {
             Object.assign(data, builtGeo);
