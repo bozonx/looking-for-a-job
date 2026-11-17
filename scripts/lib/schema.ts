@@ -5,12 +5,9 @@ const score = z.number().min(0).max(100);
 const nscore = score.nullable();
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 
-/** Группы работодателя из config/regions.yaml; поле region вычисляет score.ts. */
-export const REGIONS = ['argentina', 'ru_speaking_team', 'ru_speaking', 'anglo', 'spanish', 'europe', 'uae', 'asia', 'other', 'unknown'] as const;
-export const TRACKS = ['vue', 'react', 'angular', 'fullstack', 'ai_engineer', 'automation'] as const;
-/** Решение по вакансии. Нет статуса (null) — решения нет: такие вакансии со временем удаляет cleanup. */
-export const STATUSES = ['selected', 'needs_attention', 'applied', 'apply_failed'] as const;
-export const STOP_FLAGS = ['office_outside_ar', 'location_restricted', 'nationality_excluded', 'ru_corporate', 'inadequate', 'scam'] as const;
+import { ATTENTION_REASONS, EMPLOYMENT, REGIONS, STATUSES, STOP_FLAGS, TRACKS } from './enums.ts';
+
+export { ATTENTION_REASONS, EMPLOYMENT, REGIONS, STATUSES, STOP_FLAGS, TRACKS };
 
 export const ScoresSchema = z.object({
   remote: score,
@@ -70,7 +67,7 @@ export const VacancySchema = z.object({
     .object({ min: z.number().nullable(), max: z.number().nullable(), currency: z.string(), period: z.enum(['year', 'month', 'hour']) })
     .nullable()
     .optional(),
-  employment: z.enum(['full-time', 'contract', 'b2b', 'eor', 'unknown']).default('unknown'),
+  employment: z.enum(EMPLOYMENT).default('unknown'),
   vacancy_language: z.string().nullable().optional(),
   work_languages: z.array(z.string()).nullable().optional(),
   role_tracks: z.array(z.enum(TRACKS)).default([]),
@@ -91,7 +88,7 @@ export const VacancySchema = z.object({
     .default([]),
 
   status: z.enum(STATUSES).nullable().default(null),
-  attention_reason: z.enum(['unknown_question', 'special_media', 'captcha', 'login', 'ambiguous', 'other']).nullable().optional(),
+  attention_reason: z.enum(ATTENTION_REASONS).nullable().optional(),
   attention_details: z.string().nullable().optional(),
   starred: z.boolean().default(false),
   flagged: z.boolean().default(false), // ⚑ «проблемная»: пользователь считает скоринг/данные неверными; агент разбирает и снимает (playbooks/flagged.md)

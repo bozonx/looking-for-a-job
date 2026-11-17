@@ -13,7 +13,7 @@
     "score": "node --env-file-if-exists=.env scripts/score.ts",
     "rescore": "node --env-file-if-exists=.env scripts/score.ts --all",
     "validate": "node --env-file-if-exists=.env scripts/validate.ts",
-    "test": "node --test scripts/lib/*.test.ts",
+    "test": "node --test scripts/lib/*.test.ts app/tests/*.test.ts",
     "typecheck": "tsc -p . && nuxi prepare app >/dev/null && tsc -p app/.nuxt/tsconfig.server.json --noEmit && tsc -p app/.nuxt/tsconfig.app.json --noEmit",
     "dev": "nuxt dev app",
     "ui:build": "nuxt build app",
