@@ -5,16 +5,24 @@
  *   не повторялись синхронно; или ровно Retry-After: секунды либо HTTP-дата, ≤ 60с);
  * - общий бюджет на один запрос с повторами (TOTAL_BUDGET_MS) — зависший хост не съедает минуты;
  * - 429 после всех повторов → хост блокируется до конца запуска: дальнейшие запросы к нему сразу падают,
- *   а не добивают площадку, которая уже нас ограничила.
+ *   а не добивают площадку, которая уже нас ограничила; хост ставится на паузу и в data/state/host-cooldown.json
+ *   (Retry-After или COOLDOWN_429_MS) — следующие запуски его тоже не трогают;
+ * - 403 дважды за запуск от одного хоста → хост блокируется до конца запуска (защита от ботов, долбить бесполезно);
+ * - User-Agent — обычный Chrome на Windows: со «скриптовым» UA HTML-страницы за Cloudflare отвечают 403.
  */
-export const UA = 'Mozilla/5.0 (job-search personal script)';
+export const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
+const BROWSER_HEADERS = { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' };
 
 const ATTEMPT_TIMEOUT_MS = 30_000;
 const TOTAL_BUDGET_MS = 120_000;
 const HOST_GAP_MS = 500;
 const MAX_RETRY_WAIT_MS = 60_000;
+const COOLDOWN_429_MS = 3600e3;
+/** после стольких 403 от хоста за запуск — блок до конца запуска */
+const MAX_403 = 2;
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { cooldownUntil, fmtUntil, setCooldown } from './cooldown.ts';
 
 export const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -29,6 +37,8 @@ export async function pool<T>(items: T[], limit: number, fn: (item: T) => Promis
 
 /** хосты, ответившие 429 после всех повторов, — до конца запуска не трогаем */
 const blockedHosts = new Set<string>();
+/** хост → сколько 403 он отдал за запуск */
+const forbidden = new Map<string, number>();
 /** хост → момент, раньше которого следующий запрос к нему не отправляем */
 const nextSlot = new Map<string, number>();
 
@@ -63,10 +73,10 @@ const jitter = (ms: number) => Math.round(ms * (0.8 + Math.random() * 0.4));
 export class HostBlockedError extends Error {}
 
 /** Ждёт своей очереди к хосту. Слот резервируется синхронно — корректно и при параллельных вызовах. */
-async function throttle(host: string): Promise<void> {
+async function throttle(host: string, gapMs = HOST_GAP_MS): Promise<void> {
   const now = Date.now();
   const at = Math.max(now, nextSlot.get(host) ?? 0);
-  nextSlot.set(host, at + HOST_GAP_MS);
+  nextSlot.set(host, at + gapMs);
   if (at > now) await sleep(at - now);
 }
 
@@ -79,13 +89,20 @@ export function retryAfterMs(v: string | null | undefined, now = Date.now()): nu
   return Number.isFinite(t) ? Math.max(0, t - now) : null;
 }
 
-export async function fetchWithRetry(url: string, init: RequestInit = {}, retries = 3): Promise<Response> {
+/** gapMs — пауза между запросами к хосту, если HOST_GAP_MS мало (HTML-страницы, а не API) */
+export async function fetchWithRetry(url: string, init: RequestInit = {}, retries = 3, opts: { gapMs?: number } = {}): Promise<Response> {
   const host = new URL(url).host;
-  if (blockedHosts.has(host)) throw new HostBlockedError(`${url}: хост ${host} ограничил запросы (429) — пропущено до следующего сбора`);
-  const headers = { 'User-Agent': UA, ...(init.headers as Record<string, string> | undefined) };
+  if (blockedHosts.has(host)) throw new HostBlockedError(`${url}: хост ${host} ограничил запросы (429/403) — пропущено до следующего запуска`);
+  const paused = cooldownUntil('http', host);
+  if (paused) {
+    blockedHosts.add(host);
+    warn(`${host}: на паузе после 429 до ${fmtUntil(paused)} — запросы к хосту пропущены`);
+    throw new HostBlockedError(`${url}: хост ${host} на паузе до ${fmtUntil(paused)} (429)`);
+  }
+  const headers = { ...BROWSER_HEADERS, ...(init.headers as Record<string, string> | undefined) };
   const deadline = Date.now() + TOTAL_BUDGET_MS;
   for (let attempt = 0; ; attempt++) {
-    await throttle(host);
+    await throttle(host, opts.gapMs);
     let res: Response | null = null;
     let err: unknown = null;
     try {
@@ -100,7 +117,16 @@ export async function fetchWithRetry(url: string, init: RequestInit = {}, retrie
     if (!retriable || attempt >= retries || outOfBudget) {
       if (res?.status === 429) {
         blockedHosts.add(host);
-        warn(`${host}: 429 Too Many Requests после ${attempt + 1} попыток — остальные запросы к хосту в этом запуске пропущены`);
+        const until = setCooldown('http', host, Math.max(ra ?? 0, COOLDOWN_429_MS));
+        warn(`${host}: 429 Too Many Requests после ${attempt + 1} попыток — хост на паузе до ${fmtUntil(until)}`);
+      }
+      if (res?.status === 403) {
+        const n = (forbidden.get(host) ?? 0) + 1;
+        forbidden.set(host, n);
+        if (n >= MAX_403) {
+          blockedHosts.add(host);
+          warn(`${host}: ${n}× HTTP 403 (защита от ботов?) — остальные запросы к хосту в этом запуске пропущены`);
+        }
       }
       if (err) throw new Error(`${url}: ${(err as Error).message}`);
       return res!;

@@ -5,7 +5,9 @@
  * Бережно к площадкам (без бана):
  * - запросы к одной площадке строго последовательно, пауза GAP_MS (+ случайный разброс); разные площадки — параллельно;
  * - не больше --limit страниц с одной площадки за запуск (по умолчанию 40), свежие вакансии первыми;
- * - 403/429 → площадка до конца запуска пропускается;
+ * - 403/429 → площадка пропускается и ставится на паузу (data/state/host-cooldown.json): 403 — на COOLDOWN_403_DAYS,
+ *   429 — на COOLDOWN_429_HOURS; на паузе её вакансии не загружаются (и не помечаются как пробованные);
+ * - сетевая ошибка / таймаут одной страницы — вакансия пропускается; MAX_ERRORS ошибок подряд — площадка пропускается;
  * - каждая вакансия пробуется один раз: real_url_tried_at; повтор — только с --force.
  *
  * Правила извлечения (проверены на живых страницах, 2026-11):
@@ -15,7 +17,8 @@
  * Не используются: workingnomads «Apply now» (там реклама), himalayas (403 от защиты), getonbrd/habr/jobicy/remotive/YC
  * (отклик на самой площадке или за логином), HN (ссылки из комментария извлекает агент при скоринге).
  */
-import { fetchWithRetry, sleep } from './lib/http.ts';
+import { fetchWithRetry, HostBlockedError, sleep } from './lib/http.ts';
+import { cooldownUntil, fmtUntil, setCooldown } from './lib/cooldown.ts';
 import { loadAll, parseVacancy, resolveTargets, writeVacancy, type VacancyFile } from './lib/vacancy.ts';
 import { deriveApply } from './lib/target.ts';
 import { channelFromUrl, extractChannels, mergeChannels, type Channel } from './lib/channels.ts';
@@ -25,6 +28,9 @@ import { appendRunLog } from './lib/runlog.ts';
 
 const GAP_MS = 3000;
 const JITTER_MS = 1500;
+const MAX_ERRORS = 3;
+const COOLDOWN_403_DAYS = 7;
+const COOLDOWN_429_HOURS = 24;
 
 const args = process.argv.slice(2);
 const val = (n: string) => {
@@ -105,8 +111,14 @@ async function main() {
     .sort((a, b) => date(b).localeCompare(date(a)));
 
   const byHost = new Map<string, VacancyFile[]>();
+  const paused = new Map<string, Date>();
   for (const v of queue) {
     const h = new URL(v.data.source_url).hostname;
+    const until = paused.get(h) ?? cooldownUntil('resolve', h) ?? cooldownUntil('http', h);
+    if (until) {
+      paused.set(h, until);
+      continue;
+    }
     const list = byHost.get(h) ?? [];
     if (list.length < limit) list.push(v);
     byHost.set(h, list);
@@ -115,22 +127,31 @@ async function main() {
   console.log(`Страниц к загрузке: ${total} (в очереди ${queue.length}, лимит ${limit} на площадку): ${[...byHost].map(([h, l]) => `${h} ${l.length}`).join(', ')}`);
 
   const found: string[] = [];
-  const notes: string[] = [];
+  const notes: string[] = [...paused].map(([h, d]) => `${h}: на паузе до ${fmtUntil(d)} — не загружалась`);
+  for (const n of notes) console.log(`⏸ ${n}`);
   let tried = 0;
   await Promise.all(
     [...byHost].map(async ([host, list]) => {
+      let errorsInRow = 0;
       for (const [i, v] of list.entries()) {
         if (i) await sleep(GAP_MS + Math.random() * JITTER_MS);
         let res: Response;
         try {
           res = await fetchWithRetry(v.data.source_url, {}, 1);
         } catch (e) {
-          notes.push(`${host}: ${(e as Error).message} — площадка пропущена`);
-          return;
+          const msg = (e as Error).message;
+          console.log(`! ${v.data.id}: ${msg}`);
+          if (e instanceof HostBlockedError || ++errorsInRow >= MAX_ERRORS) {
+            notes.push(`${host}: ${e instanceof HostBlockedError ? msg : `${errorsInRow} ошибок подряд (последняя: ${msg})`} — площадка пропущена`);
+            return;
+          }
+          continue;
         }
+        errorsInRow = 0;
         if (res.status === 403 || res.status === 429) {
           await res.body?.cancel().catch(() => {});
-          notes.push(`${host}: HTTP ${res.status} — площадка пропущена до следующего запуска`);
+          const until = dryRun ? null : setCooldown('resolve', host, res.status === 403 ? COOLDOWN_403_DAYS * 86400e3 : COOLDOWN_429_HOURS * 3600e3);
+          notes.push(`${host}: HTTP ${res.status} — площадка пропущена${until ? `, на паузе до ${fmtUntil(until)}` : ''}`);
           return;
         }
         tried++;

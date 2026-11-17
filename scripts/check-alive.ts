@@ -18,7 +18,9 @@
 import { fetchWithRetry, pool } from './lib/http.ts';
 
 /** не больше стольких проверок одновременно — иначе сотни хостов = сотни открытых соединений */
-const PARALLEL_CHECKS = 16;
+const PARALLEL_CHECKS = 8;
+/** пауза к одному хосту для generic-проверки: это HTML-страницы, а не API ATS */
+const GENERIC_GAP_MS = 1500;
 import { loadAll, parseVacancy, resolveTargets, writeVacancy } from './lib/vacancy.ts';
 import { appendRunLog } from './lib/runlog.ts';
 
@@ -91,7 +93,7 @@ export async function checkUrl(raw: string): Promise<{ verdict: Verdict; how: st
   }
 
   // Прочие сайты: только явные признаки. 200 не считаем «жива» — многие отдают 200 на заглушку.
-  const res = await fetchWithRetry(raw, { redirect: 'follow' });
+  const res = await fetchWithRetry(raw, { redirect: 'follow' }, 3, { gapMs: GENERIC_GAP_MS });
   await res.body?.cancel().catch(() => {});
   if (res.status === 404 || res.status === 410) return { verdict: 'closed', how: `generic ${res.status}` };
   if (/not_found|notfound|expired|job-closed|no-longer/i.test(res.url) && res.url !== raw) return { verdict: 'closed', how: 'generic redirect' };
