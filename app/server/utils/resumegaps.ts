@@ -12,6 +12,7 @@ export interface ResumeAnalysis {
   responsibilitiesMissing: string[];
   softMatched: string[];
   spellingDiffs: Record<string, string[]>;
+  frequencies: Record<string, number>;
 }
 
 function factsText(): string | null {
@@ -23,9 +24,13 @@ export function resumeGaps(rm: Record<string, any> | null | undefined): string[]
   return analyzeResumeMatch(rm)?.missing ?? null;
 }
 
-export function analyzeResumeMatch(rm: Record<string, any> | null | undefined): ResumeAnalysis | null {
+export function analyzeResumeMatch(
+  rm: Record<string, any> | null | undefined,
+  vacancies: Array<{ data: Record<string, any> }> = [],
+  overrides?: { resume?: string; facts?: string | null },
+): ResumeAnalysis | null {
   if (!rm?.resume) return null;
-  const text = resumeText(rm.resume);
+  const text = overrides?.resume ?? resumeText(rm.resume);
   if (!text) return null;
 
   const dict = loadSkills();
@@ -33,7 +38,7 @@ export function analyzeResumeMatch(rm: Record<string, any> | null | undefined): 
   const have = skillsInText(text, dict);
   const haveResp = skillsInText(text, respDict);
 
-  const facts = factsText();
+  const facts = overrides && 'facts' in overrides ? (overrides.facts ?? null) : factsText();
   const factsSkills = facts ? skillsInText(facts, dict) : new Set<string>();
   const factsResp = facts ? skillsInText(facts, respDict) : new Set<string>();
 
@@ -76,6 +81,40 @@ export function analyzeResumeMatch(rm: Record<string, any> | null | undefined): 
     }
   }
 
+  const frequencies: Record<string, number> = {};
+  if (vacancies.length) {
+    const skillCounts = new Map<string, number>();
+    const respCounts = new Map<string, number>();
+    for (const v of vacancies) {
+      const vrm = v.data?.resume_match;
+      if (!vrm) continue;
+      const seenSkill = new Set<string>();
+      for (const s of [...(vrm.required ?? []), ...(vrm.nice_to_have ?? [])]) {
+        const c = normSkill(String(s), dict).name;
+        if (!seenSkill.has(c)) {
+          seenSkill.add(c);
+          skillCounts.set(c, (skillCounts.get(c) ?? 0) + 1);
+        }
+      }
+      const seenResp = new Set<string>();
+      for (const r of vrm.responsibilities ?? []) {
+        const c = normSkill(String(r), respDict).name;
+        if (!seenResp.has(c)) {
+          seenResp.add(c);
+          respCounts.set(c, (respCounts.get(c) ?? 0) + 1);
+        }
+      }
+    }
+    for (const s of [...reqAndNice, ...(rm.ats_keywords_missing ?? []).map(String)]) {
+      const n = skillCounts.get(normSkill(s, dict).name);
+      if (n) frequencies[s] = n;
+    }
+    for (const r of (rm.responsibilities ?? []).map(String)) {
+      const n = respCounts.get(normSkill(r, respDict).name);
+      if (n) frequencies[r] = n;
+    }
+  }
+
   return {
     missing,
     inFacts: [...inFacts],
@@ -83,5 +122,6 @@ export function analyzeResumeMatch(rm: Record<string, any> | null | undefined): 
     responsibilitiesMissing,
     softMatched,
     spellingDiffs,
+    frequencies,
   };
 }

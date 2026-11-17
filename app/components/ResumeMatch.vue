@@ -11,6 +11,7 @@ interface ResumeAnalysis {
   responsibilitiesMissing: string[];
   softMatched: string[];
   spellingDiffs: Record<string, string[]>;
+  frequencies: Record<string, number>;
 }
 
 const props = defineProps<{
@@ -25,6 +26,7 @@ const missing = computed(() => new Set<string>(props.analysis?.missing ?? props.
 const inFacts = computed(() => new Set<string>(props.analysis?.inFacts ?? []));
 const softMatched = computed(() => new Set<string>(props.analysis?.softMatched ?? []));
 const spellingDiffs = computed(() => props.analysis?.spellingDiffs ?? {});
+const frequencies = computed(() => props.analysis?.frequencies ?? {});
 
 const facts = computed(() =>
   [
@@ -70,9 +72,11 @@ function copySkill(s: string) {
 }
 
 function gapTitle(s: string) {
+  const freq = frequencies.value[s];
+  const freqHint = freq && freq > 1 ? ` (встречается в ${freq} вакансиях)` : '';
   return inFacts.value.has(s)
-    ? 'Есть в profile/facts.md, но нет в резюме трека — кликните, чтобы скопировать'
-    : 'Нет ни в резюме, ни в profile/facts.md — кликните, чтобы скопировать';
+    ? `Есть в profile/facts.md, но нет в резюме трека${freqHint} — кликните, чтобы скопировать`
+    : `Нет ни в резюме, ни в profile/facts.md${freqHint} — кликните, чтобы скопировать`;
 }
 </script>
 
@@ -125,7 +129,7 @@ function gapTitle(s: string) {
           :title="gapTitle(s)"
           @click="copySkill(s)"
         >
-          {{ s }}<span v-if="inFacts.has(s)" class="facts-badge"> · в фактах</span>
+          {{ s }}<span v-if="inFacts.has(s)" class="facts-badge"> · в фактах</span><span v-if="(frequencies[s] ?? 0) > 1" class="freq-badge">×{{ frequencies[s] }}</span>
         </button>
       </div>
 
@@ -139,7 +143,7 @@ function gapTitle(s: string) {
           :title="gapTitle(s)"
           @click="copySkill(s)"
         >
-          {{ s }}<span v-if="inFacts.has(s)" class="facts-badge"> · в фактах</span>
+          {{ s }}<span v-if="inFacts.has(s)" class="facts-badge"> · в фактах</span><span v-if="(frequencies[s] ?? 0) > 1" class="freq-badge">×{{ frequencies[s] }}</span>
         </button>
       </div>
 
@@ -153,12 +157,12 @@ function gapTitle(s: string) {
           :title="gapTitle(s)"
           @click="copySkill(s)"
         >
-          {{ s }}<span v-if="inFacts.has(s)" class="facts-badge"> · в фактах</span>
+          {{ s }}<span v-if="inFacts.has(s)" class="facts-badge"> · в фактах</span><span v-if="(frequencies[s] ?? 0) > 1" class="freq-badge">×{{ frequencies[s] }}</span>
         </button>
       </div>
 
       <div class="gap-hint small muted">
-        💡 Если есть пометка <b>«в фактах»</b> — опыт уже описан в <code>profile/facts.md</code>, добавьте его в <code>profile/resumes/{{ m.resume }}.md</code>. Если скоринг ошибся — нажмите <b>⚑ Проблемная</b> (клавиша <b>f</b>).
+        💡 Если есть пометка <b>«в фактах»</b> — опыт уже описан в <code>profile/facts.md</code>, добавьте его в <code>profile/resumes/{{ m.resume }}.md</code>. Счётчик <b>×N</b> — в скольких вакансиях встречается требование. Если скоринг ошибся — нажмите <b>⚑ Проблемная</b> (клавиша <b>f</b>).
       </div>
     </div>
 
@@ -189,7 +193,7 @@ function gapTitle(s: string) {
       <ul v-if="respMissing.length" class="resp-list">
         <li v-for="r in respMissing" :key="r">
           <button type="button" class="link-btn" :title="gapTitle(r)" @click="copySkill(r)">
-            {{ analysis ? '⚠ ' : '' }}{{ r }}<span v-if="inFacts.has(r)" class="muted small"> (в фактах)</span>
+            {{ analysis ? '⚠ ' : '' }}{{ r }}<span v-if="inFacts.has(r)" class="muted small"> (в фактах)</span><span v-if="(frequencies[r] ?? 0) > 1" class="freq-badge">×{{ frequencies[r] }}</span>
           </button>
         </li>
       </ul>

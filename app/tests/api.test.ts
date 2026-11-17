@@ -56,3 +56,34 @@ test('batch отклоняет пустые, слишком большие и н
   }
   assert.equal(writes, 0);
 });
+
+test('analyzeResumeMatch сопоставляет навыки, обязанности, факты, написания и частотность', async () => {
+  const { analyzeResumeMatch } = await import('../server/utils/resumegaps.ts');
+  const rm = {
+    resume: 'vue',
+    required: ['Vue', 'TypeScript'],
+    nice_to_have: ['GraphQL', 'Docker'],
+    responsibilities: ['code review', 'mentor developers'],
+    soft_requirements: ['mentoring', 'ownership'],
+    keyword_spellings: { Vue: ['Vue.js', 'Vue 3'] },
+  };
+  const vacancies = [
+    { data: { resume_match: rm } },
+    { data: { resume_match: { required: ['GraphQL'], nice_to_have: [], responsibilities: ['mentor developers'] } } },
+  ];
+  const res = analyzeResumeMatch(rm, vacancies, {
+    resume: 'Experienced with Vue 3, TypeScript, code review, and mentoring.',
+    facts: 'Worked with GraphQL and mentored junior developers (mentor developers).',
+  });
+  assert.ok(res);
+  assert.deepEqual(res.missing, ['GraphQL', 'Docker']);
+  assert.ok(res.inFacts.includes('GraphQL'));
+  assert.ok(res.inFacts.includes('mentor developers'));
+  assert.ok(!res.inFacts.includes('Docker'));
+  assert.deepEqual(res.responsibilitiesMatched, ['code review']);
+  assert.deepEqual(res.responsibilitiesMissing, ['mentor developers']);
+  assert.deepEqual(res.softMatched, ['mentoring']);
+  assert.deepEqual(res.spellingDiffs, { Vue: ['Vue.js'] });
+  assert.equal(res.frequencies['GraphQL'], 2);
+  assert.equal(res.frequencies['mentor developers'], 2);
+});
