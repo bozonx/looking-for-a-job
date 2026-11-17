@@ -69,7 +69,7 @@ stop_flags: []
 best_resume: vue
 score_reasoning: Явно указана полная удалёнка в пределах EU-таймзон, команда 8 человек, есть сайт и Crunchbase …
 requirements_special: []
-status: new
+status: null
 attention_reason: null
 attention_details: null
 starred: false
@@ -235,19 +235,18 @@ apply_channels:
 
 ### `status`
 ```
-new ──▶ selected ──▶ applied
+null ◀──▶ selected ──▶ applied
  │          │   └──▶ needs_attention ──(дополнил answers.md / разобрался)──▶ selected / applied
  │          └──────▶ apply_failed   (техническая ошибка — можно повторить)
- └──▶ rejected
+
 ```
 
 | Значение | Кто ставит | Смысл |
 |---|---|---|
-| `new` | С (и UI — «вернуть») | собрана, не разобрана |
+| `null` | С / UI | решение не принято; отсутствие скоринга определяется отдельно: `scores: null` |
 | `selected` | UI | хочу откликнуться |
-| `rejected` | UI | не интересно |
 | `needs_attention` | О | нужно моё решение (см. `attention_reason`) |
-| `applied` | О | отклик отправлен |
+| `applied` | О / UI | отклик отправлен пользователем; `applied_via: agent` или `manual` |
 | `apply_failed` | О | техническая ошибка, можно повторить |
 
 ### `attention_reason`, `attention_details` · О
@@ -257,7 +256,7 @@ new ──▶ selected ──▶ applied
 Звезда (отмеченные — сверху списка) и ваши заметки (сохраняются при потере фокуса).
 
 ### `possibly_closed` · А/О
-Агент случайно увидел, что вакансия закрыта. Ненадёжный признак — специально не отслеживается. Такие исключаются из отклика.
+Признак возможного закрытия: проверка `npm run check-alive` по real_url или отсутствие в снимке ATS при сборе. Такие исключаются из очереди скоринга и отклика.
 
 ### `apply_log` · О
 Ссылка на `data/runs/<дата>-apply.md` и краткий итог отклика.

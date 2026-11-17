@@ -6,7 +6,7 @@
 
 - **Node.js ≥ 23.6** — скрипты на TypeScript запускаются нативно, без сборки. Проверка: `node -v`.
 - **Агент** — Claude Code, Codex или любой другой, умеющий читать `AGENTS.md`. Запускается из корня репозитория.
-- **Браузер Orca** — пока не обязателен (RemoteOK собирается через API). Понадобится для HTML-площадок, LinkedIn и откликов.
+- **Chromium/Chrome** — нужен для откликов и PDF резюме. Для откликов запустите `npm run browser:start` (CDP :9222); сбор открытых API и лент работает без браузера.
 
 ```bash
 npm install
@@ -67,7 +67,7 @@ cp questions.example.md questions.md
 
 Важно: `preferences.md` и `weights.yaml` должны говорить одно и то же. Поменяли смысл в одном — поправьте второй. Подробно о том, как веса превращаются в балл, — [how-it-works.md](how-it-works.md#скоринг).
 
-Стоп-факторы (`office_outside_ar`, `location_restricted`, `nationality_excluded`, `ru_corporate`) и список регионов зашиты под конкретную ситуацию (живу в Аргентине). Если ваша другая — поменяйте описание в `preferences.md`, `playbooks/scoring.md`, `dev_docs/design.md §8.1`; для нового значения флага или региона нужно также расширить enum в `scripts/lib/schema.ts`.
+Стоп-факторы (`office_outside_ar`, `location_restricted`, `nationality_excluded`, `ru_corporate`) и список регионов зашиты под конкретную ситуацию (живу в Аргентине). Если ваша другая — поменяйте описание в `preferences.md`, `playbooks/scoring.md`, `dev_docs/design.md §8.1`; для нового значения флага или региона нужно также расширить enum в `scripts/lib/enums.ts`.
 
 ## 4. Первый сбор
 
@@ -89,7 +89,7 @@ npm run collect -- --dry-run
 npm run dev     # http://localhost:3000
 ```
 
-Отмечайте интересное (`a`), отклоняйте (`x`), ставьте звёзды (`s`). См. [running.md](running.md#ui).
+Отмечайте интересное (`a`), снимайте выбор (`u`), ставьте звёзды (`s`). См. [running.md](running.md#ui).
 
 ## 6. Через несколько дней
 
