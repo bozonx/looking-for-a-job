@@ -68,6 +68,14 @@ export const VacancySchema = z.object({
     .object({ min: z.number().nullable(), max: z.number().nullable(), currency: z.string(), period: z.enum(['year', 'month', 'hour']) })
     .nullable()
     .optional(),
+  hire_from_ar: z.enum(['yes', 'likely', 'unknown', 'no']).nullable().optional(),
+  hire_from_ar_evidence: z.string().nullable().optional(),
+  timezone: z.string().nullable().optional(),
+  seniority: z.enum(['junior', 'mid', 'senior', 'staff', 'lead', 'unknown']).nullable().optional(),
+  company_stage: z.enum(['early', 'growth', 'enterprise', 'agency', 'unknown']).nullable().optional(),
+  salary_usd_month: z.object({ min: z.number().nonnegative().nullable(), max: z.number().nonnegative().nullable() }).nullable().optional(),
+  best_track: z.enum(TRACKS).nullable().optional(),
+  employer_group: z.enum(REGIONS).nullable().optional(),
   employment: z.enum(EMPLOYMENT).default('unknown'),
   vacancy_language: z.string().nullable().optional(),
   work_languages: z.array(z.string()).nullable().optional(),

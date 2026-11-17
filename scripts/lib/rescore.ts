@@ -1,3 +1,4 @@
+import { bestTrack, monthlyUsd } from './derived.ts';
 /** Shared by scripts/score.ts and the UI's POST /api/rescore — one place for derived-field logic. */
 import { computeOverall, loadRegions, loadWeights, regionGroup, type Regions, type Weights } from './scoring.ts';
 import { deriveApply } from './target.ts';
@@ -23,6 +24,9 @@ export function rescoreVacancy(v: VacancyFile, { W, R }: RescoreCtx): { overall:
   const s = d.scores;
   if (!s) return null;
   d.region = regionGroup(R, d.company_country, d.ru_speaking_team) as typeof d.region;
+  d.employer_group = d.region;
+  d.best_track = bestTrack(s.fit ?? {}, W.fit_tracks);
+  d.salary_usd_month = monthlyUsd(d.salary);
   s.region = R[d.region!]?.score ?? null;
   // каналы: агент мог дописать real_url — добавляем его; извлечение из текста делает сбор / npm run channels
   d.apply_channels = mergeChannels(d.apply_channels, [channelFromUrl(d.real_url, 'agent')]);
