@@ -25,6 +25,7 @@ const ROOT = resolve(import.meta.dirname, '..');
 const RESUMES = join(PROFILE, 'resumes');
 import {
   PROFILE, LANGS, type Lang, type Project, type SoftSkillRef, splitFrontMatter, stripComments, readProjects, projectRefs,
+  loadCommonSkills, injectCommonSkills,
   softSkillRefs, readSoftSkills, readEducation, loadTracks,
 } from './lib/resume.ts';
 export { splitFrontMatter };
@@ -279,7 +280,8 @@ function build(job: Job, header: Header, projects: Map<string, Project>, opts: {
       : trackSoft?.length
         ? trackSoft.map((id) => ({ id }))
         : undefined;
-  const md = assembleTail(stripComments(body), projectsMd(refs, projects, job.lang), job.lang, softRefs);
+  const withCommon = injectCommonSkills(stripComments(body), job.lang, loadCommonSkills());
+  const md = assembleTail(withCommon, projectsMd(refs, projects, job.lang), job.lang, softRefs);
   const usePhoto = flag('photo') || (job.lang === 'ru' && !flag('no-photo'));
   const html = renderHtml(header, job.lang, title, md, usePhoto ? photoDataUri() : null);
   mkdirSync(dirname(job.out), { recursive: true });

@@ -243,3 +243,42 @@ export function anachronisms(job: JobBlock, dates: Record<string, number>): [str
   }
   return out;
 }
+
+// ---------- общие навыки (ATS)
+
+const COMMON_SKILLS_LABEL: Record<Lang, string> = {
+  en: 'Tools & Practices',
+  ru: 'Инструменты и практики',
+  es: 'Herramientas y prácticas',
+};
+
+/** Загружает список общих навыков из profile/common-skills.md (строки `- …`). */
+export function loadCommonSkills(): string[] {
+  const f = join(PROFILE, 'common-skills.md');
+  if (!existsSync(f)) return [];
+  const raw = stripComments(readFileSync(f, 'utf8'));
+  return raw
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith('- '))
+    .map((l) => l.slice(2).trim())
+    .filter(Boolean);
+}
+
+/** Добавляет общие навыки в конец секции Skills/Навыки/Habilidades без дублирования. */
+export function injectCommonSkills(body: string, lang: Lang, commonSkills: string[]): string {
+  if (!commonSkills.length) return body;
+  const secRe = /^(## (?:Skills|Навыки|Habilidades)\s*\n)([\s\S]*?)(?=^## |$(?![\s\S]))/im;
+  const m = body.match(secRe);
+  if (!m) return body;
+  const sectionText = m[2]!;
+  const missing = commonSkills.filter((skill) => {
+    const parts = skill.split('/').map((p) => p.trim()).filter(Boolean);
+    return !parts.some((p) => new RegExp(`(?<![\\p{L}\\p{N}])${esc(p)}(?![\\p{L}\\p{N}])`, 'iu').test(sectionText));
+  });
+  if (!missing.length) return body;
+  const label = COMMON_SKILLS_LABEL[lang] ?? COMMON_SKILLS_LABEL.en;
+  const trimmed = sectionText.replace(/\s+$/, '');
+  const line = `- **${label}:** ${missing.join(', ')}`;
+  return body.replace(secRe, `${m[1]}${trimmed}\n${line}\n\n`);
+}
