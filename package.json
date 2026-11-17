@@ -26,6 +26,7 @@
     "check-alive": "node --env-file-if-exists=.env scripts/check-alive.ts",
     "resolve-urls": "node --env-file-if-exists=.env scripts/resolve-urls.ts",
     "render-resume": "node --env-file-if-exists=.env scripts/render-resume.ts",
+    "resume-check": "node --env-file-if-exists=.env scripts/resume-check.ts",
     "browser": "node --env-file-if-exists=.env scripts/browser.ts",
     "browser:start": "node --env-file-if-exists=.env scripts/browser.ts start",
     "apply-set": "node --env-file-if-exists=.env scripts/apply-set.ts",

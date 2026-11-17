@@ -1,0 +1,90 @@
+# Заготовки резюме: стек и должности по местам работы для каждого трека.
+# Читают: playbooks/resume-update.md (сборка profile/resumes/<трек>.md), playbooks/tailor.md (под вакансию),
+# scripts/resume-check.ts (проверка). Плейсхолдеры в profile/facts.md: {FE} {STATE} {META} {BE}.
+#
+# Правило стека: последние 2 места — стек трека, первые 2 — «противоположный», чтобы был виден опыт обоих.
+# Под вакансию: стек вакансии на последних местах, самый приоритетный — на последнем; если вакансия
+# требует несколько фреймворков (Vue + React, Angular + React) — ставить именно их, самый важный — на JBS.
+# Год выхода технологии ≤ года окончания места (config/tech-dates.yaml). {STATE} — первый подходящий по дате.
+
+stacks:
+  vue: { FE: Vue.js, STATE: [Pinia, Vuex], META: Nuxt }
+  react: { FE: React, STATE: [Redux Toolkit, Redux], META: Next.js }
+  angular: { FE: Angular, STATE: [NgRx, RxJS], META: Angular Universal }
+  nest: { BE: NestJS }
+  express: { BE: Express }
+
+# Порядок мест: от последнего к первому. Даты и компании — profile/facts.md.
+jobs: [JBS, ContentX, Shutterfly, TruckViewer]
+
+tracks:
+  vue:
+    title: Senior Frontend Engineer (Vue.js)
+    projects: [fastcat, neptu-themes, tyco]
+    places:
+      JBS: { stack: [vue, nest], title: Senior Frontend Engineer }
+      ContentX: { stack: [vue, nest], title: Senior Frontend Developer }
+      Shutterfly: { stack: [react, express], title: Senior Software Engineer }
+      TruckViewer: { stack: [react, express], title: Software Engineer }
+  react:
+    title: Senior Frontend Engineer (React)
+    projects: [fastcat, billing-ai-apps, tyco]
+    places:
+      JBS: { stack: [react, nest], title: Senior Frontend Engineer }
+      ContentX: { stack: [react, nest], title: Senior Frontend Developer }
+      Shutterfly: { stack: [vue, express], title: Senior Software Engineer }
+      TruckViewer: { stack: [vue, express], title: Software Engineer }
+  angular:
+    title: Senior Frontend Engineer (Angular)
+    projects: [fastcat, billing-ai-apps]
+    places:
+      JBS: { stack: [angular, nest], title: Senior Frontend Engineer }
+      ContentX: { stack: [angular, nest], title: Senior Frontend Developer }
+      Shutterfly: { stack: [vue, express], title: Senior Software Engineer }
+      TruckViewer: { stack: [vue, express], title: Software Engineer }
+  fullstack:
+    # React + Node/NestJS + TS + Redux; старые места — фронтенд, чтобы был виден опыт и фронта, и бэка.
+    # DevOps — большой опыт, но как часть fullstack-работы, не отдельная роль.
+    title: Senior Full Stack Engineer
+    projects: [billing-ai-apps, image-processing, fastcat]
+    places:
+      JBS: { stack: [react, nest], title: Senior Full Stack Engineer }
+      ContentX: { stack: [react, nest], title: Senior Software Engineer }
+      Shutterfly: { stack: [react, express], title: Senior Frontend Developer }
+      TruckViewer: { stack: [react, express], title: Frontend Developer }
+  ai_engineer:
+    file: ai-engineer
+    title: Senior Software Engineer (AI)
+    projects: [ai-kit, tyco, billing-ai-apps]
+    places:
+      JBS: { stack: [react, nest], title: Senior AI Engineer, focus: ai }
+      ContentX: { stack: [react, nest], title: Senior Full Stack Engineer }
+      Shutterfly: { stack: [react, express], title: Senior Software Engineer }
+      TruckViewer: { stack: [react, express], title: Software Engineer }
+  automation:
+    # JBS — автоматизация бизнес-процессов и микроконтроллеров (n8n, AI, Arduino/Raspberry Pi/ESP32).
+    title: AI Automation Engineer
+    projects: [ai-kit, image-processing, tyco]
+    places:
+      JBS: { stack: [vue, nest], title: Automation Engineer (AI & IoT), focus: automation }
+      ContentX: { stack: [vue, nest], title: Senior Full Stack Developer }
+      Shutterfly: { stack: [react, express], title: Senior Software Engineer }
+      TruckViewer: { stack: [react, express], title: Software Engineer }
+
+# Вариации должностей, которые чаще всего встречаются в вакансиях (data/runs/*-insights.md, заголовки вакансий).
+# Используются в общих заготовках, чтобы места работы не звучали одинаково.
+title_variants:
+  - Senior Software Engineer
+  - Senior Full Stack Engineer
+  - Senior Frontend Engineer
+  - Senior Frontend Developer
+  - Software Engineer
+  - Full Stack Developer
+  - Frontend Developer
+
+# Лимиты длины (resume-check): пункты по местам [последнее → первое], проекты, страницы.
+limits:
+  bullets: [6, 5, 4, 3]
+  min_bullets: [4, 3, 2, 2]
+  projects: [2, 3]
+  pages: 2

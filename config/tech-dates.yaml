@@ -1,0 +1,83 @@
+# Год первого стабильного/публичного релиза технологии. Проверка анахронизмов в резюме (npm run resume-check):
+# технология в описании места работы допустима, если год ≤ года окончания работы на нём.
+# Ключ — написание в резюме (сравнение по границам слова, без учёта регистра). Длинные ключи проверяются раньше коротких.
+AngularJS: 2010
+Angular: 2016
+Angular Universal: 2017
+Signals: 2023
+NgRx: 2016
+RxJS: 2012
+React: 2013
+React Hooks: 2019
+Redux: 2015
+Redux Toolkit: 2019
+Zustand: 2019
+MobX: 2015
+Next.js: 2016
+React Native: 2015
+Vue.js: 2014
+Vue 3: 2020
+Composition API: 2020
+Vuex: 2016
+Pinia: 2021
+Nuxt: 2016
+Nuxt 3: 2022
+Nuxt 4: 2025
+Svelte: 2016
+SvelteKit: 2022
+TypeScript: 2012
+Node.js: 2009
+Express: 2010
+NestJS: 2017
+Fastify: 2016
+Hono: 2022
+Deno: 2020
+Bun: 2023
+Prisma: 2020
+TypeORM: 2016
+Drizzle: 2023
+GraphQL: 2015
+tRPC: 2021
+Zod: 2020
+TanStack Query: 2022
+BullMQ: 2019
+pgvector: 2021
+Supabase: 2020
+Tailwind CSS: 2019
+Vite: 2020
+Vitest: 2022
+Playwright: 2020
+Cypress: 2017
+Jest: 2014
+Storybook: 2016
+Module Federation: 2020
+FSD: 2021
+Turborepo: 2021
+pnpm: 2017
+Webpack: 2012
+Docker: 2013
+Kubernetes: 2015
+Helm: 2016
+Terraform: 2014
+GitHub Actions: 2019
+GitLab CI: 2015
+Cloudflare Workers: 2018
+Tauri: 2022
+Electron: 2013
+WebGPU: 2023
+WebCodecs: 2021
+PixiJS: 2013
+PostHog: 2020
+n8n: 2019
+LangChain: 2022
+LangGraph: 2024
+Vercel AI SDK: 2023
+LLM: 2022
+OpenAI: 2020
+RAG: 2021
+MCP: 2024
+Claude Code: 2025
+Cursor: 2023
+Codex: 2025
+AI agents: 2023
+ESP32: 2016

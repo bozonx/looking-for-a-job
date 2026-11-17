@@ -1,12 +1,20 @@
 # Банк фактов
 
-<!-- Все правдивые факты карьеры (en). Треки — подмножество; адаптация под вакансию может подтянуть отсюда. -->
+<!-- Источник всех резюме (playbooks/tailor.md). Пункт: «- ✔|~ [ключи из config/responsibilities.yaml] текст».
+     Плейсхолдеры стека {FE} {STATE} {META} {BE} — подставляются по config/resume-tracks.yaml.
+     ✔ — факт пользователя, ~ — черновик агента. Цифры — абсолютные и канонические. -->
+
+## Навыки
+- Основные (коммерческие): Vue.js, Nuxt, Pinia, Node.js, PostgreSQL
+- Учил, второстепенный опыт: AWS, Python
+- Само собой разумеющееся: Git, REST, unit testing, Agile
 
 ## Acme Inc — Jan 2022 — Present
 Реальный стек: Vue, Nuxt, TypeScript, PostgreSQL
-- Migrated the SPA from Vue 2 to Vue 3 + Vite, cutting build time by 70%.
-- Introduced Playwright E2E tests covering checkout.
+- ✔ [migrate legacy systems] Migrated the SPA to {FE} + Vite, cutting build time from 90 s to 25 s.
+- ~ [write automated tests] Introduced 120 Playwright E2E tests covering checkout.
 
-## Навыки (полный пул)
-- Frontend: Vue.js, Nuxt, Pinia
-- Backend: Node.js, PostgreSQL
+## Образование
+- en: 2010–2014 — Example University, Computer Science
+- ru: 2010–2014 — Пример университет, информатика
+- es: 2010–2014 — Universidad Ejemplo, Informática

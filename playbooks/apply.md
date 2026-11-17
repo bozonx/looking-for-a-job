@@ -77,14 +77,15 @@
 
 ### 3. Пакет (`data/generated/<id>/`)
 
-1. Резюме: `playbooks/tailor.md` §3 → `resume.<lang>.md` + `tailor.md`, PDF — `npm run render-resume -- --file …`.
-   Если адаптация не нужна (вакансия близка к треку), допустим базовый PDF `data/generated/base/…` — укажи в `application.md`.
+1. Резюме: всегда `playbooks/tailor.md` §3 → `resume.<lang>.md` + `tailor.md`, проверка `npm run resume-check -- --file …`,
+   PDF — `npm run render-resume -- --file …`. Базовый PDF `data/generated/base/…` — только если пользователь так сказал.
+   Вопросы из `resume-check` («нет в facts.md») — в общий список вопросов шага 2.5 и в `profile/questions.md`.
 2. Письмо — если нужно (`config/cover-letter.md`, «Когда писать»): `cover-letter.<lang>.md`. Есть текстовое поле —
    вставляй текст; только загрузка файла — сохрани `cover-letter.<lang>.txt` рядом и загрузи его.
 3. `application.md` по шаблону `apply-plan.md` §7: front matter (`state: prepared`, `prepared_at`), таблица «Поля»
    (каждое поле формы: обязательность, ответ, источник), «Развёрнутые ответы», «Мне», «Email» (для email-отклика).
    Генерируемые ответы — `apply-plan.md` §4.3: язык формы, прямой ответ первым, 1–2 доказательства из опыта словами вакансии,
-   только существующие цифры, под лимит поля; knock-out вопросы — только правда.
+   цифры — из `facts.md`, стек и годы — согласованы с отправленным резюме (`resume.<lang>.md`: «Years with Vue» = годы мест, где в нём Vue), под лимит поля; knock-out вопросы — только правда.
 4. «подготовь отклики» на этом заканчивается: отчёт — таблица (вакансия, площадка, резюме, письмо, вопросы к пользователю).
 
 ### 4. Заполнение

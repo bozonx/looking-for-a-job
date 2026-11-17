@@ -1,5 +1,6 @@
 /**
- * Сборка резюме в PDF: шапка (profile/about.md) + резюме (трек или адаптированное) + пет-проекты (profile/projects.md).
+ * Сборка резюме в PDF: шапка (profile/about.md) + резюме (трек или адаптированное) + пет-проекты (profile/projects.md,
+ *   описание можно переопределить: projects: [{id, desc}]) + образование (facts.md) + soft skills (soft-skills.md).
  * markdown → HTML-шаблон → PDF через headless Chromium (один столбец, текстовый слой, без таблиц и картинок).
  *
  *   npm run render-resume -- --track vue [--lang en|ru|es] [--projects fastcat,tyco] [--out file.pdf] [--html]
@@ -18,28 +19,35 @@ import { dirname, join, resolve, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { homedir } from 'node:os';
-import { parse as parseYaml } from 'yaml';
 import { marked } from 'marked';
 
 const ROOT = resolve(import.meta.dirname, '..');
-const PROFILE = join(ROOT, 'profile');
 const RESUMES = join(PROFILE, 'resumes');
-const LANGS = ['en', 'ru', 'es'] as const;
-type Lang = (typeof LANGS)[number];
+import {
+  PROFILE, LANGS, type Lang, type Project, splitFrontMatter, stripComments, readProjects, projectRefs,
+  readSoftSkills, readEducation,
+} from './lib/resume.ts';
+export { splitFrontMatter };
 
-const T: Record<Lang, { projects: string; langs: Record<string, string>; levels: Record<string, string> }> = {
+const T: Record<Lang, { projects: string; education: string; soft: string; langs: Record<string, string>; levels: Record<string, string> }> = {
   en: {
     projects: 'Pet projects',
+    education: 'Education',
+    soft: 'Soft skills',
     langs: { русский: 'Russian', английский: 'English', испанский: 'Spanish', португальский: 'Portuguese' },
     levels: { native: 'Native', родной: 'Native' },
   },
   ru: {
     projects: 'Пет-проекты',
+    education: 'Образование',
+    soft: 'Личные качества',
     langs: { русский: 'Русский', английский: 'Английский', испанский: 'Испанский', португальский: 'Португальский' },
     levels: { native: 'родной', родной: 'родной' },
   },
   es: {
     projects: 'Proyectos personales',
+    education: 'Educación',
+    soft: 'Habilidades blandas',
     langs: { русский: 'Ruso', английский: 'Inglés', испанский: 'Español', португальский: 'Portugués' },
     levels: { native: 'Nativo', родной: 'Nativo' },
   },
@@ -60,13 +68,6 @@ function die(msg: string): never {
 
 // ---------- разбор файлов
 
-export function splitFrontMatter(text: string): { data: Record<string, any>; body: string } {
-  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
-  if (!m) return { data: {}, body: text };
-  return { data: (parseYaml(m[1]) as Record<string, any>) ?? {}, body: text.slice(m[0].length) };
-}
-
-const stripComments = (s: string) => s.replace(/<!--[\s\S]*?-->/g, '');
 const sha = (s: string) => createHash('sha1').update(s).digest('hex').slice(0, 12);
 
 interface Header {
@@ -123,47 +124,15 @@ function readHeader(): Header {
   return { nameLatin, nameNative, location: field(about, 'Локация в резюме'), contacts, languages };
 }
 
-interface Project {
-  id: string;
-  name: string;
-  links: string[];
-  stack: string;
-  desc: Partial<Record<Lang, string>>;
-}
-
-function readProjects(): Map<string, Project> {
-  const file = join(PROFILE, 'projects.md');
-  const out = new Map<string, Project>();
-  if (!existsSync(file)) return out;
-  const text = stripComments(readFileSync(file, 'utf8'));
-  for (const sec of text.split(/^## /m).slice(1)) {
-    const [idLine, ...rest] = sec.split('\n');
-    const f: Record<string, string> = {};
-    for (const l of rest) {
-      const m = l.match(/^- (\w+):\s*(.*)$/);
-      if (m) f[m[1]] = m[2].trim();
-    }
-    const id = idLine.trim();
-    out.set(id, {
-      id,
-      name: f.name || id,
-      links: (f.links ?? '').split('|').map((s) => s.trim()).filter(Boolean),
-      stack: f.stack ?? '',
-      desc: { en: f.en, ru: f.ru, es: f.es },
-    });
-  }
-  return out;
-}
-
 // ---------- HTML
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-function projectsMd(ids: string[], all: Map<string, Project>, lang: Lang): string {
-  if (!ids.length) return '';
-  const items = ids.map((id) => {
+function projectsMd(refs: { id: string; desc?: string }[], all: Map<string, Project>, lang: Lang): string {
+  if (!refs.length) return '';
+  const items = refs.map(({ id, desc }) => {
     const p = all.get(id) ?? die(`проект «${id}» не найден в profile/projects.md`);
-    let d = p.desc[lang];
+    let d = desc ?? p.desc[lang];
     if (!d) {
       console.warn(`⚠ у проекта ${id} нет описания «${lang}:» — взято en`);
       d = p.desc.en ?? '';
@@ -174,15 +143,29 @@ function projectsMd(ids: string[], all: Map<string, Project>, lang: Lang): strin
   return `## ${T[lang].projects}\n\n${items.join('\n')}\n`;
 }
 
-/** Вставить секцию проектов перед последней секцией (Education), если она последняя; иначе в конец. */
-function injectProjects(body: string, projects: string): string {
-  if (!projects) return body;
-  const sections = [...body.matchAll(/^## .+$/gm)];
-  const last = sections.at(-1);
-  if (last && /education|образование|educaci[oó]n|formaci[oó]n/i.test(last[0])) {
-    return body.slice(0, last.index) + projects + '\n' + body.slice(last.index);
+const hasSection = (body: string, re: RegExp) => [...body.matchAll(/^## (.+)$/gm)].some((m) => re.test(m[1]!));
+const EDU_RE = /education|образование|educaci[oó]n|formaci[oó]n/i;
+
+/** Хвост резюме из профиля: пет-проекты → образование (facts.md) → soft skills (soft-skills.md).
+ *  Если в теле уже есть секция образования (старые файлы) — проекты встают перед ней, образование не дублируется. */
+function assembleTail(body: string, projects: string, lang: Lang): string {
+  let out = body.trimEnd() + '\n';
+  if (hasSection(out, EDU_RE)) {
+    if (projects) {
+      const last = [...out.matchAll(/^## .+$/gm)].pop()!;
+      out = EDU_RE.test(last[0]) ? out.slice(0, last.index) + projects + '\n' + out.slice(last.index) : out + '\n' + projects;
+    }
+  } else {
+    if (projects) out += '\n' + projects;
+    const edu = readEducation(lang);
+    if (edu.length) out += `\n## ${T[lang].education}\n\n${edu.map((e) => `- ${e}`).join('\n')}\n`;
+    else console.warn(`⚠ нет образования «- ${lang}: …» в profile/facts.md (## Образование)`);
   }
-  return body.trimEnd() + '\n\n' + projects;
+  if (!hasSection(out, /soft|личные|habilidades blandas/i)) {
+    const soft = readSoftSkills(lang);
+    if (soft.length) out += `\n## ${T[lang].soft}\n\n${soft.map((e) => `- ${e}`).join('\n')}\n`;
+  }
+  return out;
 }
 
 function photoDataUri(): string | null {
@@ -287,8 +270,8 @@ function build(job: Job, header: Header, projects: Map<string, Project>, opts: {
     if (data.source_hash !== sha(en)) console.warn(`⚠ ${basename(job.src)}: перевод устарел (source_hash ≠ ${sha(en)}) — обнови по playbooks/tailor.md`);
   }
   const title = data.title ?? die(`${job.src}: нет title во front matter`);
-  const ids: string[] = opts.projects ?? data.projects ?? [];
-  const md = injectProjects(stripComments(body).trim() + '\n', projectsMd(ids, projects, job.lang));
+  const refs = opts.projects ? opts.projects.map((id) => ({ id })) : projectRefs(data.projects);
+  const md = assembleTail(stripComments(body), projectsMd(refs, projects, job.lang), job.lang);
   const usePhoto = flag('photo') || (job.lang === 'ru' && !flag('no-photo'));
   const html = renderHtml(header, job.lang, title, md, usePhoto ? photoDataUri() : null);
   mkdirSync(dirname(job.out), { recursive: true });
