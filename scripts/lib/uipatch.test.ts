@@ -35,3 +35,13 @@ test('isMarked учитывает заметки', () => {
   assert.equal(isMarked({ status: null, starred: true }), true);
   assert.equal(isMarked({ status: null, notes: '[агент 2026-11-17] не подходит' }), false);
 });
+
+test('результат отклика: только у applied, с датой; отмена отклика его сбрасывает', () => {
+  assert.equal(typeof applyUiPatch({ status: 'selected' }, { outcome: 'rejected' }, now), 'string');
+  const a = applyUiPatch({ status: 'applied', applied_via: 'agent' }, { outcome: 'interview' }, now) as any;
+  assert.deepEqual([a.outcome, a.outcome_at], ['interview', '2026-11-17']);
+  const b = applyUiPatch(a, { outcome: null }, now) as any;
+  assert.deepEqual([b.outcome, b.outcome_at], [null, null]);
+  const c = applyUiPatch({ status: 'applied', applied_via: 'manual', outcome: 'screen', outcome_at: '2026-11-10' }, { status: null }) as any;
+  assert.deepEqual([c.status, c.outcome, c.outcome_at], [null, null, null]);
+});

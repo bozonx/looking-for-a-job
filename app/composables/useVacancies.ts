@@ -34,7 +34,7 @@ async function patch(id: string, body: Record<string, unknown>) {
   try {
     const res = await $fetch<{ data: Row }>(`/api/vacancies/${encodeURIComponent(id)}`, { method: 'PATCH', body });
     const it = items.value.find((v) => v.id === id);
-    if (it) Object.assign(it, { status: res.data.status, starred: res.data.starred, flagged: res.data.flagged, notes: res.data.notes, applied_at: res.data.applied_at, applied_via: res.data.applied_via });
+    if (it) Object.assign(it, { status: res.data.status, starred: res.data.starred, flagged: res.data.flagged, notes: res.data.notes, applied_at: res.data.applied_at, applied_via: res.data.applied_via, outcome: res.data.outcome });
     seq++; // отменить ответ опроса, ушедшего до PATCH
     await refresh();
   } catch (e) {

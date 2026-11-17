@@ -5,9 +5,9 @@ const score = z.number().min(0).max(100);
 const nscore = score.nullable();
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 
-import { ATTENTION_REASONS, EMPLOYMENT, REGIONS, STATUSES, STOP_FLAGS, TRACKS } from './enums.ts';
+import { ATTENTION_REASONS, EMPLOYMENT, OUTCOMES, REGIONS, STATUSES, STOP_FLAGS, TRACKS } from './enums.ts';
 
-export { ATTENTION_REASONS, EMPLOYMENT, REGIONS, STATUSES, STOP_FLAGS, TRACKS };
+export { OUTCOMES, ATTENTION_REASONS, EMPLOYMENT, REGIONS, STATUSES, STOP_FLAGS, TRACKS };
 
 export const ScoresSchema = z.object({
   remote: score,
@@ -99,6 +99,10 @@ export const VacancySchema = z.object({
   applied_at: z.string().nullable().optional(),
   apply_log: z.string().nullable().optional(),
   applied_via: z.enum(['agent', 'manual']).nullable().optional(), // manual — пользователь откликнулся сам и отметил в UI
+  // результат отклика (только при status: applied): ставит пользователь в UI; null — ждём ответа.
+  // Сигнал «работает ли резюме»: npm run insights считает конверсию по трекам и версиям заготовок.
+  outcome: z.enum(OUTCOMES).nullable().optional(),
+  outcome_at: date.nullable().optional(),
   scoring_version: z.number().int().nullable().optional(),
 });
 

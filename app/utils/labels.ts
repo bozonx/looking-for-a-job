@@ -1,16 +1,24 @@
 import {
+  OUTCOMES, type Outcome,
   ATTENTION_REASONS, EMPLOYMENT, REGIONS, STATUSES, STOP_FLAGS, TRACKS,
   type AttentionReason, type Employment, type Region, type Status, type StopFlag,
 } from '../../scripts/lib/enums.ts';
 
 /** Перечисления — из схемы (scripts/lib/enums.ts), чтобы фильтры не расходились с данными. */
-export { ATTENTION_REASONS, EMPLOYMENT, REGIONS, STATUSES, STOP_FLAGS, TRACKS };
+export { OUTCOMES, ATTENTION_REASONS, EMPLOYMENT, REGIONS, STATUSES, STOP_FLAGS, TRACKS };
 
 export const STATUS_LABEL: Record<Status, string> = {
   selected: 'выбрана',
   needs_attention: 'внимание',
   applied: 'отклик',
   apply_failed: 'ошибка',
+};
+export const OUTCOME_LABEL: Record<Outcome, string> = {
+  no_reply: 'нет ответа',
+  rejected: 'отказ',
+  screen: 'скрининг',
+  interview: 'собеседование',
+  offer: 'оффер',
 };
 export const ATTENTION_LABEL: Record<AttentionReason, string> = {
   unknown_question: 'неизвестный вопрос',

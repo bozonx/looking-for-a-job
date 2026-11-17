@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { OUTCOMES } from '../../../../scripts/lib/enums.ts';
 import { applyUiPatch } from '../../../../scripts/lib/uipatch.ts';
 
 /**
- * UI: `selected` ↔ null, ручной отклик (`applied`, applied_via: manual) и его отмена, ★, ⚑, заметки.
+ * UI: `selected` ↔ null, результат отклика (`outcome`), ручной отклик (`applied`, applied_via: manual) и его отмена, ★, ⚑, заметки.
  * Переходы проверяются на свежих данных файла (scripts/lib/uipatch.ts): статусы агента UI не затирает.
  */
 const Patch = z
@@ -11,6 +12,7 @@ const Patch = z
     starred: z.boolean(),
     flagged: z.boolean(),
     notes: z.string(),
+    outcome: z.enum(OUTCOMES).nullable(),
   })
   .partial()
   .strict();

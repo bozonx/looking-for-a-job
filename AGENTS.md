@@ -10,7 +10,7 @@
 | «собери», «собери вакансии» | `playbooks/collect.md` |
 | «запусти скоринг», «скоринг» | Скоринг следующего батча из очереди — см. раздел «Скоринг следующего батча» ниже |
 | «открой UI», «покажи вакансии» | `npm run dev` → http://localhost:3000 (этап 2, `app/`) |
-| «проанализируй журнал», «что улучшить в резюме / поиске» | `playbooks/analyze.md` |
+| «проанализируй журнал», «что улучшить в поиске» | `playbooks/analyze.md` (система: предфильтр, источники, скоринг; по резюме — только сводка) |
 | «проверь проблемные», «разбери ⚑» | `playbooks/flagged.md` (вакансии с `flagged: true`: разбор → отчёт с предложениями → применение одобренного) |
 | «калибровка скоринга», «дай выборку на проверку» | `npm run calibrate` → список пользователю (`playbooks/flagged.md` §0) |
 | «что отсеял предфильтр», «проверь предфильтр» | `npm run prefilter-review` → предложения правок `config/prefilter.yaml` (не применять без согласия) |
@@ -18,7 +18,7 @@
 | «найди прямые ссылки» | `npm run resolve-urls` (real_url и контакты со страниц агрегаторов) |
 | «найди каналы отклика», «куда откликаться» | `npm run channels` (без сети: `apply_channels` из ссылок и текста, `--force` — переизвлечь) |
 | «сделай резюме <трек> [на <язык>]», «переведи резюме», «адаптируй резюме под <id>» | `playbooks/tailor.md` (`npm run render-resume`) |
-| «обнови заготовки резюме» | `playbooks/resume-update.md` (факты + рынок → `profile/resumes/*.md`) |
+| «обнови заготовки резюме», «что улучшить в резюме» | `playbooks/resume-update.md` (факты + рынок + конверсия откликов → `profile/resumes/*.md`) |
 | «проверь резюме» | `npm run resume-check -- --tracks` или `--file <md>` |
 | «подготовь отклики», «откликнись», «откликнись выбранным», «откликнись по скорингу», «повтори отклики», «продолжи отклики» | `playbooks/apply.md` (агент заполняет форму, Submit нажимает пользователь) |
 | «отправил», «пропусти», «не подходит», «готово» (во время откликов) | `playbooks/apply.md`, шаги 5–6 и «Проблемы» |
@@ -51,8 +51,8 @@
 - Код скриптов — только TypeScript; после изменений — `npm run typecheck` и `npm test`.
 - `data/` и `profile/` — личное, в git не коммитить.
 - Заявки агент не отправляет: Submit нажимает пользователь (`dev_docs/apply-plan.md`).
-- `status` — решение: `null` (нет решения), `selected` (на отклик), `applied` (агент или сам пользователь — `applied_via: agent|manual`), `needs_attention`/`apply_failed` (агент). Неотскоренная = `scores: null`.
+- `status` — решение: `null` (нет решения), `selected` (на отклик), `applied` (агент или сам пользователь — `applied_via: agent|manual`), `needs_attention`/`apply_failed` (агент). У `applied` — `outcome` (`no_reply|rejected|screen|interview|offer`, ставит пользователь в UI): по нему `insights` считает, работает ли резюме. Неотскоренная = `scores: null`.
 - Новизна — `collected_run` == `data/state/last-collect.json`. ★ — личная пометка, в скоринге и анализе не учитывается.
 - Чистка (`cleanup`; автоматически после `collect` при `CLEANUP_ON_COLLECT`): удаляет только неотмеченные — `status: null`, без ★/⚑ и без заметки пользователя (строки `[агент …]` не в счёт) — старше `CLEANUP_DEFAULT_DAYS`. Всё отмеченное хранится бессрочно. Закрытые (`possibly_closed`) только помечаются и удаляются по тому же правилу.
 - Жизненный цикл вакансии — `dev_docs/design.md`.
-- UI (`app/`) пишет в front matter только `status` (`null`/`selected`, ручной отклик `applied` + `applied_at`/`applied_via: manual`), `starred`, `flagged`, `notes`; статусы агента UI не меняет (`scripts/lib/uipatch.ts`); остальные поля — агент и скрипты. Устройство UI — `docs/running.md`.
+- UI (`app/`) пишет в front matter только `status` (`null`/`selected`, ручной отклик `applied` + `applied_at`/`applied_via: manual`), `starred`, `flagged`, `notes`, `outcome`/`outcome_at` (только у `applied`); статусы агента UI не меняет (`scripts/lib/uipatch.ts`); остальные поля — агент и скрипты. Устройство UI — `docs/running.md`.

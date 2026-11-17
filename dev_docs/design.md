@@ -34,13 +34,13 @@
 - Провайдеры (только открытые API и ленты, `config/sources.md`): **ATS компаний** (Greenhouse/Lever/Ashby — снимок открытых вакансий, пропавшие → `possibly_closed`), **Get on Board**, **HN Who is hiring**, **RemoteOK**, **Himalayas**, **Jobicy**, **Remotive**, стандартные ленты **RSS/Atom/JSON Feed** (We Work Remotely) — без кода, через `config/sources.yaml`. Новый источник = провайдер + строка в реестре + строка в `config/sources.md`.
 - Скоринг: частные оценки агента + детерминированный `overall`, стоп-флаги, регион по справочнику, `apply_target` по `apply-priority.yaml`; `npm run score` / `rescore` / `validate` (zod).
 - Обслуживание: `cleanup` (без решения — старше `CLEANUP_DEFAULT_DAYS`; автоматически после `collect`, если `CLEANUP_ON_COLLECT`), `dedupe` (диагностика), `fetch-page` (HTML → markdown), журнал `data/insights.md`.
-- Обратная связь: `resume_match` в каждой вакансии (сравнение с резюме, словарь `config/skills.yaml`), метрики прогонов `data/runs/stats.jsonl`, отчёт `npm run insights`, разбор — `playbooks/analyze.md`.
+- Обратная связь: `resume_match` в каждой вакансии (рынок трека, словарь `config/skills.yaml`), `outcome` откликов (конверсия по версиям заготовок), метрики прогонов `data/runs/stats.jsonl`, отчёт `npm run insights`. Разбор системы — `playbooks/analyze.md`, правки резюме — `playbooks/resume-update.md`. Журнал `data/insights.md` — только задачи по системе (формат проверяет `validate`).
 
 **Этап 2 — UI** (`app/`, Nuxt SPA + Nitro). Подробно: `docs/running.md`, раздел «UI».
 
 - Кэш вакансий в памяти + `chokidar`, опрос раз в 5 с, ошибки разбора видны в UI.
 - Вкладки, фильтры, сортировка, карточка, горячие клавиши, rescore из UI.
-- Запись только `status` (`null`/`selected`/ручной `applied`), `starred`, `flagged`, `notes` — с перечитыванием файла и атомарной записью.
+- Запись только `status` (`null`/`selected`/ручной `applied`), `starred`, `flagged`, `notes`, `outcome` (результат отклика) — с перечитыванием файла и атомарной записью.
 
 ## 5. Что предстоит
 

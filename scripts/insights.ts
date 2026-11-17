@@ -13,6 +13,8 @@
  *   самым частым вариантом), домены и типы продукта, soft-требования, медиана требуемых лет.
  * Конвейер: по источникам — объёмы из data/runs/stats.jsonl, доля мусора, стоп-флагов,
  *   отклонённых вручную, утечки предфильтра (fit по всем трекам низкий).
+ * Отклики: конверсия (ответ / скрининг+ / собеседование+) по трекам и версиям заготовок — за всё время,
+ *   не только за период: это прямая проверка, помогают ли правки резюме (lib/outcomes.ts).
  * Журнал: счётчики тегов data/insights.md за период.
  * Отчёт печатается и сохраняется в data/runs/<дата>-insights.md.
  */
@@ -24,6 +26,7 @@ import { TRACKS } from './lib/schema.ts';
 import { loadSkills, normSkill } from './lib/skills.ts';
 import { loadAll } from './lib/vacancy.ts';
 import { inMarket, MARKET_FIT, needsMarketFields } from './lib/market.ts';
+import { addToFunnel, backupsDir, emptyFunnel, MIN_APPLIED, resumeVersions, SILENCE_DAYS, versionOf, type Funnel } from './lib/outcomes.ts';
 import { hasSpelling, resumeText, skillsInText } from './lib/resumeskills.ts';
 
 const args = process.argv.slice(2);
@@ -34,7 +37,8 @@ const save = !args.includes('--no-save');
 
 const dict = loadSkills();
 const respDict = loadSkills(path.join(CONFIG_DIR, 'responsibilities.yaml'));
-const vac = loadAll().filter((v) => String(v.data.collected_at) >= since);
+const all = loadAll();
+const vac = all.filter((v) => String(v.data.collected_at) >= since);
 const scored = vac.filter((v) => v.data.scores);
 const relevant = scored.filter((v) => !(v.data.stop_flags ?? []).length);
 /** Минимум вакансий на трек для выводов; меньше — отчёт помечается как предварительный. */
@@ -207,6 +211,36 @@ if (unknownResp.size)
       'нормализуй через npm run pending -- --upgrade или добавь синонимы.',
     '',
   );
+
+// ---------- Отклики (за всё время) ----------
+{
+  const applied = all.filter((v) => v.data.status === 'applied');
+  const versions = resumeVersions(backupsDir(DATA_DIR));
+  const byTrack = new Map<string, Funnel>(), byVer = new Map<string, Funnel>(), total = emptyFunnel();
+  for (const v of applied) {
+    const t = String(v.data.best_resume ?? '—'), ver = versionOf(v.data.applied_at, versions);
+    for (const [m, k] of [[byTrack, t], [byVer, ver]] as const) {
+      if (!m.has(k)) m.set(k, emptyFunnel());
+      addToFunnel(m.get(k)!, v.data, today());
+    }
+    addToFunnel(total, v.data, today());
+  }
+  const row = (k: string, f: Funnel) => {
+    const done = f.applied - f.waiting;
+    return `| ${k} | ${f.applied} | ${f.waiting} | ${pct(f.applied - f.waiting - f.no_reply, done)} | ${pct(f.positive, done)} | ${pct(f.interview, done)} |${done < MIN_APPLIED ? ' ⚠ мало' : ''}`;
+  };
+  const head = (k: string) => [`| ${k} | откликов | ждём | ответили | скрининг+ | собеседование+ |`, '|---|---|---|---|---|---|'];
+  out.push('### Отклики: работает ли резюме', '');
+  if (!applied.length) out.push('_Откликов пока нет. Результат (ответ, отказ, собеседование) отмечай в UI у вакансии со статусом «отклик»._', '');
+  else
+    out.push(
+      `Доли — от откликов с известным исходом (без ответа ${SILENCE_DAYS}+ дн. = «нет ответа»). Сравнивать группы — от ${MIN_APPLIED} откликов.`,
+      `Без отмеченного результата: ${applied.filter((v) => !v.data.outcome).length} из ${applied.length}.`,
+      '',
+      ...head('трек'), ...[...byTrack].map(([k, f]) => row(k, f)), row('**всего**', total), '',
+      ...head('заготовки'), ...[...byVer].sort().map(([k, f]) => row(k, f)), '',
+    );
+}
 
 // ---------- Особые требования отклика ----------
 const special: Counter = new Map();

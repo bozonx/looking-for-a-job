@@ -56,6 +56,15 @@ const ruTeam = computed(() => (v.value?.ru_speaking_team == null ? 'неизве
         <span v-if="v.status" class="status" :data-s="v.status">
           {{ labelOf(STATUS_LABEL, v.status) }}<template v-if="v.status === 'applied'"> · {{ v.applied_via === 'manual' ? 'сам' : 'агент' }}<template v-if="v.applied_at"> {{ String(v.applied_at).slice(0, 10) }}</template></template>
         </span>
+        <select
+          v-if="v.status === 'applied'"
+          :value="v.outcome ?? ''"
+          title="Что ответил работодатель — по этим данным считается, работает ли резюме (npm run insights)"
+          @change="emit('patch', id, { outcome: ($event.target as HTMLSelectElement).value || null })"
+        >
+          <option value="">результат: ждём</option>
+          <option v-for="o in OUTCOMES" :key="o" :value="o">{{ OUTCOME_LABEL[o] }}</option>
+        </select>
       </div>
     </header>
 

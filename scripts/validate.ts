@@ -3,6 +3,9 @@ import path from 'node:path';
 import { listVacancyFiles, parseVacancy, resolveTargets } from './lib/vacancy.ts';
 import { ScoredVacancySchema, VacancySchema } from './lib/schema.ts';
 import { loadSkills, normSkill } from './lib/skills.ts';
+import fs from 'node:fs';
+import { DATA_DIR } from './lib/env.ts';
+import { checkJournal } from './lib/journal.ts';
 
 const targets = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const files = targets.length ? resolveTargets(targets) : listVacancyFiles();
@@ -81,5 +84,10 @@ if (unknownSkills.size)
     `\n⚠ Навыки не из config/skills.yaml (добавь ключом или синонимом): ` +
       [...unknownSkills].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}×${n}`).join(', '),
   );
+// журнал: предупреждения, не ошибки — чистит агент (playbooks/collect.md, шаг 6)
+const jf = path.join(DATA_DIR, 'insights.md');
+const jIssues = fs.existsSync(jf) ? checkJournal(fs.readFileSync(jf, 'utf8')) : [];
+if (jIssues.length)
+  console.log(`\n⚠ data/insights.md: ${jIssues.length} проблем (перепиши или удали строку):\n` + jIssues.map((x) => `    стр. ${x.line}: ${x.problem} — ${x.text}`).join('\n'));
 console.log(`\nChecked ${files.length}, invalid ${bad}, pending scoring ${pending}, with warnings ${warned}`);
 process.exit(bad ? 1 : 0);
