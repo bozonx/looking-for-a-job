@@ -31,7 +31,7 @@ export function rescoreVacancy(v: VacancyFile, { W, R }: RescoreCtx): { overall:
   // каналы: агент мог дописать real_url — добавляем его; извлечение из текста делает сбор / npm run channels
   d.apply_channels = mergeChannels(d.apply_channels, [channelFromUrl(d.real_url, 'agent')]);
   deriveApply(d);
-  const res = computeOverall(W, s, d.stop_flags ?? []);
+  const res = computeOverall(W, s, d.stop_flags ?? [], d.seniority);
   d.scores = { ...s, overall: res.overall };
   d.stop_flags = res.flags;
   const check = ScoredVacancySchema.safeParse(d);

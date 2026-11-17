@@ -68,3 +68,12 @@ test('config/weights.yaml согласован с треками', () => {
   for (const t of Object.keys(fit())) assert.ok(t in real.fit_tracks, `fit_tracks.${t}`);
   assert.ok(real.positive.fit > 0);
 });
+
+test('уровень junior ограничивает итог, сохраняя высокий fit по стеку', () => {
+  const weights = { ...W, seniority_cap: { levels: ['junior'], cap: 35 } };
+  const scores = base();
+  assert.equal(computeOverall(weights, scores, [], 'junior').overall, 35);
+  assert.equal(scores.fit.vue, 90);
+  assert.equal(computeOverall(weights, scores, [], 'senior').overall, 89);
+  assert.equal(computeOverall(weights, scores, ['location_restricted'], 'junior').overall, 0);
+});

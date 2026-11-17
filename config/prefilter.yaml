@@ -293,3 +293,16 @@ exclude_title_soft:
   - creatio
   - uniface
 strong_title: [vue, nuxt, react, next.js, angular, svelte, typescript, node, nestjs, fullstack, full-stack, full stack, frontend, front-end, front end, javascript, фронтенд, фулстек, фуллстек, react native, ionic, capacitor, nativescript, quasar, expo$, llm, ai engineer, agentic]
+
+# Только полное совпадение явного ограничения; адрес компании не проверяется.
+exclude_location_exact:
+  - US only
+  - USA only
+  - United States only
+  - Remote (US only)
+  - Remote - US only
+  - Canada only
+  - UK only
+  - EU only
+  - Europe only
+  - Remote (Europe only)

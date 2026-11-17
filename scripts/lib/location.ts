@@ -84,7 +84,7 @@ export function regionUnlikely(location: string | null | undefined): string | nu
   if (m) return m[0];
   // «City, Region, BE» / «Foster City, CA»
   const code = loc.match(/,\s*([A-Z]{2})\s*(?:[;)]|$)/);
-  if (code && !LATAM_CODES.has(code[1])) return US_STATES.has(code[1]) ? `US-${code[1]}` : code[1];
+  if (code?.[1] && !LATAM_CODES.has(code[1])) return US_STATES.has(code[1]) ? `US-${code[1]}` : code[1];
   if (OFFICE_RE.test(loc) && !REMOTE_RE.test(loc)) return 'офис/гибрид';
   return null;
 }

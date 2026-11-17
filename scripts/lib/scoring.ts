@@ -11,6 +11,7 @@ export interface Weights {
   fit_tracks: Record<string, number>;
   /** лучший СЫРОЙ fit (без веса трека) < below → overall ≤ cap: роль нерелевантна ни одному треку */
   fit_cap?: { below: number; cap: number };
+  seniority_cap?: { levels: string[]; cap: number };
   scam_legitimacy_below: number;
 }
 
@@ -40,7 +41,7 @@ export function regionGroup(R: Regions, country: string | null | undefined, ruTe
   return 'other';
 }
 
-export function computeOverall(W: Weights, scores: Record<string, any>, stopFlags: string[]): { overall: number; flags: string[] } {
+export function computeOverall(W: Weights, scores: Record<string, any>, stopFlags: string[], seniority?: string | null): { overall: number; flags: string[] } {
   const flags = [...new Set(stopFlags ?? [])];
   if (typeof scores.legitimacy === 'number' && scores.legitimacy < W.scam_legitimacy_below && !flags.includes('scam')) flags.push('scam');
   if (flags.some((f) => (STOP_FLAGS as readonly string[]).includes(f))) return { overall: 0, flags };
@@ -59,5 +60,6 @@ export function computeOverall(W: Weights, scores: Record<string, any>, stopFlag
   for (const [k, w] of Object.entries(W.inverse)) if (typeof scores[k] === 'number') add(w, 100 - scores[k]);
   let overall = wsum ? Math.round(sum / wsum) : 0;
   if (W.fit_cap && bestRawFit !== undefined && bestRawFit < W.fit_cap.below) overall = Math.min(overall, W.fit_cap.cap);
+  if (seniority && W.seniority_cap?.levels.includes(seniority)) overall = Math.min(overall, W.seniority_cap.cap);
   return { overall, flags };
 }

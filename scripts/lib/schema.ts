@@ -3,6 +3,7 @@ import { CHANNEL_BY, CHANNEL_TYPES } from './channels.ts';
 
 const score = z.number().min(0).max(100);
 const nscore = score.nullable();
+const language = z.string().regex(/^[a-z]{2}$/, 'Код языка ISO 639-1 (два строчных символа)');
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 
 import { ATTENTION_REASONS, EMPLOYMENT, OUTCOMES, REGIONS, STATUSES, STOP_FLAGS, TRACKS } from './enums.ts';
@@ -78,8 +79,8 @@ export const VacancySchema = z.object({
   best_track: z.enum(TRACKS).nullable().optional(),
   employer_group: z.enum(REGIONS).nullable().optional(),
   employment: z.enum(EMPLOYMENT).default('unknown'),
-  vacancy_language: z.string().nullable().optional(),
-  work_languages: z.array(z.string()).nullable().optional(),
+  vacancy_language: language.nullable().optional(),
+  work_languages: z.array(language).nullable().optional(),
   role_tracks: z.array(z.enum(TRACKS)).default([]),
   tags: z.array(z.string()).optional(),
 
@@ -94,7 +95,7 @@ export const VacancySchema = z.object({
   resume_match: ResumeMatchSchema.nullable().optional(),
 
   requirements_special: z
-    .array(z.object({ type: z.string(), standard: z.boolean(), details: z.string() }))
+    .array(z.object({ type: z.enum(['keyword', 'video', 'note', 'other', 'cover_letter', 'custom_cover_letter', 'test']), standard: z.boolean(), details: z.string() }))
     .default([]),
 
   status: z.enum(STATUSES).nullable().default(null),
@@ -105,7 +106,7 @@ export const VacancySchema = z.object({
   notes: z.string().default(''),
   possibly_closed: z.boolean().default(false), // нет в снимке ATS (collect) или real_url отвечает «нет вакансии» (check-alive)
   alive_checked_at: date.nullable().optional(), // когда npm run check-alive последний раз проверял real_url
-  applied_at: z.string().nullable().optional(),
+  applied_at: z.union([date, z.iso.datetime()]).nullable().optional(),
   apply_log: z.string().nullable().optional(),
   applied_via: z.enum(['agent', 'manual']).nullable().optional(), // manual — пользователь откликнулся сам и отметил в UI
   // результат отклика (только при status: applied): ставит пользователь в UI; null — ждём ответа.

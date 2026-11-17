@@ -8,10 +8,18 @@ import { nextSorts } from '~/utils/filters';
 const { items, errors, lastRun, refresh, patch, patchMany, rescore, usePolling } = useVacancies();
 usePolling();
 const rejectedTab = ref(false);
+const { data: health, refresh: refreshHealth } = await useFetch('/api/system');
+async function restore(id: string) {
+ try {
+  await $fetch(`/api/vacancies/${encodeURIComponent(id)}/restore`, { method: 'POST' });
+  await refresh(true);
+  show('Описание загружено. Вакансия возвращена в очередь скоринга.');
+ } catch (e) { show('Не удалось вернуть вакансию: ' + String(e)); }
+}
 const rejected = computed(() => items.value.filter(v => v.prefilter_reason));
 const system = computed(() => {
  const all = items.value.filter(v => !v.prefilter_reason);
- return `Очередь: ${all.filter(v => !v.scores && !v.possibly_closed && v.hire_from_ar !== 'no' && !v.stop_flags?.length).length} · Отсеяно: ${rejected.value.length} · Стоп-флаги: ${all.filter(v => v.stop_flags?.length).length}/${all.length} · Без канала: ${all.filter(v => !v.apply_channels?.length).length}`;
+ return `Очередь: ${all.filter(v => !v.scores && !v.possibly_closed && v.hire_from_ar !== 'no' && !v.stop_flags?.length).length} · Отсеяно: ${rejected.value.length} · Стоп-флаги: ${all.filter(v => v.stop_flags?.length).length}/${all.length} (${all.length ? Math.round(100 * all.filter(v => v.stop_flags?.length).length / all.length) : 0}%) · Без канала: ${all.filter(v => !v.apply_channels?.length).length} · Утечки (fit < 30): ${all.filter(v => v.scores?.fit && Object.values(v.scores.fit).every(x => typeof x === 'number' && x < 30)).length}`;
 });
 const { views, activeId, filters, isModified, reset, commit, view } = useViews();
 const { q, searchAll, viewCounts, rows, outsideHits, current, currentRow, move } = useVacancyList({ items: computed(() => items.value.filter(v => !v.prefilter_reason)), lastRun, views, filters, activeId });
@@ -62,10 +70,10 @@ useHotkeys(() => {
         <button class="ghost" title="Пересчитать overall по weights.yaml" @click="rescore">⟳ rescore</button>
       </ViewTabs>
 
-      <div class="hint small">{{ system }}</div>
+      <div class="hint small">{{ system }} · Открытых записей журнала: {{ health?.openInsights ?? '—' }} <button @click="refreshHealth()">Обновить журнал</button></div>
       <button @click="rejectedTab = !rejectedTab">{{ rejectedTab ? 'Вакансии' : 'Отсеяно предфильтром' }}</button>
-      <div v-if="rejectedTab"><p v-for="v in rejected" :key="v.id"><a :href="v.source_url" target="_blank">{{ v.title }}</a> — {{ v.prefilter_reason }}</p></div>
-      <FilterBar v-model:filters="view.filters" v-model:q="q" :items="items" :modified="isModified" @reset="reset" @commit="onCommit" />
+      <div v-if="rejectedTab"><p v-if="!rejected.length" class="hint">Отсеянных записей пока нет. Они появятся после следующего сбора.</p><p v-for="v in rejected" :key="v.id"><a :href="v.source_url" target="_blank">{{ v.title }}</a> — {{ v.prefilter_reason }} <button @click="restore(v.id)">Вернуть в скоринг</button></p></div>
+      <FilterBar v-if="!rejectedTab" v-model:filters="view.filters" v-model:q="q" :items="items" :modified="isModified" @reset="reset" @commit="onCommit" />
 
       <div v-if="searchAll" class="hint small">
         Поиск по всем вакансиям (фильтры вкладки не действуют, закрытые включены) —
@@ -85,8 +93,8 @@ useHotkeys(() => {
     </aside>
 
     <main class="detail">
-      <VacancyCard v-if="current" :id="current" :key="current" :rev="currentRow?._rev" @patch="patch" />
-      <p v-else class="muted empty">Выберите вакансию</p>
+      <VacancyCard v-if="current && !rejectedTab" :id="current" :key="current" :rev="currentRow?._rev" @patch="patch" />
+      <p v-else class="muted empty">{{ rejectedTab ? 'Выберите ссылку отсеянной вакансии или верните её в скоринг' : 'Выберите вакансию' }}</p>
     </main>
     <div v-if="toast" class="toast">{{ toast }}</div>
   </div>

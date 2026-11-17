@@ -28,3 +28,8 @@ fit_cap:
   cap: 35
 # Стоп-флаги (любой → overall = 0) — список STOP_FLAGS в scripts/lib/schema.ts.
 scam_legitimacy_below: 30                                        # автоматически ставит флаг scam
+
+# Уровень оценивается отдельно от совпадения стека.
+seniority_cap:
+  levels: [junior]
+  cap: 35

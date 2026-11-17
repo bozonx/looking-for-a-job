@@ -79,12 +79,13 @@ export function makeJob(f: JobFields): RawJob {
   const company = decodeEntities(f.company) || 'Unknown';
   const tags = (f.tags ?? []).map((t) => decodeEntities(t)).filter(Boolean);
   return {
+    preview: { source_url: f.sourceUrl, location: f.location ?? null, posted_at: isoDate(f.postedAt), ...geoscreen({ ...f.geo, location: f.location }) },
     extId: safeExtId(f.extId),
     postedAt: f.postedAt,
     title,
     company,
     tags,
-    skip: f.skip ?? (geoscreen(f.geo ?? {}).hire_from_ar === 'no' ? geoscreen(f.geo ?? {}).hire_from_ar_evidence ?? undefined : undefined),
+    skip: f.skip ?? (geoscreen({ ...f.geo, location: f.location }).hire_from_ar === 'no' ? geoscreen({ ...f.geo, location: f.location }).hire_from_ar_evidence ?? undefined : undefined),
     build() {
       const apply = f.applyUrl && /^(https?:|mailto:)/.test(f.applyUrl) ? f.applyUrl : null;
       const extra = Object.entries(f.extra ?? {})
@@ -99,7 +100,7 @@ export function makeJob(f: JobFields): RawJob {
         '\n';
       return {
         data: {
-          ...geoscreen(f.geo ?? {}),
+          ...geoscreen({ ...f.geo, location: f.location }),
           source_url: f.sourceUrl,
           real_url: apply && /^https?:/.test(apply) ? apply : null,
           apply_method: applyMethodFromUrl(apply),

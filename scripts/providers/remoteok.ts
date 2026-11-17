@@ -54,6 +54,7 @@ function toRaw(j: RemoteOkJob): RawJob {
   const company = decode(j.company) || 'Unknown';
   const tags = j.tags ?? [];
   return {
+    preview: { source_url: j.url || `https://remoteok.com/remote-jobs/${j.slug}`, location: decode(j.location) || null },
     extId: safeExtId(j.id),
     postedAt: j.epoch ? j.epoch * 1000 : null,
     title,

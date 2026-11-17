@@ -3,6 +3,7 @@
  * Провайдер (scripts/providers/<source>.ts) только загружает страницы списка и переводит
  * вакансию площадки в поля front matter; лимиты, предфильтр, дедупликация, seen и лог — здесь.
  */
+import { geoscreen } from './geoscreen.ts';
 import { freshnessDays } from './freshness.ts';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -31,6 +32,7 @@ export interface RawJob {
   tags: string[];
   /** причина отсеять ещё до предфильтра (формат работы, не вакансия) — учитывается как отсеянная */
   skip?: string;
+  preview?: Partial<VacancyData>;
   /** поля front matter сверх blankVacancy() и markdown-тело */
   build(): Promise<{ data: Partial<VacancyData>; body: string }> | { data: Partial<VacancyData>; body: string };
 }
@@ -280,11 +282,12 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
         // наверху ленты не должна останавливать сбор
         const old = !p.snapshot && j.postedAt != null && j.postedAt < minTime;
         // отсеянная раньше, но проходящая предфильтр сейчас (его расширили) — не «известная», собираем заново
-        const refiltered = !idx.byId.has(id) && seen.isPrefiltered(id) && !j.skip && prefilter(j.title, j.tags).ok;
-        const known = !refiltered && (idx.byId.has(id) || seen.has(id));
+        const refiltered = (!idx.byId.has(id) || !!idx.byId.get(id)?.data.prefilter_reason) && seen.isPrefiltered(id) && !j.skip && prefilter(j.title, j.tags).ok;
+        const missingStub = !idx.byId.has(id) && seen.isPrefiltered(id);
+        const known = !refiltered && !missingStub && (idx.byId.has(id) || seen.has(id));
         if (p.snapshot && known) {
           stats.known++;
-          seen.add(id); // вакансия всё ещё открыта — не даём записи устареть
+          seen.add(id, !!idx.byId.get(id)?.data.prefilter_reason); // вакансия всё ещё открыта — не даём записи устареть
           continue;
         }
         if (old || known) {
@@ -302,13 +305,15 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
         seenStreak = 0;
 
         try {
-          const f = j.skip ? { ok: false, reason: j.skip } : prefilter(j.title, j.tags);
+          const geo = geoscreen({ location: j.preview?.location });
+          const skip = j.skip ?? (geo.hire_from_ar === 'no' ? geo.hire_from_ar_evidence : null);
+          const f = skip ? { ok: false, reason: skip } : prefilter(j.title, j.tags);
           if (!f.ok) {
             stats.prefiltered++;
             seen.add(id, true);
             rejected.push(`- ${j.title} — ${j.company} (${f.reason})`);
             if (!opts.dryRun) {
-              const built = await j.build();
+              const built = { data: j.preview ?? {}, body: `# ${j.title} — ${j.company}\n\nЗаглушка: полное описание ещё не загружено.\n` };
               const data: VacancyData = { ...blankVacancy(SOURCE, j.extId), title: j.title, company: j.company || 'Unknown', tags: j.tags, ...built.data, id, prefilter_reason: f.reason };
               writeVacancy(vacancyPath(data.collected_at, SOURCE, data.company, data.title, j.extId), data, built.body);
             }
@@ -317,9 +322,14 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
 
           const built = await j.build();
           const data: VacancyData = { ...blankVacancy(SOURCE, j.extId), title: j.title, company: j.company || 'Unknown', tags: j.tags, ...built.data, id };
+          const builtGeo = geoscreen({ location: data.location });
+          if (builtGeo.hire_from_ar === 'no') {
+            Object.assign(data, builtGeo);
+            data.prefilter_reason = builtGeo.hire_from_ar_evidence;
+          }
           if (!data.source_url) throw new Error('no source_url');
           const urls = [data.source_url, data.real_url].filter(Boolean) as string[];
-          const dup = findDuplicate(idx, { id, urls, company: data.company, title: data.title });
+          const dup = refiltered ? undefined : findDuplicate(idx, { id, urls, company: data.company, title: data.title });
 
           // company+title в том же источнике при другом id — та же роль в другой стране/офисе: одна запись,
           // локации сливаются в location, ссылка (с id) — в duplicates; скорить одно и то же дважды незачем
@@ -366,6 +376,7 @@ async function collectSource(p: Provider, opts: CollectOptions, { all, idx }: Co
           data.apply_channels = baseChannels(data, built.body);
           deriveApply(data);
           let file = vacancyPath(data.collected_at, SOURCE, data.company, data.title, j.extId);
+          if (refiltered && idx.byId.get(id)?.data.prefilter_reason && !opts.dryRun) fs.unlinkSync(idx.byId.get(id)!.file);
           if (fs.existsSync(file)) throw new Error(`[bug] коллизия имени файла (другая вакансия уже записана под этим именем): ${path.relative(process.cwd(), file)}`);
           if (!opts.dryRun) writeVacancy(file, data, built.body);
           const vf = { file, data, body: built.body };
